@@ -8,8 +8,8 @@ from apps.employees.models import Employee
 from apps.organization import services
 from apps.organization.models import Department, Designation
 
-from .hr_views import hr_perm
-from .org_forms import DepartmentForm, DesignationForm
+from apps.web.access import hr_perm
+from apps.web.forms.organization import DepartmentForm, DesignationForm
 
 WORKING = [Employee.Status.ACTIVE, Employee.Status.ON_NOTICE]
 
@@ -36,7 +36,7 @@ def department_list(request):
     counts = _staff_counts(request.user, "department", departments)
     for d in departments:
         d.staff = counts.get(d.pk, 0)
-    return render(request, "web/department_list.html",
+    return render(request, "web/organization/departments.html",
                   {"departments": departments, "multi_company": manageable.count() > 1})
 
 
@@ -86,7 +86,7 @@ def department_delete(request, pk):
         else:
             messages.success(request, f"{name} was deleted.")
             return redirect("web:department_list")
-    return render(request, "web/org_delete.html", {
+    return render(request, "web/organization/delete.html", {
         "kind": "department", "name": dept.name, "blockers": blocking, "active": dept.is_active,
         "can_change": request.user.has_perm("organization.change_department"),
         "toggle_url": reverse("web:department_toggle", args=[dept.pk]),
@@ -101,7 +101,7 @@ def designation_list(request):
     counts = _staff_counts(request.user, "designation", designations)
     for d in designations:
         d.staff = counts.get(d.pk, 0)
-    return render(request, "web/designation_list.html", {"designations": designations})
+    return render(request, "web/organization/designations.html", {"designations": designations})
 
 
 @hr_perm("organization.add_designation")
@@ -150,7 +150,7 @@ def designation_delete(request, pk):
         else:
             messages.success(request, f"{name} was deleted.")
             return redirect("web:designation_list")
-    return render(request, "web/org_delete.html", {
+    return render(request, "web/organization/delete.html", {
         "kind": "designation", "name": d.name, "blockers": blocking, "active": d.is_active,
         "can_change": request.user.has_perm("organization.change_designation"),
         "toggle_url": reverse("web:designation_toggle", args=[d.pk]),

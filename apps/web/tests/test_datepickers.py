@@ -11,7 +11,7 @@ from django.urls import reverse
 from apps.compliance import services
 from apps.compliance.testing import ComplianceCase
 from apps.web.calendar_hints import leave_calendar_hints
-from apps.web.forms import date_input
+from apps.web.forms.common import date_input
 
 ASSETS = ["web/vendor/air-datepicker/air-datepicker.js", "web/vendor/air-datepicker/air-datepicker.css",
           "web/datepickers.js", "web/datepicker-theme.css"]

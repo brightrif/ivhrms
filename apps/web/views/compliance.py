@@ -15,8 +15,14 @@ from apps.compliance import schedule, services
 from apps.compliance.models import Document, DocumentType, RenewalPayment, RenewalTask
 from apps.organization.services import companies_for
 
-from .compliance_forms import (DocumentForm, DocumentTypeForm, PaymentForm, RenewalTaskForm, RenewForm)
-from .hr_views import hr_perm
+from apps.web.forms.compliance import (
+    DocumentForm,
+    DocumentTypeForm,
+    PaymentForm,
+    RenewalTaskForm,
+    RenewForm,
+)
+from apps.web.access import hr_perm
 
 Company_types = DocumentType.AppliesTo.COMPANY
 
@@ -75,7 +81,7 @@ def _back(doc):
 
 @hr_perm("compliance.view_document")
 def dashboard(request):
-    return render(request, "web/compliance_dashboard.html", services.dashboard(request.user))
+    return render(request, "web/compliance/dashboard.html", services.dashboard(request.user))
 
 
 @hr_perm("compliance.view_document")
@@ -103,7 +109,7 @@ def document_list(request):
     if state in (schedule.EXPIRED, schedule.DUE, schedule.VALID):
         docs = [d for d in docs if d.is_current and d.state == state]
     companies = companies_for(request.user)
-    return render(request, "web/compliance_documents.html", {
+    return render(request, "web/compliance/documents.html", {
         "docs": docs, "q": q, "company": company, "dtype": dtype, "state": state, "history": history,
         "companies": companies, "multi_company": companies.count() > 1,
         "types": DocumentType.objects.filter(is_active=True, applies_to=Company_types),
@@ -118,7 +124,7 @@ def document_detail(request, pk):
     chain = [doc] + doc.older_versions()
     tasks = list(RenewalTask.objects.filter(document__in=chain)
                  .select_related("assignee", "document").prefetch_related("payments__paid_by"))
-    return render(request, "web/compliance_detail.html", {
+    return render(request, "web/compliance/detail.html", {
         "doc": doc, "history": chain[1:], "newer": doc.newer_version(), "tasks": tasks,
         "open_task": next((t for t in tasks if t.status == RenewalTask.Status.OPEN and t.document_id == doc.pk), None),
         "alerts": doc.alerts.all()[:8]})
@@ -261,7 +267,7 @@ def costs(request):
         year = int(request.GET.get("year", ""))
     except ValueError:
         year = years[0] if years else timezone.localdate().year
-    return render(request, "web/compliance_costs.html", {
+    return render(request, "web/compliance/costs.html", {
         "year": year, "years": years or [year], **services.cost_report(request.user, year)})
 
 
@@ -269,7 +275,7 @@ def costs(request):
 
 @hr_perm("compliance.view_documenttype")
 def type_list(request):
-    return render(request, "web/compliance_types.html", {
+    return render(request, "web/compliance/types.html", {
         "types": DocumentType.objects.filter(applies_to=Company_types).order_by("-is_active", "name")})
 
 

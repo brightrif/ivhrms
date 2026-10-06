@@ -14,7 +14,7 @@ from apps.compliance.validators import validate_extension, validate_file_size
 from apps.organization.models import Company
 from apps.organization.services import companies_for
 
-from .forms import date_input
+from apps.web.forms.common import date_input
 
 # A plain FileInput on purpose: the "Currently: <link>" widget would ask for a public URL, and these files have none.
 SCAN_ATTRS = {"accept": ".pdf,.jpg,.jpeg,.png"}

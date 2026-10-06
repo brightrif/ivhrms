@@ -1,30 +1,26 @@
+"""Staff records: list, add, edit, change assignment and logins (HR)."""
+
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required, permission_required
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.cache import patch_vary_headers
+from django.utils.html import format_html
 from django.views.decorators.http import require_POST
 
-from apps.employees import services
+from apps.employees import numbering, services
 from apps.employees.models import Employee
 from apps.organization.services import companies_for
-
-from django.http import HttpResponse
-from django.utils.html import format_html
-
-from apps.employees import numbering
-
-
-from .hr_forms import ASSIGNMENT_FIELDS, AssignmentForm, EmployeeForm, EmployeePersonalForm
-
-
-def hr_perm(perm):
-    def decorator(view):
-        return login_required(permission_required(perm, raise_exception=True)(view))
-    return decorator
+from apps.web.access import hr_perm
+from apps.web.forms.staff import (
+    ASSIGNMENT_FIELDS,
+    AssignmentForm,
+    EmployeeForm,
+    EmployeePersonalForm,
+)
 
 
 def _scoped_employee(request, pk):
@@ -59,7 +55,7 @@ def employee_list(request):
         "statuses": Employee.Status.choices, "worker_types": Employee.WorkerType.choices,
     }
     partial = request.headers.get("HX-Request") == "true" and not request.headers.get("HX-History-Restore-Request")
-    resp = render(request, "web/_employee_table.html" if partial else "web/employee_list.html", ctx)
+    resp = render(request, "web/staff/_table.html" if partial else "web/staff/list.html", ctx)
     patch_vary_headers(resp, ["HX-Request"])
     return resp
 
@@ -83,14 +79,14 @@ def employee_create(request):
                 return redirect("web:employee_detail", pk=employee.pk)
     else:
         form = EmployeeForm(user=request.user, initial={"joining_date": timezone.localdate()})
-    return render(request, "web/employee_form.html", {"form": form})
+    return render(request, "web/staff/form.html", {"form": form})
 
 
 @hr_perm("employees.add_employee")
 def employee_company_fields(request):
     """HTMX: the company-dependent dropdowns (department, manager, shift)."""
     form = EmployeeForm(user=request.user, company_id=request.GET.get("company"))
-    return render(request, "web/_employee_company_fields.html", {"form": form})
+    return render(request, "web/staff/_company_fields.html", {"form": form})
 
 
 @hr_perm("employees.view_employee")
@@ -102,7 +98,7 @@ def employee_detail(request, pk):
     else:
         credentials = None
     history = emp.history.select_related("department", "designation", "reporting_manager")
-    return render(request, "web/employee_detail.html",
+    return render(request, "web/staff/detail.html",
                   {"employee": emp, "history": history, "credentials": credentials})
 
 

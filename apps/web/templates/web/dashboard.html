@@ -46,7 +46,7 @@
   <table class="table table-hover align-middle mb-0">
     <thead class="table-light"><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th><th></th></tr></thead>
     <tbody>
-    {% for l in leaves %}{% include "web/_leave_row.html" %}{% empty %}
+    {% for l in leaves %}{% include "web/leave/_row.html" %}{% empty %}
       <tr><td colspan="5" class="text-center text-body-secondary py-4">No leave requests yet.</td></tr>
     {% endfor %}
     </tbody>

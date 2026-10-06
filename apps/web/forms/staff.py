@@ -11,7 +11,7 @@ from apps.employees.models import Employee, EmploymentRecord
 from apps.organization.models import Department, Designation, Grade, Location
 from apps.organization.services import companies_for
 
-from .forms import date_input
+from apps.web.forms.common import date_input
 
 ASSIGNMENT_FIELDS = ("employment_type", "department", "designation", "grade", "location", "reporting_manager")
 

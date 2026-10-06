@@ -7,8 +7,8 @@ from django.views.decorators.http import require_POST
 from apps.employees.models import Employee
 from apps.organization import services
 
-from .company_forms import CompanyForm
-from .hr_views import hr_perm
+from apps.web.forms.companies import CompanyForm
+from apps.web.access import hr_perm
 
 
 def _company(request, pk):
@@ -22,7 +22,7 @@ def company_list(request):
     companies = (services.manageable_companies(request.user)
                  .annotate(staff=Count("employees", filter=Q(employees__status__in=working)))
                  .order_by("-is_active", "name"))
-    return render(request, "web/company_list.html", {"companies": companies})
+    return render(request, "web/companies/list.html", {"companies": companies})
 
 
 @hr_perm("organization.add_company")
@@ -79,5 +79,5 @@ def company_delete(request, pk):
                 return redirect("web:company_list")
         else:
             error = "That does not match the company code. Nothing was deleted."
-    return render(request, "web/company_delete.html",
+    return render(request, "web/companies/delete.html",
                   {"company": company, "blockers": blocking, "error": error})

@@ -35,8 +35,8 @@
 </div>
 {% endif %}
 
-{% include "web/_compliance_doc_table.html" with docs=overdue title="Overdue" empty="Nothing is overdue." %}
-{% include "web/_compliance_doc_table.html" with docs=due title="Due soon" empty="Nothing is inside its alert window." %}
+{% include "web/compliance/_doc_table.html" with docs=overdue title="Overdue" empty="Nothing is overdue." %}
+{% include "web/compliance/_doc_table.html" with docs=due title="Due soon" empty="Nothing is inside its alert window." %}
 
 <div class="card shadow-sm border-0 mb-3">
   <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -64,5 +64,5 @@
   </div>
 </div>
 
-{% include "web/_compliance_doc_table.html" with docs=upcoming title="Coming up (next 90 days)" empty="Nothing else expires in the next 90 days." %}
+{% include "web/compliance/_doc_table.html" with docs=upcoming title="Coming up (next 90 days)" empty="Nothing else expires in the next 90 days." %}
 {% endblock %}
