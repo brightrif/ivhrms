@@ -2,7 +2,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from .models import Vehicle, normalise_chassis, normalise_plate
-
+from .usage import OdometerReading
 
 class VehicleError(Exception):
     pass
@@ -42,6 +42,9 @@ def create_vehicle(user, vehicle):
         vehicle.save()
     except IntegrityError as exc:
         raise VehicleError("This plate or chassis number is already registered.") from exc
+    if vehicle.odometer:
+        OdometerReading.objects.create(vehicle=vehicle, reading_on=timezone.localdate(),
+                                       odometer=vehicle.odometer, source=OdometerReading.Source.INITIAL)
     return vehicle
 
 

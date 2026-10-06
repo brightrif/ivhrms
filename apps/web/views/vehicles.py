@@ -9,6 +9,7 @@ from apps.compliance.models import Document, DocumentType
 from apps.organization.services import companies_for
 from apps.vehicles import services
 from apps.vehicles.models import Vehicle
+from apps.vehicles.usage import VehicleAssignment
 
 from apps.web.access import hr_perm
 from apps.web.forms.vehicles import SellForm, VehicleDocumentForm, VehicleForm
@@ -51,9 +52,12 @@ def vehicle_list(request):
     status = request.GET.get("status", "")
     companies = companies_for(request.user)
     qs = (Vehicle.objects.for_user(request.user).select_related("company")
-          .prefetch_related(Prefetch("documents", to_attr="current_docs",
-                                     queryset=Document.objects.filter(is_current=True)
-                                     .select_related("document_type"))))
+          .prefetch_related(
+              Prefetch("documents", to_attr="current_docs",
+                       queryset=Document.objects.filter(is_current=True).select_related("document_type")),
+              Prefetch("assignments", to_attr="open_assignments",
+                       queryset=VehicleAssignment.objects.filter(assigned_to__isnull=True)
+                       .select_related("employee"))))
     if q:
         qs = qs.filter(Q(plate_number__icontains=q) | Q(make__icontains=q) | Q(model__icontains=q)
                        | Q(chassis_number__icontains=q))
@@ -67,6 +71,7 @@ def vehicle_list(request):
     for v in vehicles:
         states = [d.state for d in v.current_docs]
         v.expired, v.due = states.count(schedule.EXPIRED), states.count(schedule.DUE)
+        v.driver = v.open_assignments[0].employee if v.open_assignments else None
     return render(request, "web/vehicles/list.html", {
         "vehicles": vehicles, "q": q, "company": company, "status": status, "companies": companies,
         "multi_company": companies.count() > 1, "statuses": Vehicle.Status.choices})
@@ -79,8 +84,11 @@ def vehicle_detail(request, pk):
     held = {d.document_type_id for d in docs}
     missing = [t for t in DocumentType.objects.filter(is_active=True, applies_to=DocumentType.AppliesTo.VEHICLE)
                if t.pk not in held]
-    return render(request, "web/vehicles/detail.html", {"vehicle": vehicle, "docs": docs, "missing": missing})
-
+    history = list(vehicle.assignments.select_related("employee")[:15])      # newest first, so the open one is in it
+    return render(request, "web/vehicles/detail.html", {
+        "vehicle": vehicle, "docs": docs, "missing": missing, "history": history,
+        "current": next((a for a in history if a.is_open), None),
+        "readings": list(vehicle.odometer_readings.all()[:6])})
 
 @hr_perm("vehicles.add_vehicle")
 def vehicle_create(request):

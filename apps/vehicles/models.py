@@ -6,7 +6,7 @@ from django.utils import timezone
 from apps.audit.registry import audited
 from apps.core.models import BaseModel
 from apps.core.scoping import CompanyQuerySet
-
+from .usage import OdometerReading, VehicleAssignment  # noqa: E402,F401  (registers the two new models)
 
 def normalise_plate(value):
     """Upper case with single spaces: '  ab  123 ' -> 'AB 123'."""

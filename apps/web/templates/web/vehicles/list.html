@@ -24,14 +24,14 @@
 
 <div class="card shadow-sm border-0"><div class="table-responsive">
   <table class="table table-hover align-middle mb-0">
-    <thead class="table-light"><tr><th>Plate</th><th>Vehicle</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Type</th><th class="text-end">Odometer</th><th>Documents</th><th>Status</th></tr></thead>
+    <thead class="table-light"><tr><th>Plate</th><th>Vehicle</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Driver</th><th class="text-end">Odometer</th><th>Documents</th><th>Status</th></tr></thead>
     <tbody>
     {% for v in vehicles %}
       <tr{% if v.status == "sold" %} class="table-light text-body-secondary"{% endif %}>
         <td><a class="fw-medium text-decoration-none" href="{% url 'web:vehicle_detail' v.pk %}">{{ v.plate_number }}</a></td>
         <td>{{ v.description|default:"-" }}</td>
         {% if multi_company %}<td>{{ v.company.code }}</td>{% endif %}
-        <td>{{ v.get_kind_display }}</td>
+        <td>{% if v.driver %}{{ v.driver.full_name }}{% if v.driver.status == "separated" %} <span class="badge text-bg-danger">Has left</span>{% endif %}{% else %}<span class="text-body-secondary">-</span>{% endif %}</td>
         <td class="text-end text-nowrap">{{ v.odometer }} km</td>
         <td class="text-nowrap">
           {% if v.expired %}<span class="badge text-bg-danger">{{ v.expired }} expired</span>{% endif %}
