@@ -171,7 +171,7 @@ class CompliancePageTests(ComplianceCase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("already has a current document", str(self.form_of(r).non_field_errors()))
         # a named one (e.g. a second vehicle) is fine
-        plate = DocumentType.objects.get(code="vehicle-registration")
+        plate = DocumentType.objects.get(code="insurance-policy")
         for ref in ("111111", "222222"):
             self.client.post(url, self.doc_data(document_type=plate.pk, reference_name=ref))
         self.assertEqual(Document.objects.filter(document_type=plate).count(), 2)
@@ -275,19 +275,22 @@ class CompliancePageTests(ComplianceCase):
 
     def test_hr_manages_document_types(self):
         url = reverse("web:compliance_type_create")
-        r = self.client.post(url, {"name": "Fire Safety Permit", "alert_days": "7, 60, 30", "overdue_repeat_days": "5",
-                                   "default_validity_months": "12"})
+        r = self.client.post(url, {"applies_to": "company", "name": "Fire Safety Permit", "alert_days": "7, 60, 30",
+                                   "overdue_repeat_days": "5", "default_validity_months": "12"})
         self.assertRedirects(r, reverse("web:compliance_types"))
         fire = DocumentType.objects.get(code="fire-safety-permit")
         self.assertEqual((fire.alert_days, fire.overdue_repeat_days, fire.applies_to), ([60, 30, 7], 5, "company"))
-        same_name = self.client.post(url, {"name": "fire safety  permit", "overdue_repeat_days": "7"})
+        same_name = self.client.post(url, {"applies_to": "company", "name": "fire safety  permit", "overdue_repeat_days": "7"})
         self.assertIn("name", self.form_of(same_name).errors)            # two types may not share a name
-        self.client.post(url, {"name": "Fire-Safety Permit", "alert_days": "", "overdue_repeat_days": "7"})
+        self.client.post(url, {"applies_to": "company", "name": "Fire-Safety Permit", "alert_days": "",
+                               "overdue_repeat_days": "7"})
         second = DocumentType.objects.get(code="fire-safety-permit-2")    # same code, so it gets a suffix
         self.assertEqual(second.alert_days, [])                          # blank switches alerts off
-        taken = self.client.post(url, {"name": "Whatever", "code": "cr", "overdue_repeat_days": "7"})
+        taken = self.client.post(url, {"applies_to": "company", "name": "Whatever", "code": "cr",
+                                       "overdue_repeat_days": "7"})
         self.assertIn("code", self.form_of(taken).errors)
-        bad = self.client.post(url, {"name": "Broken", "alert_days": "soon", "overdue_repeat_days": "7"})
+        bad = self.client.post(url, {"applies_to": "company", "name": "Broken", "alert_days": "soon",
+                                     "overdue_repeat_days": "7"})
         self.assertIn("alert_days", self.form_of(bad).errors)
 
         edit = reverse("web:compliance_type_edit", args=[self.cr.pk])

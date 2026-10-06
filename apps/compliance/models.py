@@ -22,6 +22,7 @@ class DocumentType(BaseModel):
         COMPANY = "company", "Company"
         EMPLOYEE = "employee", "Employee"        # reserved for the employee documents phase
         DEPENDANT = "dependant", "Dependant"
+        VEHICLE = "vehicle", "Vehicle"
 
     code = models.SlugField(max_length=40, unique=True)
     name = models.CharField(max_length=120)
@@ -53,12 +54,20 @@ class DocumentType(BaseModel):
         return self.name
 
 
-@audited(module="compliance", company="company_id")
+@audited(module="compliance", company="company_id", subject="employee_id")
 class Document(BaseModel):
-    """One issued certificate. A renewal creates a NEW row linked to the old one, so history is kept."""
+    """One issued certificate. A renewal creates a NEW row linked to the old one, so history is kept.
+
+    It belongs to the company (CR, licences...) or to an employee (passport, residence permit...). Either way
+    `company` is filled in, so every company-scoped screen and rule keeps working."""
     company = models.ForeignKey("organization.Company", on_delete=models.PROTECT,
                                 related_name="compliance_documents")
+    vehicle = models.ForeignKey("vehicles.Vehicle", null=True, blank=True, on_delete=models.PROTECT,
+                                related_name="documents")
     document_type = models.ForeignKey(DocumentType, on_delete=models.PROTECT, related_name="documents")
+    employee = models.ForeignKey("employees.Employee", null=True, blank=True, on_delete=models.PROTECT,
+                                 related_name="compliance_documents",
+                                 help_text="Set for personal documents; empty for company documents.")
     reference_name = models.CharField(max_length=120, blank=True)
     number = models.CharField(max_length=60, blank=True)
     issue_date = models.DateField(null=True, blank=True)
@@ -80,20 +89,70 @@ class Document(BaseModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["company", "document_type", "reference_name"],
-                condition=models.Q(is_current=True), name="uniq_current_compliance_document",
+                condition=models.Q(is_current=True, employee__isnull=True, vehicle__isnull=True),
+                name="uniq_current_company_document",
                 violation_error_message="This company already has a current document of this type with "
                                         "the same reference. Renew that one, or give this one a "
                                         "different reference name."),
+            models.UniqueConstraint(
+                fields=["employee", "document_type", "reference_name"],
+                condition=models.Q(is_current=True, employee__isnull=False), name="uniq_current_employee_document",
+                violation_error_message="This employee already has a current document of this type with "
+                                        "the same reference. Renew that one, or give this one a "
+                                        "different reference name."),
+            models.UniqueConstraint(
+                fields=["vehicle", "document_type", "reference_name"],
+                condition=models.Q(is_current=True, vehicle__isnull=False), name="uniq_current_vehicle_document",
+                violation_error_message="This vehicle already has a current document of this type. Renew that one instead."),
             models.CheckConstraint(
                 condition=models.Q(issue_date__isnull=True) | models.Q(expiry_date__gte=models.F("issue_date")),
                 name="compliance_expiry_after_issue"),
         ]
-        indexes = [models.Index(fields=["company", "is_current", "expiry_date"])]
+        indexes = [models.Index(fields=["company", "is_current", "expiry_date"]),
+                   models.Index(fields=["employee", "is_current"])]
+
+    def save(self, *args, **kwargs):
+        # The company always follows the owner: the employee's company, or the vehicle's company.
+        if self.employee_id:
+            self.company_id = self.employee.company_id
+        elif self.vehicle_id:
+            self.company_id = self.vehicle.company_id
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        """The kind of document and its owner must match: company <-> neither, employee <-> an employee,
+        vehicle <-> a vehicle."""
+        super().clean()
+        if not self.document_type_id:
+            return
+        kinds = DocumentType.AppliesTo
+        kind = self.document_type.applies_to
+        if kind == kinds.EMPLOYEE and not self.employee_id:
+            raise ValidationError("A personal document type needs an employee.")
+        if kind == kinds.VEHICLE and not self.vehicle_id:
+            raise ValidationError("A vehicle document type needs a vehicle.")
+        if self.employee_id and kind != kinds.EMPLOYEE:
+            raise ValidationError("Only personal document types can be attached to an employee.")
+        if self.vehicle_id and kind != kinds.VEHICLE:
+            raise ValidationError("Only vehicle document types can be attached to a vehicle.")
+
+    @property
+    def is_employee_document(self):
+        return self.employee_id is not None
+
+    @property
+    def subject_label(self):
+        """Who or what the document is about: the employee, or else the company."""
+        if self.employee_id:
+            e = self.employee
+            return f"{e.full_name} ({e.employee_no})" if e.employee_no else e.full_name
+        return self.company.name
 
     @property
     def label(self):
         name = self.document_type.name
-        return f"{name} - {self.reference_name}" if self.reference_name else name
+        ref = self.vehicle.plate_number if self.vehicle_id else self.reference_name
+        return f"{name} - {ref}" if ref else name
 
     @property
     def days_left(self):
@@ -122,10 +181,12 @@ class Document(BaseModel):
         return self.next_versions.order_by("-id").first()
 
     def __str__(self):
+        if self.employee_id:
+            return f"{self.label} - {self.employee.full_name}"
         return f"{self.label} ({self.company.code})"
 
 
-@audited(module="compliance", company="company_id")
+@audited(module="compliance", company="company_id", subject="employee_id")
 class RenewalTask(BaseModel):
     """The to-do that opens before a document expires."""
 
@@ -163,6 +224,10 @@ class RenewalTask(BaseModel):
         super().save(*args, **kwargs)
 
     @property
+    def employee_id(self):
+        return self.document.employee_id
+
+    @property
     def paid_total(self):
         return sum((p.total for p in self.payments.all()), Decimal("0"))     # sum in Python, not SQL
 
@@ -170,7 +235,7 @@ class RenewalTask(BaseModel):
         return f"Renewal of {self.document}"
 
 
-@audited(module="compliance", company="company_id")
+@audited(module="compliance", company="company_id", subject="employee_id")
 class RenewalPayment(BaseModel):
     """Money actually paid for a renewal. A renewal can have several (CR fee, Chamber fee, agent...)."""
 
@@ -198,12 +263,18 @@ class RenewalPayment(BaseModel):
                                validators=[validate_extension, validate_file_size])
     paid_by = models.ForeignKey("accounts.User", null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name="+")
+    charged_to_employee = models.BooleanField(
+        default=False, help_text="The employee bears this cost (payroll will deduct it once payroll exists).")
     remarks = models.TextField(blank=True)
 
     objects = CompanyQuerySet.as_manager()
 
     class Meta:
         ordering = ["-paid_on", "-id"]
+
+    @property
+    def employee_id(self):
+        return self.task.document.employee_id
 
     @property
     def total(self):

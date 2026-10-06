@@ -31,7 +31,13 @@
     <div class="card shadow-sm border-0 h-100"><div class="card-body">
       <h2>Details</h2>
       <dl class="row gy-1 mb-0">
+        {% if doc.employee_id %}
+        <dt class="col-5 fw-normal text-body-secondary">Employee</dt>
+        <dd class="col-7 mb-0"><a class="text-decoration-none" href="{% url 'web:employee_detail' doc.employee_id %}">{{ doc.employee.full_name }}</a>
+          <span class="text-body-secondary small">{{ doc.employee.employee_no }}</span></dd>
+        {% endif %}
         <dt class="col-5 fw-normal text-body-secondary">Company</dt><dd class="col-7 mb-0">{{ doc.company.name }}</dd>
+        {% if doc.vehicle %}<dt class="col-5 fw-normal text-body-secondary">Vehicle</dt><dd class="col-7 mb-0"><a href="{% url 'web:vehicle_detail' doc.vehicle.pk %}">{{ doc.vehicle.plate_number }}</a></dd>{% endif %}
         <dt class="col-5 fw-normal text-body-secondary">Type</dt><dd class="col-7 mb-0">{{ doc.document_type.name }}</dd>
         {% if doc.reference_name %}<dt class="col-5 fw-normal text-body-secondary">Reference</dt><dd class="col-7 mb-0">{{ doc.reference_name }}</dd>{% endif %}
         <dt class="col-5 fw-normal text-body-secondary">Number</dt><dd class="col-7 mb-0">{{ doc.number|default:"-" }}</dd>
@@ -93,7 +99,7 @@
       {% for p in t.payments.all %}
         <tr>
           <td class="text-nowrap">{{ p.paid_on|date:"d M Y" }}</td>
-          <td>{{ p.description|default:"-" }}{% if p.paid_by %}<div class="small text-body-secondary">{{ p.paid_by.get_full_name|default:p.paid_by.username }}</div>{% endif %}</td>
+          <td>{{ p.description|default:"-" }}{% if p.charged_to_employee %} <span class="badge text-bg-light border" title="Payroll will deduct this from the employee">Charged to employee</span>{% endif %}{% if p.paid_by %}<div class="small text-body-secondary">{{ p.paid_by.get_full_name|default:p.paid_by.username }}</div>{% endif %}</td>
           <td class="text-end">{{ p.government_fee|floatformat:3 }}</td>
           <td class="text-end">{{ p.service_fee|floatformat:3 }}</td>
           <td class="text-end">{{ p.fine|floatformat:3 }}</td>

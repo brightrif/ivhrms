@@ -1,0 +1,54 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}{{ vehicle.plate_number }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0 d-flex flex-wrap align-items-center gap-2">{{ vehicle.plate_number }}
+    {% status_badge vehicle.badge_state vehicle.get_status_display %}</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_list' %}">All vehicles</a>
+    {% if vehicle.status != "sold" %}
+      {% if perms.vehicles.change_vehicle %}
+        <a class="btn btn-outline-primary" href="{% url 'web:vehicle_edit' vehicle.pk %}">Edit</a>
+        <a class="btn btn-outline-danger" href="{% url 'web:vehicle_sell' vehicle.pk %}">Mark as sold</a>
+      {% endif %}
+      {% if perms.compliance.add_document %}
+        <a class="btn btn-primary" href="{% url 'web:vehicle_document_create' vehicle.pk %}"><i class="bi bi-plus-lg me-1"></i>Add document</a>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <h2>Details</h2>
+      <dl class="row gy-1 mb-0">
+        <dt class="col-5 fw-normal text-body-secondary">Company</dt><dd class="col-7 mb-0">{{ vehicle.company.name }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Vehicle</dt><dd class="col-7 mb-0">{{ vehicle.description|default:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Type</dt><dd class="col-7 mb-0">{{ vehicle.get_kind_display }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Colour</dt><dd class="col-7 mb-0">{{ vehicle.colour|default:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Chassis (VIN)</dt><dd class="col-7 mb-0">{{ vehicle.chassis_number|default:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Fuel</dt><dd class="col-7 mb-0">{{ vehicle.get_fuel_type_display }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Ownership</dt><dd class="col-7 mb-0">{{ vehicle.get_ownership_display }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Odometer</dt><dd class="col-7 mb-0">{{ vehicle.odometer }} km</dd>
+        {% if vehicle.sold_on %}<dt class="col-5 fw-normal text-body-secondary">Sold on</dt><dd class="col-7 mb-0">{{ vehicle.sold_on|date:"d M Y" }}</dd>{% endif %}
+        {% if vehicle.notes %}<dt class="col-5 fw-normal text-body-secondary">Notes</dt><dd class="col-7 mb-0">{{ vehicle.notes|linebreaksbr }}</dd>{% endif %}
+      </dl>
+    </div></div>
+  </div>
+  <div class="col-lg-7">
+    {% include "web/compliance/_doc_table.html" with docs=docs title="Documents" empty="No documents on file for this vehicle." %}
+    {% if missing and vehicle.status != "sold" and perms.compliance.add_document %}
+    <div class="card shadow-sm border-0"><div class="card-body">
+      <h2>Not on file</h2>
+      <div class="d-flex flex-wrap gap-2">
+        {% for t in missing %}
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'web:vehicle_document_create' vehicle.pk %}?type={{ t.pk }}"><i class="bi bi-plus-lg me-1"></i>{{ t.name }}</a>
+        {% endfor %}
+      </div>
+    </div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -2,37 +2,52 @@
 {% load bs %}
 {% block title %}Document types{% endblock %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
   <h1 class="mb-0">Document types</h1>
   <div class="d-flex gap-2">
     <a class="btn btn-outline-secondary" href="{% url 'web:compliance_dashboard' %}">Dashboard</a>
     {% if perms.compliance.add_documenttype %}<a class="btn btn-primary" href="{% url 'web:compliance_type_create' %}"><i class="bi bi-plus-lg me-1"></i>Add type</a>{% endif %}
   </div>
 </div>
-<div class="card shadow-sm border-0"><div class="table-responsive">
-  <table class="table table-hover align-middle mb-0">
-    <thead class="table-light"><tr><th>Type</th><th>Authority</th><th>Usual validity</th><th>Alerts (days before)</th><th>Required</th><th>Status</th><th></th></tr></thead>
-    <tbody>
-    {% for t in types %}
-      <tr{% if not t.is_active %} class="opacity-75"{% endif %}>
-        <td><div class="fw-medium">{{ t.name }}</div>{% if t.name_ar %}<div class="small text-body-secondary" dir="rtl">{{ t.name_ar }}</div>{% endif %}</td>
-        <td>{{ t.authority|default:"-" }}</td>
-        <td>{% if t.default_validity_months %}{{ t.default_validity_months }} months{% else %}-{% endif %}</td>
-        <td>{% if t.alert_days %}{{ t.alert_days|join:", " }}{% else %}<span class="text-body-secondary">Off</span>{% endif %}</td>
-        <td>{% if t.is_mandatory %}<i class="bi bi-check-lg text-success"></i>{% else %}-{% endif %}</td>
-        <td>{% if t.is_active %}{% status_badge "active" "Active" %}{% else %}{% status_badge "separated" "Inactive" %}{% endif %}</td>
-        <td class="text-end text-nowrap">
-          {% if perms.compliance.change_documenttype %}
-          <a class="btn btn-sm btn-outline-primary" href="{% url 'web:compliance_type_edit' t.pk %}">Edit</a>
-          <form method="post" action="{% url 'web:compliance_type_toggle' t.pk %}" class="d-inline"
-                onsubmit="return confirm('{% if t.is_active %}Deactivate{% else %}Reactivate{% endif %} {{ t.name|escapejs }}?')">
-            {% csrf_token %}<button class="btn btn-sm btn-outline-secondary">{% if t.is_active %}Deactivate{% else %}Reactivate{% endif %}</button></form>
-          {% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div></div>
+
+<div class="row g-3">
+{% regroup types by applies_to as groups %}
+{% for group in groups %}
+  <div class="col-xl-6">
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">{% if group.grouper == "employee" %}Employee documents{% else %}Company documents{% endif %}</span>
+        <span class="badge text-bg-light border">{{ group.list|length }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle mb-0">
+          <thead class="table-light"><tr><th>Type</th><th>Alerts (days before)</th><th></th></tr></thead>
+          <tbody>
+          {% for t in group.list %}
+            <tr{% if not t.is_active %} class="opacity-75"{% endif %}>
+              <td title="{{ t.authority }}">
+                <span class="fw-medium">{{ t.name }}</span>
+                {% if t.is_mandatory %}<span class="badge text-bg-light border" title="{% if t.applies_to == 'employee' %}Counted in the staff coverage list{% else %}Shown as missing if the company has none{% endif %}">Required</span>{% endif %}
+                {% if not t.is_active %}<span class="badge text-bg-secondary">Inactive</span>{% endif %}
+              </td>
+              <td class="small text-nowrap">{% if t.alert_days %}{{ t.alert_days|join:", " }}{% else %}<span class="text-body-secondary">Off</span>{% endif %}</td>
+              <td class="text-end text-nowrap">
+                {% if perms.compliance.change_documenttype %}
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'web:compliance_type_edit' t.pk %}">Edit</a>
+                <form method="post" action="{% url 'web:compliance_type_toggle' t.pk %}" class="d-inline"
+                      onsubmit="return confirm('{% if t.is_active %}Deactivate{% else %}Reactivate{% endif %} {{ t.name|escapejs }}?')">
+                  {% csrf_token %}<button class="btn btn-sm btn-outline-secondary" title="{% if t.is_active %}Deactivate{% else %}Reactivate{% endif %}"
+                          aria-label="{% if t.is_active %}Deactivate{% else %}Reactivate{% endif %}"><i class="bi {% if t.is_active %}bi-slash-circle{% else %}bi-arrow-counterclockwise{% endif %}"></i></button></form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endfor %}
+</div>
 <p class="small text-body-secondary mt-2">A deactivated type stops sending alerts and disappears from new documents. Existing records are kept.</p>
 {% endblock %}

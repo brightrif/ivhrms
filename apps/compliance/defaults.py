@@ -18,11 +18,39 @@ DOCUMENT_TYPES = [
          authority="Insurer", default_validity_months=12),
     dict(code="lease-contract", name="Premises Lease Contract", name_ar="عقد الإيجار",
          authority="Landlord", default_validity_months=12),
-    dict(code="vehicle-registration", name="Vehicle Registration", name_ar="استمارة المركبة",
-         authority="Traffic Directorate", default_validity_months=12),
     dict(code="bank-guarantee", name="Bank Guarantee", name_ar="الضمان البنكي",
          authority="Bank", default_validity_months=12),
+     dict(code="vehicle-registration", name="Vehicle Registration", name_ar="استمارة المركبة",
+         authority="Traffic Directorate", default_validity_months=12, applies_to="vehicle"),
+    dict(code="vehicle-insurance", name="Vehicle Insurance", name_ar="تأمين المركبة",
+         authority="Insurer", default_validity_months=12, applies_to="vehicle"),
+    dict(code="vehicle-inspection", name="Periodic Vehicle Inspection", name_ar="الفحص الفني الدوري",
+         authority="Traffic Directorate", default_validity_months=12, applies_to="vehicle"),
 ]
+
+# Personal documents. "Required" means most staff are expected to hold one, so it is counted in the coverage list
+# (the missing page lets HR judge exceptions, e.g. a Bahraini needs no residence permit). Validity periods and alert days are placeholders to confirm with the client; they can be
+# edited on the Document types page. Work permits come from LMRA and residence permits from NPRA, and a work
+# permit can be renewed up to six months ahead, which is why those two start alerting early.
+EMPLOYEE_DOCUMENT_TYPES = [
+    dict(code="passport", is_mandatory=True, name="Passport", name_ar="جواز السفر", applies_to="employee",
+         authority="Issuing country", alert_days=[180, 90, 30, 7, 0]),
+    dict(code="cpr-card", is_mandatory=True, name="CPR Card (ID)", name_ar="البطاقة الذكية (CPR)", applies_to="employee",
+         authority="Population Registry (CPR)", alert_days=[60, 30, 14, 7, 0]),
+    dict(code="residence-permit", is_mandatory=True, name="Residence Permit", name_ar="تصريح الإقامة", applies_to="employee",
+         authority="NPRA (Nationality, Passports and Residence Affairs)", default_validity_months=24,
+         alert_days=[90, 60, 30, 14, 7, 0]),
+    dict(code="work-permit", is_mandatory=True, name="Work Permit", name_ar="تصريح العمل", applies_to="employee",
+         authority="LMRA (Labour Market Regulatory Authority)", default_validity_months=24,
+         alert_days=[90, 60, 30, 14, 7, 0]),
+    dict(code="health-insurance", is_mandatory=True, name="Health Insurance", name_ar="التأمين الصحي", applies_to="employee",
+         authority="Insurer", default_validity_months=12, alert_days=[60, 30, 14, 7, 0]),
+    dict(code="driving-licence", name="Driving Licence", name_ar="رخصة القيادة", applies_to="employee",
+         authority="Traffic Directorate", alert_days=[60, 30, 14, 7, 0]),
+    dict(code="employment-contract", name="Employment Contract (fixed term)", name_ar="عقد العمل",
+         applies_to="employee", authority="Employer", alert_days=[60, 30, 14, 0]),
+]
+DOCUMENT_TYPES += EMPLOYEE_DOCUMENT_TYPES
 
 _VIEW = ["view_document", "view_renewaltask", "view_renewalpayment"]
 

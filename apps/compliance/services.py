@@ -7,10 +7,12 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mass_mail
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
+from apps.employees.models import Employee
 from apps.organization.services import companies_for
 
 from . import schedule
@@ -38,12 +40,24 @@ def add_months(d, months):
 # ---------------------------------------------------------------- documents
 
 def current_documents(user):
+    """Current documents the user may see. Documents of people who have left the company, and of sold
+    vehicles, are not chased."""
     return (Document.objects.filter(is_current=True, document_type__is_active=True)
-            .for_user(user).select_related("company", "document_type", "responsible"))
+            .for_user(user).select_related("company", "document_type", "responsible", "employee", "vehicle")
+            .exclude(employee__status=Employee.Status.SEPARATED)
+            .exclude(vehicle__status="sold"))                # "sold" = Vehicle.Status.SOLD, a literal to avoid an import
+
+
 
 
 @transaction.atomic
 def create_document(user, doc):
+    try:
+        doc.clean()                                   # company type <-> no employee, employee type <-> an employee
+    except ValidationError as exc:
+        raise ComplianceError(" ".join(exc.messages)) from exc
+    if doc.employee_id and doc.employee.status == Employee.Status.SEPARATED:
+        raise ComplianceError("This employee has left the company.")
     try:
         doc.save()
     except IntegrityError as exc:
@@ -70,12 +84,15 @@ def renew_document(doc, user, *, expiry_date, number="", issue_date=None, file=N
         raise ComplianceError(f"The new expiry date must be later than the current one ({old.expiry_date:%d %b %Y}).")
     if issue_date and expiry_date < issue_date:
         raise ComplianceError("The expiry date cannot be before the issue date.")
+    if old.employee_id and old.employee.status == Employee.Status.SEPARATED:
+        raise ComplianceError("This employee has left the company.")
 
     old.is_current = False
     old.save(update_fields=["is_current"])
-    new = Document(company_id=old.company_id, document_type_id=old.document_type_id,
+    new = Document(company_id=old.company_id, employee_id=old.employee_id, document_type_id=old.document_type_id,
                    reference_name=old.reference_name, number=number or old.number, issue_date=issue_date,
                    expiry_date=expiry_date, responsible_id=old.responsible_id, agent_name=old.agent_name,
+                   vehicle_id=old.vehicle_id,
                    notes=notes, previous=old)
     if file:
         new.file = file
@@ -119,6 +136,8 @@ def record_payment(task, payment):
         raise ComplianceError("This renewal was cancelled, so no payment can be recorded against it.")
     if payment.total <= 0:
         raise ComplianceError("Enter at least one amount greater than zero.")
+    if payment.charged_to_employee and not task.document.employee_id:
+        raise ComplianceError("Only the cost of an employee's document can be charged to the employee.")
     payment.task = task
     payment.save()
     return payment
@@ -135,8 +154,32 @@ def mandatory_missing(user):
     return [(c, t) for c in companies for t in types if (c.pk, t.pk) not in held]
 
 
+def coverage(user):
+    """For each required personal document type: how many active employees have a current one on file."""
+    staff = Employee.objects.for_user(user).exclude(status=Employee.Status.SEPARATED)
+    total = staff.count()
+    types = list(DocumentType.objects.filter(is_active=True, is_mandatory=True,
+                                             applies_to=DocumentType.AppliesTo.EMPLOYEE))
+    if not total or not types:
+        return []
+    held = defaultdict(set)
+    for type_id, employee_id in (Document.objects.filter(is_current=True, document_type__in=types, employee__in=staff)
+                                 .values_list("document_type_id", "employee_id")):
+        held[type_id].add(employee_id)
+    return [{"type": t, "total": total, "have": len(held[t.pk]), "missing": total - len(held[t.pk]),
+             "pct": round(100 * len(held[t.pk]) / total)} for t in types]
+
+
+def employees_missing(user, dtype):
+    """Active employees with no current document of this type, for HR to follow up (some may not need one)."""
+    have = Document.objects.filter(is_current=True, document_type=dtype, employee__isnull=False).values("employee_id")
+    return (Employee.objects.for_user(user).exclude(status=Employee.Status.SEPARATED).exclude(pk__in=have)
+            .select_related("company").order_by("company__name", "employee_no"))
+
+
 def dashboard(user):
     overdue, due, upcoming = [], [], []
+    company_rows, employee_rows = [], []              # everything that needs a look, by whom it belongs to
     for doc in current_documents(user):
         state, left = doc.state, doc.days_left
         if state == schedule.EXPIRED:
@@ -145,11 +188,15 @@ def dashboard(user):
             due.append(doc)
         elif left <= UPCOMING_DAYS:
             upcoming.append(doc)
+        else:
+            continue
+        (employee_rows if doc.employee_id else company_rows).append(doc)
     tasks = (RenewalTask.objects.for_user(user).filter(status=TaskStatus.OPEN)
-             .select_related("company", "assignee", "document__document_type")
+             .select_related("company", "assignee", "document__document_type", "document__employee")
              .prefetch_related("payments"))
     return {"overdue": overdue, "due": due, "upcoming": upcoming, "open_tasks": list(tasks),
-            "missing": mandatory_missing(user)}
+            "missing": mandatory_missing(user), "company_rows": company_rows, "employee_rows": employee_rows,
+            "coverage": coverage(user)}
 
 
 def attention_count(user):
@@ -159,7 +206,8 @@ def attention_count(user):
 
 def cost_report(user, year):
     """Payments in a year grouped by company and document type. Summed in Python (BHD has 3 decimals)."""
-    rows = defaultdict(lambda: {"government": Decimal("0"), "service": Decimal("0"), "fine": Decimal("0"), "count": 0})
+    rows = defaultdict(lambda: {"government": Decimal("0"), "service": Decimal("0"), "fine": Decimal("0"),
+                                "charged": Decimal("0"), "count": 0})
     payments = (RenewalPayment.objects.for_user(user).filter(paid_on__year=year)
                 .select_related("company", "task__document__document_type"))
     for p in payments:
@@ -168,7 +216,10 @@ def cost_report(user, year):
         row["service"] += p.service_fee
         row["fine"] += p.fine
         row["count"] += 1
-    table, grand = [], {"government": Decimal("0"), "service": Decimal("0"), "fine": Decimal("0")}
+        if p.charged_to_employee:
+            row["charged"] += p.total
+    table, grand = [], {"government": Decimal("0"), "service": Decimal("0"), "fine": Decimal("0"),
+                        "charged": Decimal("0")}
     for (company, dtype), r in sorted(rows.items(), key=lambda kv: (kv[0][0].name, kv[0][1].name)):
         r["total"] = r["government"] + r["service"] + r["fine"]
         table.append({"company": company, "type": dtype, **r})
@@ -205,7 +256,7 @@ def _link(doc):
 
 
 def build_message(doc, days_left):
-    name = f"{doc.label} - {doc.company.name}"
+    name = f"{doc.label} - {doc.subject_label}"
     if days_left > 0:
         subject = f"[Compliance] {name} expires in {days_left} day{'s' if days_left != 1 else ''}"
         when = f"expires on {doc.expiry_date:%d %b %Y} ({days_left} day{'s' if days_left != 1 else ''} from now)"
@@ -216,6 +267,8 @@ def build_message(doc, days_left):
         subject = f"[Compliance] OVERDUE: {name} expired {-days_left} day{'s' if days_left != -1 else ''} ago"
         when = f"EXPIRED on {doc.expiry_date:%d %b %Y} ({-days_left} day{'s' if days_left != -1 else ''} ago)"
     lines = [f"{name} {when}.", ""]
+    if doc.employee_id:
+        lines.append(f"Company: {doc.company.name}")
     if doc.number:
         lines.append(f"Number: {doc.number}")
     if doc.responsible:
@@ -242,7 +295,9 @@ def run_daily_scan(today=None):
     today = today or timezone.localdate()
     stats = {"checked": 0, "alerts": 0, "emails": 0, "tasks": 0, "errors": 0}
     docs = (Document.objects.filter(is_current=True, document_type__is_active=True, company__is_active=True)
-            .select_related("company", "document_type", "responsible"))
+            .exclude(employee__status=Employee.Status.SEPARATED)
+            .exclude(vehicle__status="sold")                 # a sold vehicle's documents are not chased
+            .select_related("company", "document_type", "responsible", "employee", "vehicle"))
     for doc in docs:
         stats["checked"] += 1
         left = (doc.expiry_date - today).days

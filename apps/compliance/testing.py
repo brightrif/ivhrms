@@ -6,6 +6,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.employees.models import Employee
 from apps.organization.models import Company, CompanyAccess
 
 from .models import Document, DocumentType
@@ -40,6 +41,23 @@ class ComplianceCase(TestCase):
         self.other_hr = make_user("hr2", "HR", self.other_co)
         self.nobody = make_user("nobody")                        # no permissions at all
         self.cr = DocumentType.objects.get(code="cr")
+        self.passport = DocumentType.objects.get(code="passport")
+        self.residence = DocumentType.objects.get(code="residence-permit")
+
+        def make_employee(company, no, first, **kwargs):
+            return Employee.objects.create(company=company, employee_no=no, first_name=first, last_name="Test",
+                                           joining_date=self.today - timedelta(days=400), **kwargs)
+
+        self.emp = make_employee(self.co, "IV-0001", "Ali", nationality="Indian")
+        self.emp2 = make_employee(self.co, "IV-0002", "Sara", nationality="Bahraini")
+        self.emp_other = make_employee(self.other_co, "X2-0001", "Zed")
+
+    def make_employee_doc(self, employee=None, days=25, *, dtype=None, **kwargs):
+        employee = employee or self.emp
+        kwargs.setdefault("responsible", self.pro)
+        return Document.objects.create(employee=employee, company=employee.company,
+                                       document_type=dtype or self.residence,
+                                       expiry_date=self.today + timedelta(days=days), **kwargs)
 
     def make_doc(self, days=25, *, dtype=None, company=None, **kwargs):
         kwargs.setdefault("responsible", self.pro)

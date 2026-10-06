@@ -10,22 +10,6 @@ python -m venv ivenv
 
 source ivenv/Scripts/activate
 
-# Git command for first time
-
-echo "# ivhrms" >> README.md
-git init
-git add README.md
-git commit -m "first commit"
-git branch -M main
-git remote add origin git@github.com:brightrif/ivhrms.git
-git push -u origin main
-
-# Git for update
-
-git add .
-git commit -m "comments"
-git push -u origin main
-
 # Istalled package
 
 pip install django django-environ "psycopg[binary]" celery redis

@@ -10,6 +10,7 @@ from apps.audit.models import AuditEvent
 from apps.compliance import schedule, services
 from apps.compliance.defaults import ensure_system_defaults
 from apps.compliance.models import (AlertLog, Document, DocumentType, RenewalPayment, RenewalTask)
+from apps.employees.models import Employee
 from apps.compliance.testing import ComplianceCase
 from apps.organization.models import Company
 
@@ -63,7 +64,8 @@ class DefaultsTests(ComplianceCase):
         cr = DocumentType.objects.get(code="cr")
         self.assertEqual((cr.default_validity_months, cr.is_mandatory, cr.alert_days), (12, True, [30, 14, 7, 1, 0]))
         self.assertIn("السجل", cr.name_ar)
-        self.assertEqual(DocumentType.objects.count(), 8)
+        kinds = DocumentType.objects.values_list("applies_to", flat=True)
+        self.assertEqual((sum(k == "company" for k in kinds), sum(k == "employee" for k in kinds)), (7, 7))
         self.assertTrue(self.hr.has_perm("compliance.add_document"))
         self.assertTrue(self.finance.has_perm("compliance.add_renewalpayment"))
         self.assertFalse(self.finance.has_perm("compliance.add_document"))
@@ -80,7 +82,7 @@ class DefaultsTests(ComplianceCase):
         ensure_system_defaults()
         cr = DocumentType.objects.get(code="cr")
         self.assertEqual((cr.alert_days, cr.name), ([60, 30], "Our CR"))
-        self.assertEqual(DocumentType.objects.count(), 8)
+        self.assertEqual(DocumentType.objects.count(), 17)
 
 
 class ScanTests(ComplianceCase):
@@ -236,7 +238,7 @@ class RenewalAndPaymentTests(ComplianceCase):
         with self.assertRaises(services.ComplianceError):
             services.create_document(self.hr, Document(company=self.co, document_type=self.cr,
                                                        expiry_date=self.today + timedelta(days=50)))
-        vehicle = DocumentType.objects.get(code="vehicle-registration")      # named ones can coexist
+        vehicle = DocumentType.objects.get(code="insurance-policy")      # named ones can coexist
         for plate in ("123456", "654321"):
             self.make_doc(100, dtype=vehicle, reference_name=plate)
         self.assertEqual(Document.objects.filter(document_type=vehicle).count(), 2)
@@ -322,3 +324,117 @@ class DashboardAndReportTests(ComplianceCase):
                           report["grand"]["total"]), (Decimal("70.000"), Decimal("10.500"), Decimal("20.000"),
                                                       Decimal("100.500")))
         self.assertEqual(services.payment_years(self.hr), [self.today.year])
+
+
+class EmployeeDocumentTests(ComplianceCase):
+    def test_personal_document_types_exist_with_early_alerts(self):
+        passport = DocumentType.objects.get(code="passport")
+        self.assertEqual((passport.applies_to, passport.alert_days[0]), ("employee", 180))   # six months' notice
+        work = DocumentType.objects.get(code="work-permit")
+        self.assertIn("LMRA", work.authority)
+        self.assertIn("NPRA", DocumentType.objects.get(code="residence-permit").authority)
+        required = set(DocumentType.objects.filter(applies_to="employee", is_mandatory=True).values_list("code", flat=True))
+        self.assertEqual(required, {"passport", "cpr-card", "residence-permit", "work-permit", "health-insurance"})
+
+    def test_a_personal_document_takes_the_employees_company(self):
+        doc = Document.objects.create(employee=self.emp_other, company=self.co, document_type=self.passport,
+                                      expiry_date=self.today + timedelta(days=400))
+        self.assertEqual(doc.company, self.other_co)                # whatever was passed, it follows the employee
+        self.assertEqual((doc.subject_label, doc.is_employee_document), ("Zed Test (X2-0001)", True))
+
+    def test_the_kind_of_document_and_its_owner_must_match(self):
+        far = self.today + timedelta(days=300)
+        cases = [
+            Document(company=self.co, document_type=self.passport, expiry_date=far),                       # no employee
+            Document(company=self.co, employee=self.emp, document_type=self.cr, expiry_date=far),          # company type
+        ]
+        for doc in cases:
+            with self.assertRaises(services.ComplianceError):
+                services.create_document(self.hr, doc)
+        self.emp.status = Employee.Status.SEPARATED
+        self.emp.save()
+        with self.assertRaisesMessage(services.ComplianceError, "left the company"):
+            services.create_document(self.hr, Document(employee=self.emp, document_type=self.passport, expiry_date=far))
+
+    def test_everyone_can_have_a_passport_but_only_one_current_each(self):
+        self.make_employee_doc(self.emp, 300, dtype=self.passport)
+        self.make_employee_doc(self.emp2, 300, dtype=self.passport)             # a colleague's passport does not clash
+        self.make_doc(300)                                                       # nor does the company's own CR
+        with self.assertRaises(services.ComplianceError):
+            services.create_document(self.hr, Document(employee=self.emp, document_type=self.passport,
+                                                       expiry_date=self.today + timedelta(days=200)))
+        self.assertEqual(Document.objects.filter(document_type=self.passport, is_current=True).count(), 2)
+
+    def test_renewing_keeps_the_employee(self):
+        old = self.make_employee_doc(self.emp, 20)
+        new = services.renew_document(old, self.hr, expiry_date=old.expiry_date + timedelta(days=730))
+        self.assertEqual((new.employee, new.company, new.previous), (self.emp, self.co, old))
+
+    def test_alert_names_the_employee_and_goes_to_the_usual_people(self):
+        self.make_employee_doc(self.emp, 25)
+        services.run_daily_scan(self.today)
+        self.assertEqual(sorted(m.to[0] for m in mail.outbox),
+                         ["fin@example.com", "hr@example.com", "pro@example.com"])
+        subject, body = mail.outbox[0].subject, mail.outbox[0].body
+        self.assertIn("Residence Permit - Ali Test (IV-0001)", subject)
+        self.assertIn("expires in 25 days", subject)
+        self.assertIn("Company: IV Spare Parts", body)
+        self.assertEqual(RenewalTask.objects.get().document.employee, self.emp)
+
+    def test_people_who_have_left_are_not_chased_but_company_documents_still_are(self):
+        self.make_employee_doc(self.emp, 25)
+        self.make_doc(25)
+        Employee.objects.filter(pk=self.emp.pk).update(status="separated")
+        stats = services.run_daily_scan(self.today)
+        self.assertEqual(stats["alerts"], 1)                                      # only the CR
+        self.assertEqual(AlertLog.objects.get().document.employee_id, None)
+        self.assertEqual(services.dashboard(self.hr)["employee_rows"], [])
+
+    def test_other_companies_hr_is_not_told_about_our_staff(self):
+        self.make_employee_doc(self.emp_other, 25, responsible=None)
+        services.run_daily_scan(self.today)
+        self.assertEqual([m.to[0] for m in mail.outbox], ["hr2@example.com"])
+
+    def test_audit_trail_is_about_the_employee(self):
+        doc = self.make_employee_doc(self.emp, 25)
+        event = AuditEvent.objects.get(module="compliance", action="create", object_id=str(doc.pk))
+        self.assertEqual((event.subject_employee_id, event.company_id), (self.emp.pk, self.co.pk))
+        task = services.open_renewal(doc)
+        services.record_payment(task, RenewalPayment(paid_on=self.today, government_fee=Decimal("20")))
+        for model in ("renewaltask", "renewalpayment"):
+            self.assertTrue(AuditEvent.objects.filter(module="compliance", action="create",
+                                                      subject_employee_id=self.emp.pk,
+                                                      content_type__model=model).exists(), model)
+
+    def test_dashboard_separates_company_and_employee_rows(self):
+        company = self.make_doc(10)
+        person = self.make_employee_doc(self.emp, 20)
+        self.make_employee_doc(self.emp_other, 5)                                 # another company's: invisible
+        data = services.dashboard(self.hr)
+        self.assertEqual((data["company_rows"], data["employee_rows"]), ([company], [person]))
+        self.assertEqual(services.attention_count(self.hr), 2)
+
+    def test_coverage_counts_active_staff_with_a_current_document(self):
+        self.make_employee_doc(self.emp, 300, dtype=self.passport)
+        Employee.objects.create(company=self.co, employee_no="IV-0009", first_name="Gone", joining_date=self.today,
+                                status="separated")
+        rows = {r["type"].code: r for r in services.coverage(self.hr)}
+        self.assertEqual((rows["passport"]["total"], rows["passport"]["have"], rows["passport"]["missing"],
+                          rows["passport"]["pct"]), (2, 1, 1, 50))               # the former employee is not counted
+        self.assertEqual(rows["cpr-card"]["missing"], 2)
+        self.assertNotIn("driving-licence", rows)                                # optional types are not counted
+        self.assertEqual(list(services.employees_missing(self.hr, self.passport)), [self.emp2])
+        self.assertEqual(services.coverage(self.nobody), [])                     # sees no company, so no staff
+
+    def test_cost_charged_to_the_employee_is_tracked_and_only_for_employee_documents(self):
+        task = services.open_renewal(self.make_employee_doc(self.emp, 25))
+        services.record_payment(task, RenewalPayment(paid_on=self.today, government_fee=Decimal("40.000"),
+                                                     charged_to_employee=True))
+        services.record_payment(task, RenewalPayment(paid_on=self.today, service_fee=Decimal("10.000")))
+        report = services.cost_report(self.hr, self.today.year)
+        self.assertEqual((report["grand"]["total"], report["grand"]["charged"]),
+                         (Decimal("50.000"), Decimal("40.000")))
+        company_task = services.open_renewal(self.make_doc(25))
+        with self.assertRaises(services.ComplianceError):
+            services.record_payment(company_task, RenewalPayment(paid_on=self.today, government_fee=Decimal("5"),
+                                                                 charged_to_employee=True))

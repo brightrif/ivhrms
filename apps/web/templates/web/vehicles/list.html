@@ -1,0 +1,49 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Vehicles{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Vehicles</h1>
+  {% if perms.vehicles.add_vehicle %}<a class="btn btn-primary" href="{% url 'web:vehicle_create' %}"><i class="bi bi-plus-lg me-1"></i>Add vehicle</a>{% endif %}
+</div>
+
+<form method="get" class="row g-2 mb-3 align-items-center">
+  <div class="col-md-4"><input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Search plate, make, model or chassis"></div>
+  {% if multi_company %}
+  <div class="col-6 col-md-3"><select name="company" class="form-select">
+    <option value="">All companies</option>
+    {% for c in companies %}<option value="{{ c.pk }}"{% if c.pk|stringformat:"s" == company %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+  </select></div>
+  {% endif %}
+  <div class="col-6 col-md-2"><select name="status" class="form-select">
+    <option value="">Not sold</option>
+    {% for value, label in statuses %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></div>
+  <div class="col-auto"><button class="btn btn-outline-primary">Filter</button></div>
+</form>
+
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Plate</th><th>Vehicle</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Type</th><th class="text-end">Odometer</th><th>Documents</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for v in vehicles %}
+      <tr{% if v.status == "sold" %} class="table-light text-body-secondary"{% endif %}>
+        <td><a class="fw-medium text-decoration-none" href="{% url 'web:vehicle_detail' v.pk %}">{{ v.plate_number }}</a></td>
+        <td>{{ v.description|default:"-" }}</td>
+        {% if multi_company %}<td>{{ v.company.code }}</td>{% endif %}
+        <td>{{ v.get_kind_display }}</td>
+        <td class="text-end text-nowrap">{{ v.odometer }} km</td>
+        <td class="text-nowrap">
+          {% if v.expired %}<span class="badge text-bg-danger">{{ v.expired }} expired</span>{% endif %}
+          {% if v.due %}<span class="badge text-bg-warning">{{ v.due }} due soon</span>{% endif %}
+          {% if not v.expired and not v.due %}{% if v.current_docs %}<span class="text-body-secondary small">{{ v.current_docs|length }} valid</span>{% else %}<span class="text-body-secondary small">None on file</span>{% endif %}{% endif %}
+        </td>
+        <td>{% status_badge v.badge_state v.get_status_display %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-center text-body-secondary py-4">No vehicles match.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

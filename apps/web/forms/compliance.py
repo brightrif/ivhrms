@@ -11,6 +11,7 @@ from django.utils.text import slugify
 from apps.compliance import schedule, services
 from apps.compliance.models import Document, DocumentType, RenewalPayment, RenewalTask
 from apps.compliance.validators import validate_extension, validate_file_size
+from apps.employees.models import Employee
 from apps.organization.models import Company
 from apps.organization.services import companies_for
 
@@ -41,10 +42,18 @@ def _people_field(field, user, include_pk=None, empty="Not assigned"):
     field.empty_label = empty
 
 
+def _employee_label(e):
+    return f"{e.employee_no} - {e.full_name}" if e.employee_no else e.full_name
+
+
 class DocumentForm(forms.ModelForm):
+    """A compliance document. `kind` is "company" (CR, licences...) or "employee" (passport, permits...).
+
+    An employee document takes its company from the employee, so the company box is not shown for it."""
+
     class Meta:
         model = Document
-        fields = ["company", "document_type", "reference_name", "number", "issue_date", "expiry_date",
+        fields = ["company", "employee", "document_type", "reference_name", "number", "issue_date", "expiry_date",
                   "responsible", "agent_name", "file", "notes"]
         widgets = {
             "issue_date": date_input(max="today"), "expiry_date": date_input(min_from="id_issue_date"),
@@ -52,25 +61,47 @@ class DocumentForm(forms.ModelForm):
         }
         labels = {"document_type": "Document type", "agent_name": "Handled by (agent / PRO)",
                   "file": "Scanned copy", "number": "Certificate / reference number"}
-        help_texts = {"reference_name": "Only if the company holds several of this type, e.g. a vehicle plate.",
+        help_texts = {"reference_name": "Only if there are several of this type, e.g. a branch name.",
                       "file": SCAN_HELP}
 
-    def __init__(self, *args, user, **kwargs):
+    def __init__(self, *args, user, kind="company", **kwargs):
         super().__init__(*args, **kwargs)
-        company, dtype = self.fields["company"], self.fields["document_type"]
-        if self.instance.pk:                         # the company and type of an existing document are fixed
-            company.queryset = Company.objects.filter(pk=self.instance.company_id)
-            dtype.queryset = DocumentType.objects.filter(pk=self.instance.document_type_id)
-            company.disabled = dtype.disabled = True
+        editing = bool(self.instance.pk)
+        if editing:
+            kind = "employee" if self.instance.employee_id else "company"
+        self.kind = kind
+        kinds = DocumentType.AppliesTo
+        company, employee, dtype = self.fields["company"], self.fields["employee"], self.fields["document_type"]
+        if kind == "company":
+            del self.fields["employee"]
         else:
-            companies = companies_for(user)
-            company.queryset = companies
-            ids = list(companies.values_list("pk", flat=True)[:2])
-            if len(ids) == 1:
-                self.initial.setdefault("company", ids[0])
-                company.widget = forms.HiddenInput()
-            dtype.queryset = DocumentType.objects.filter(is_active=True,
-                                                         applies_to=DocumentType.AppliesTo.COMPANY)
+            del self.fields["company"]                # an employee's document is in the employee's company
+            employee.help_text = ""                   # (the model's note is about the data, not about this form)
+
+        if editing:                                   # who and what an existing document is cannot change
+            dtype.queryset = DocumentType.objects.filter(pk=self.instance.document_type_id)
+            dtype.disabled = True
+            if kind == "company":
+                company.queryset = Company.objects.filter(pk=self.instance.company_id)
+                company.disabled = True
+            else:
+                employee.queryset = Employee.objects.filter(pk=self.instance.employee_id)
+                employee.disabled = True
+        else:
+            dtype.queryset = DocumentType.objects.filter(
+                is_active=True, applies_to=kinds.EMPLOYEE if kind == "employee" else kinds.COMPANY)
+            if kind == "company":
+                companies = companies_for(user)
+                company.queryset = companies
+                ids = list(companies.values_list("pk", flat=True)[:2])
+                if len(ids) == 1:
+                    self.initial.setdefault("company", ids[0])
+                    company.widget = forms.HiddenInput()
+            else:
+                employee.queryset = (Employee.objects.for_user(user).exclude(status=Employee.Status.SEPARATED)
+                                     .select_related("company").order_by("company__name", "employee_no"))
+                employee.label_from_instance = _employee_label
+                employee.empty_label = "Choose an employee"
             self.initial.setdefault("responsible", user.pk)
         _people_field(self.fields["responsible"], user, self.instance.responsible_id)
 
@@ -82,17 +113,22 @@ class DocumentForm(forms.ModelForm):
         issue, expiry = cd.get("issue_date"), cd.get("expiry_date")
         if issue and expiry and expiry < issue:
             self.add_error("expiry_date", "The expiry date cannot be before the issue date.")
-        company, dtype = cd.get("company"), cd.get("document_type")
-        if company and dtype:
-            # Checked here because Django skips a conditional unique rule whose condition field is not on the form
-            clash = Document.objects.filter(company=company, document_type=dtype, is_current=True,
-                                            reference_name=cd.get("reference_name", ""))
+        dtype, ref = cd.get("document_type"), cd.get("reference_name", "")
+        # Checked here because Django skips a conditional unique rule whose condition field is not on the form
+        if self.kind == "company":
+            owner = cd.get("company")
+            clash = Document.objects.filter(company=owner, employee__isnull=True,vehicle__isnull=True) if owner else None
+        else:
+            owner = cd.get("employee")
+            clash = Document.objects.filter(employee=owner) if owner else None
+        if clash is not None and dtype:
+            clash = clash.filter(document_type=dtype, is_current=True, reference_name=ref)
             if self.instance.pk:
                 clash = clash.exclude(pk=self.instance.pk)
             if clash.exists():
-                ref = cd.get("reference_name")
+                who = owner.name if self.kind == "company" else owner.full_name
                 raise ValidationError(
-                    f"{company.name} already has a current document of this type"
+                    f"{who} already has a current document of this type"
                     + (f" named '{ref}'" if ref else "")
                     + ". Renew it instead, or give this one a different reference name.")
         return cd
@@ -144,12 +180,14 @@ class PaymentForm(forms.ModelForm):
     class Meta:
         model = RenewalPayment
         fields = ["description", "paid_on", "government_fee", "service_fee", "fine", "method",
-                  "reference", "receipt", "paid_by", "remarks"]
+                  "reference", "receipt", "paid_by", "charged_to_employee", "remarks"]
         widgets = {"paid_on": date_input(max="today"), "receipt": forms.FileInput(attrs=SCAN_ATTRS),
                    "remarks": forms.Textarea(attrs={"rows": 2})}
         labels = {"government_fee": "Government fee (BHD)", "service_fee": "Service / agent fee (BHD)",
-                  "fine": "Late fine (BHD)", "reference": "Payment reference", "paid_by": "Paid by"}
-        help_texts = {"receipt": SCAN_HELP}
+                  "fine": "Late fine (BHD)", "reference": "Payment reference", "paid_by": "Paid by",
+                  "charged_to_employee": "Charge this cost to the employee"}
+        help_texts = {"receipt": SCAN_HELP,
+                      "charged_to_employee": "Payroll will deduct it once payroll exists. Tick it only if the employee pays."}
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
@@ -159,6 +197,8 @@ class PaymentForm(forms.ModelForm):
         if not self.initial.get("paid_by"):
             self.initial["paid_by"] = user.pk
         _people_field(self.fields["paid_by"], user, empty="Not recorded")
+        if not self.instance.task.document.employee_id:
+            del self.fields["charged_to_employee"]                 # a company document has no employee to charge
         for name in ("government_fee", "service_fee", "fine"):
             self.fields[name].required = False          # a cleared box means zero
 
@@ -182,21 +222,28 @@ class PaymentForm(forms.ModelForm):
 
 
 class DocumentTypeForm(forms.ModelForm):
+    applies_to = forms.ChoiceField(
+        label="Belongs to", choices=[(DocumentType.AppliesTo.COMPANY.value, "The company (CR, licences...)"),
+                                     (DocumentType.AppliesTo.EMPLOYEE.value, "An employee (passport, permits...)")],
+        help_text="Cannot be changed after the type is created.")
     alert_days = forms.CharField(
         required=False, label="Alert days before expiry",
         help_text="Comma-separated, e.g. 30, 14, 7, 1, 0. Use 0 for the expiry day. Leave blank to switch alerts off.")
 
     class Meta:
         model = DocumentType
-        fields = ["code", "name", "name_ar", "authority", "default_validity_months",
+        fields = ["applies_to", "code", "name", "name_ar", "authority", "default_validity_months",
                   "alert_days", "overdue_repeat_days", "is_mandatory"]
         labels = {"code": "Short code", "default_validity_months": "Usual validity (months)",
-                  "overdue_repeat_days": "Repeat overdue (days)"}
+                  "overdue_repeat_days": "Repeat overdue (days)", "is_mandatory": "Required"}
+        help_texts = {"is_mandatory": "Company types: shown as missing on the dashboard if the company has none. "
+                                      "Employee types: counted in the staff coverage list."}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance.pk:
             self.fields["code"].disabled = True
+            self.fields["applies_to"].disabled = True
             self.initial["alert_days"] = ", ".join(str(n) for n in self.instance.alert_days)
         else:
             self.fields["code"].required = False

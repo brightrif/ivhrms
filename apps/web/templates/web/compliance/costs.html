@@ -12,20 +12,22 @@
 </div>
 <div class="card shadow-sm border-0"><div class="table-responsive">
   <table class="table table-hover align-middle mb-0">
-    <thead class="table-light"><tr><th>Company</th><th>Document type</th><th class="text-end">Payments</th><th class="text-end">Government</th><th class="text-end">Service</th><th class="text-end">Fines</th><th class="text-end">Total (BHD)</th></tr></thead>
+    <thead class="table-light"><tr><th>Company</th><th>Document type</th><th class="text-end">Payments</th><th class="text-end">Government</th><th class="text-end">Service</th><th class="text-end">Fines</th><th class="text-end">Total (BHD)</th><th class="text-end" title="Costs ticked as charged to the employee">Charged to staff</th></tr></thead>
     <tbody>
     {% for r in rows %}
       <tr><td>{{ r.company.name }}</td><td>{{ r.type.name }}</td><td class="text-end">{{ r.count }}</td>
           <td class="text-end">{{ r.government|floatformat:3 }}</td><td class="text-end">{{ r.service|floatformat:3 }}</td>
           <td class="text-end{% if r.fine %} text-danger{% endif %}">{{ r.fine|floatformat:3 }}</td>
-          <td class="text-end fw-medium">{{ r.total|floatformat:3 }}</td></tr>
+          <td class="text-end fw-medium">{{ r.total|floatformat:3 }}</td>
+          <td class="text-end">{% if r.charged %}{{ r.charged|floatformat:3 }}{% else %}-{% endif %}</td></tr>
     {% empty %}
-      <tr><td colspan="7" class="text-center text-body-secondary py-4">No payments recorded in {{ year }}.</td></tr>
+      <tr><td colspan="8" class="text-center text-body-secondary py-4">No payments recorded in {{ year }}.</td></tr>
     {% endfor %}
     </tbody>
     {% if rows %}<tfoot><tr class="table-light fw-semibold"><td colspan="3" class="text-end">All</td>
       <td class="text-end">{{ grand.government|floatformat:3 }}</td><td class="text-end">{{ grand.service|floatformat:3 }}</td>
-      <td class="text-end">{{ grand.fine|floatformat:3 }}</td><td class="text-end">{{ grand.total|floatformat:3 }}</td></tr></tfoot>{% endif %}
+      <td class="text-end">{{ grand.fine|floatformat:3 }}</td><td class="text-end">{{ grand.total|floatformat:3 }}</td>
+      <td class="text-end">{{ grand.charged|floatformat:3 }}</td></tr></tfoot>{% endif %}
   </table>
 </div></div>
 <p class="small text-body-secondary mt-2">Fines are shown on their own so you can see what late renewals cost.</p>

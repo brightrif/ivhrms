@@ -16,6 +16,7 @@ urlpatterns = [
     path("compliance/renewals/<int:pk>/cancel/", compliance.task_cancel, name="compliance_task_cancel"),
     path("compliance/renewals/<int:pk>/payment/new/", compliance.payment_create, name="compliance_payment_create"),
     path("compliance/payments/<int:pk>/receipt/", compliance.payment_receipt, name="compliance_receipt"),
+    path("compliance/missing/<int:pk>/", compliance.missing_list, name="compliance_missing"),
     path("compliance/costs/", compliance.costs, name="compliance_costs"),
     path("compliance/types/", compliance.type_list, name="compliance_types"),
     path("compliance/types/new/", compliance.type_create, name="compliance_type_create"),

@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 from apps.audit import services as audit
 from apps.compliance import schedule, services
 from apps.compliance.models import Document, DocumentType, RenewalPayment, RenewalTask
+from apps.employees.models import Employee
 from apps.organization.services import companies_for
 
 from apps.web.forms.compliance import (
@@ -25,12 +26,15 @@ from apps.web.forms.compliance import (
 from apps.web.access import hr_perm
 
 Company_types = DocumentType.AppliesTo.COMPANY
+Employee_types = DocumentType.AppliesTo.EMPLOYEE
+Supported_types = [Company_types, Employee_types]          # dependants come later
 
 # Full-page layouts: two columns on a laptop screen so nothing needs scrolling. See form_layout.html.
 LAYOUTS = {
     "document": [
         {"title": "Document", "width": "col-lg-7",
-         "rows": [["company", "document_type"], ["reference_name", "number"], ["issue_date", "expiry_date"]]},
+         "rows": [["company", "employee", "document_type"], ["reference_name", "number"],
+                  ["issue_date", "expiry_date"]]},
         {"title": "Handling", "width": "col-lg-5",
          "rows": [["responsible", "agent_name"], ["file"], ["notes"]]},
     ],
@@ -46,11 +50,12 @@ LAYOUTS = {
     "payment": [
         {"title": "Payment", "width": "col-lg-7",
          "rows": [["description", "paid_on"], ["government_fee", "service_fee", "fine"], ["method", "reference"]]},
-        {"title": "Receipt", "width": "col-lg-5", "rows": [["receipt"], ["paid_by"], ["remarks"]]},
+        {"title": "Receipt", "width": "col-lg-5",
+         "rows": [["receipt"], ["paid_by"], ["charged_to_employee"], ["remarks"]]},
     ],
     "type": [
         {"title": "Document type", "width": "col-lg-6",
-         "rows": [["name", "name_ar"], ["code", "authority"]]},
+         "rows": [["applies_to", "code"], ["name", "name_ar"], ["authority"]]},
         {"title": "Validity and alerts", "width": "col-lg-6",
          "rows": [["default_validity_months", "overdue_repeat_days"], ["alert_days"], ["is_mandatory"]]},
     ],
@@ -64,12 +69,12 @@ def _form_page(request, form, title, back_url, layout, intro=""):
 
 def _document(request, pk):
     qs = Document.objects.for_user(request.user).select_related(
-        "company", "document_type", "responsible", "previous")
+        "company", "document_type", "responsible", "previous", "employee")
     return get_object_or_404(qs, pk=pk)
 
 
 def _task(request, pk):
-    qs = RenewalTask.objects.for_user(request.user).select_related("document__document_type", "document__company")
+    qs = RenewalTask.objects.for_user(request.user).select_related("document__document_type", "document__company","document__vehicle")
     return get_object_or_404(qs, pk=pk)
 
 
@@ -81,7 +86,10 @@ def _back(doc):
 
 @hr_perm("compliance.view_document")
 def dashboard(request):
-    return render(request, "web/compliance/dashboard.html", services.dashboard(request.user))
+    listing = reverse("web:compliance_documents")
+    return render(request, "web/compliance/dashboard.html", {
+        **services.dashboard(request.user),
+        "company_url": f"{listing}?scope=company", "employee_url": f"{listing}?scope=employee"})
 
 
 @hr_perm("compliance.view_document")
@@ -92,28 +100,46 @@ def attention_badge(request):
 
 @hr_perm("compliance.view_document")
 def document_list(request):
-    qs = Document.objects.for_user(request.user).select_related("company", "document_type", "responsible")
+    qs = Document.objects.for_user(request.user).select_related("company", "document_type", "responsible", "employee", "vehicle")
     history = request.GET.get("history") == "1"
+    former = request.GET.get("former") == "1"
     if not history:
         qs = qs.filter(is_current=True)
+    if not former:
+        qs = qs.exclude(employee__status=Employee.Status.SEPARATED)
     q = request.GET.get("q", "").strip()
     if q:
         qs = qs.filter(Q(number__icontains=q) | Q(reference_name__icontains=q) | Q(agent_name__icontains=q)
-                       | Q(document_type__name__icontains=q))
-    company, dtype, state = (request.GET.get(k, "") for k in ("company", "type", "state"))
+                       | Q(document_type__name__icontains=q) | Q(employee__first_name__icontains=q)
+                       | Q(employee__last_name__icontains=q) | Q(employee__employee_no__icontains=q)
+                       | Q(vehicle__plate_number__icontains=q))
+    company, dtype, state, scope = (request.GET.get(k, "") for k in ("company", "type", "state", "scope"))
     if company.isdigit():
         qs = qs.filter(company_id=int(company))
     if dtype.isdigit():
         qs = qs.filter(document_type_id=int(dtype))
+    if scope == "company":
+        qs = qs.filter(employee__isnull=True)
+    elif scope == "employee":
+        qs = qs.filter(employee__isnull=False)
     docs = list(qs)
     if state in (schedule.EXPIRED, schedule.DUE, schedule.VALID):
         docs = [d for d in docs if d.is_current and d.state == state]
     companies = companies_for(request.user)
     return render(request, "web/compliance/documents.html", {
-        "docs": docs, "q": q, "company": company, "dtype": dtype, "state": state, "history": history,
-        "companies": companies, "multi_company": companies.count() > 1,
-        "types": DocumentType.objects.filter(is_active=True, applies_to=Company_types),
+        "docs": docs, "q": q, "company": company, "dtype": dtype, "state": state, "scope": scope,
+        "history": history, "former": former, "companies": companies, "multi_company": companies.count() > 1,
+        "types": DocumentType.objects.filter(is_active=True, applies_to__in=Supported_types).order_by("applies_to", "name"),
         "states": [(schedule.EXPIRED, "Expired"), (schedule.DUE, "Due soon"), (schedule.VALID, "Valid")]})
+
+
+@hr_perm("compliance.view_document")
+def missing_list(request, pk):
+    """Active employees with no current document of one type (some may not need one, e.g. a Bahraini and a permit)."""
+    dtype = get_object_or_404(DocumentType, pk=pk, applies_to=Employee_types, is_active=True)
+    return render(request, "web/compliance/missing.html", {
+        "dtype": dtype, "staff": list(services.employees_missing(request.user, dtype)),
+        "multi_company": companies_for(request.user).count() > 1})
 
 
 # ------------------------------------------------------------------ documents
@@ -132,9 +158,11 @@ def document_detail(request, pk):
 
 @hr_perm("compliance.add_document")
 def document_create(request):
-    initial = {k: v for k, v in (("company", request.GET.get("company")),
-                                 ("document_type", request.GET.get("type"))) if v and v.isdigit()}
-    form = DocumentForm(request.POST or None, request.FILES or None, user=request.user, initial=initial)
+    kind = "employee" if request.GET.get("kind") == "employee" else "company"
+    wanted = (("company", request.GET.get("company")), ("employee", request.GET.get("employee")),
+              ("document_type", request.GET.get("type")))
+    initial = {k: v for k, v in wanted if v and v.isdigit()}
+    form = DocumentForm(request.POST or None, request.FILES or None, user=request.user, kind=kind, initial=initial)
     if request.method == "POST" and form.is_valid():
         try:
             doc = services.create_document(request.user, form.save(commit=False))
@@ -143,12 +171,17 @@ def document_create(request):
         else:
             messages.success(request, f"{doc.label} was added.")
             return redirect("web:compliance_detail", pk=doc.pk)
-    return _form_page(request, form, "Add compliance document", reverse("web:compliance_documents"), "document")
+    back = reverse("web:compliance_documents")
+    if kind == "employee" and initial.get("employee"):
+        back = reverse("web:employee_detail", args=[initial["employee"]])        # opened from the staff page
+    return _form_page(request, form, f"Add {kind} document", back, "document")
 
 
 @hr_perm("compliance.change_document")
 def document_edit(request, pk):
     doc = _document(request, pk)
+    if doc.vehicle_id:
+          return redirect("web:vehicle_document_edit", pk=doc.pk)
     if not doc.is_current:
         messages.error(request, "Older versions are kept as a record and cannot be edited.")
         return redirect("web:compliance_detail", pk=doc.pk)
@@ -276,7 +309,7 @@ def costs(request):
 @hr_perm("compliance.view_documenttype")
 def type_list(request):
     return render(request, "web/compliance/types.html", {
-        "types": DocumentType.objects.filter(applies_to=Company_types).order_by("-is_active", "name")})
+        "types": DocumentType.objects.filter(applies_to__in=Supported_types).order_by("applies_to", "-is_active", "name")})
 
 
 @hr_perm("compliance.add_documenttype")
@@ -291,7 +324,7 @@ def type_create(request):
 
 @hr_perm("compliance.change_documenttype")
 def type_edit(request, pk):
-    dtype = get_object_or_404(DocumentType, pk=pk, applies_to=Company_types)
+    dtype = get_object_or_404(DocumentType, pk=pk, applies_to__in=Supported_types)
     form = DocumentTypeForm(request.POST or None, instance=dtype)
     if request.method == "POST" and form.is_valid():
         form.save()
@@ -303,7 +336,7 @@ def type_edit(request, pk):
 @hr_perm("compliance.change_documenttype")
 @require_POST
 def type_toggle(request, pk):
-    dtype = get_object_or_404(DocumentType, pk=pk, applies_to=Company_types)
+    dtype = get_object_or_404(DocumentType, pk=pk, applies_to__in=Supported_types)
     dtype.is_active = not dtype.is_active
     dtype.save(update_fields=["is_active"])
     messages.success(request, f"{dtype.name} was {'reactivated' if dtype.is_active else 'deactivated'}.")

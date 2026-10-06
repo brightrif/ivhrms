@@ -71,6 +71,10 @@
             <span class="ms-auto" hx-get="{% url 'web:compliance_count' %}" hx-trigger="load, every 300s"></span>
           </a>
           {% endif %}
+          {% if perms.vehicles.view_vehicle %}
+          <a class="nav-link {% if u|slice:':8' == 'vehicle_' %}active{% endif %}" href="{% url 'web:vehicle_list' %}">
+            <i class="bi bi-car-front"></i> Vehicles</a>
+          {% endif %}
         </nav>
         {% endwith %}
       </div>
