@@ -1,0 +1,22 @@
+<div class="card shadow-sm border-0 h-100"><div class="card-body">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="mb-0">Fuel</h2>
+    <div class="d-flex gap-2">
+      {% if perms.vehicles.view_fuelfill %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:vehicle_fuel' vehicle.pk %}">All entries</a>{% endif %}
+      {% if vehicle.status != "sold" and perms.vehicles.add_fuelfill %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:vehicle_fuel_add' vehicle.pk %}">Add</a>{% endif %}
+    </div>
+  </div>
+  {% if stats.avg_kmpl %}
+    <div class="mb-2"><span class="fs-5">{{ stats.avg_kmpl|floatformat:1 }}</span> km/L
+      <span class="text-body-secondary mx-1">&middot;</span><span class="fs-5">{{ stats.cost_per_km|floatformat:3 }}</span> BHD/km</div>
+  {% else %}
+    <div class="small text-body-secondary mb-2">Consumption shows after two full-tank fill-ups.</div>
+  {% endif %}
+  <table class="table table-sm align-middle mb-0"><tbody>
+  {% for f in recent %}
+    <tr><td class="text-nowrap">{{ f.filled_on|date:"d M" }}</td><td class="text-end">{{ f.litres|floatformat:1 }} L</td><td class="text-end">{{ f.cost|floatformat:3 }}</td></tr>
+  {% empty %}
+    <tr><td class="text-body-secondary">No fuel entries yet.</td></tr>
+  {% endfor %}
+  </tbody></table>
+</div></div>

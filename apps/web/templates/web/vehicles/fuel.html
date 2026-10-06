@@ -1,0 +1,61 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Fuel: {{ vehicle.plate_number }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Fuel <span class="fw-normal text-body-secondary">{{ vehicle.plate_number }}</span></h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_detail' vehicle.pk %}">Back to vehicle</a>
+    {% if vehicle.status != "sold" and perms.vehicles.add_fuelfill %}
+      <a class="btn btn-primary" href="{% url 'web:vehicle_fuel_add' vehicle.pk %}"><i class="bi bi-plus-lg me-1"></i>Add fuel</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Average consumption</div>
+    <div class="fs-4">{% if avg_kmpl %}{{ avg_kmpl|floatformat:1 }} <span class="fs-6 text-body-secondary">km/L</span>{% else %}-{% endif %}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Fuel cost per km</div>
+    <div class="fs-4">{% if cost_per_km %}{{ cost_per_km|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD</span>{% else %}-{% endif %}</div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Last 12 months: fuel</div>
+    <div class="fs-4">{{ litres_12m|floatformat:1 }} <span class="fs-6 text-body-secondary">L</span></div>
+  </div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Last 12 months: cost</div>
+    <div class="fs-4">{{ cost_12m|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD</span></div>
+  </div></div></div>
+</div>
+
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Date</th><th class="text-end">Litres</th><th class="text-end">Cost (BHD)</th><th class="text-end">Per litre</th><th class="text-end">Odometer</th><th class="text-end">km/L</th><th>Tank</th><th>Driver</th><th>Station</th><th></th></tr></thead>
+    <tbody>
+    {% for f in rows %}
+      <tr{% if f.is_voided %} class="table-light text-body-secondary"{% endif %}>
+        <td class="text-nowrap">{{ f.filled_on|date:"d M Y" }}</td>
+        <td class="text-end">{{ f.litres|floatformat:2 }}</td>
+        <td class="text-end">{{ f.cost|floatformat:3 }}</td>
+        <td class="text-end">{{ f.price_per_litre|floatformat:3 }}</td>
+        <td class="text-end text-nowrap">{{ f.odometer }} km</td>
+        <td class="text-end">{% if f.km_per_litre %}{{ f.km_per_litre|floatformat:1 }}{% else %}-{% endif %}</td>
+        <td>{% if f.full_tank %}Full{% else %}Part{% endif %}</td>
+        <td>{{ f.driver.full_name|default:"-" }}</td>
+        <td>{{ f.station|default:"-" }}{% if f.notes %}<div class="small text-body-secondary">{{ f.notes }}</div>{% endif %}</td>
+        <td class="text-end text-nowrap">
+          {% if f.is_voided %}<span class="badge text-bg-secondary" title="{{ f.voided_reason }}">Cancelled</span><div class="small">{{ f.voided_reason }}</div>
+          {% elif perms.vehicles.change_fuelfill %}<a class="btn btn-sm btn-outline-danger" href="{% url 'web:vehicle_fuel_void' f.pk %}">Cancel</a>{% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="10" class="text-center text-body-secondary py-4">No fuel entries yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+<p class="small text-body-secondary mt-2 mb-0">Consumption is worked out from one full tank to the next, counting any part fills in between. A wrong entry is cancelled, not edited, so the history stays complete.</p>
+{% endblock %}

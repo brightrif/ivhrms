@@ -6,12 +6,13 @@ added in a later phase still gets its permissions).
 """
 from django.db import DEFAULT_DB_ALIAS, connections
 
-_READ = {"vehicle": ["view"], "vehicleassignment": ["view"], "odometerreading": ["view"]}
+_HR = ["view", "add", "change"]
+_MODELS = ["vehicle", "vehicleassignment", "odometerreading", "fuelfill", "serviceplan", "servicerecord"]
 GROUP_PERMISSIONS = {
-    "HR": {"vehicle": ["view", "add", "change"], "vehicleassignment": ["view", "add", "change"],
-           "odometerreading": ["view", "add"]},
-    "Finance": _READ,
-    "Management": _READ,
+    "HR": {"vehicle": _HR, "vehicleassignment": _HR, "odometerreading": ["view", "add"],
+           "fuelfill": _HR, "serviceplan": _HR, "servicerecord": _HR},
+    "Finance": {m: ["view"] for m in _MODELS},
+    "Management": {m: ["view"] for m in _MODELS},
 }
 
 

@@ -88,7 +88,7 @@ def vehicle_detail(request, pk):
     return render(request, "web/vehicles/detail.html", {
         "vehicle": vehicle, "docs": docs, "missing": missing, "history": history,
         "current": next((a for a in history if a.is_open), None),
-        "readings": list(vehicle.odometer_readings.all()[:6])})
+        "readings": list(vehicle.odometer_readings.filter(is_voided=False)[:6])})
 
 @hr_perm("vehicles.add_vehicle")
 def vehicle_create(request):

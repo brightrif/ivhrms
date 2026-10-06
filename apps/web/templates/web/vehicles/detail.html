@@ -1,5 +1,5 @@
 {% extends "web/base.html" %}
-{% load bs %}
+{% load bs vehicle_cards %}
 {% block title %}{{ vehicle.plate_number }}{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -19,9 +19,9 @@
   </div>
 </div>
 
-<div class="row g-3">
+<div class="row g-3 mb-3">
   <div class="col-lg-5">
-    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
       <h2>Details</h2>
       <dl class="row gy-1 mb-0">
         <dt class="col-5 fw-normal text-body-secondary">Company</dt><dd class="col-7 mb-0">{{ vehicle.company.name }}</dd>
@@ -34,25 +34,6 @@
         {% if vehicle.sold_on %}<dt class="col-5 fw-normal text-body-secondary">Sold on</dt><dd class="col-7 mb-0">{{ vehicle.sold_on|date:"d M Y" }}</dd>{% endif %}
         {% if vehicle.notes %}<dt class="col-5 fw-normal text-body-secondary">Notes</dt><dd class="col-7 mb-0">{{ vehicle.notes|linebreaksbr }}</dd>{% endif %}
       </dl>
-    </div></div>
-
-    <div class="card shadow-sm border-0"><div class="card-body">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h2 class="mb-0">Odometer <span class="fw-normal text-body-secondary">{{ vehicle.odometer }} km</span></h2>
-        {% if vehicle.status != "sold" and perms.vehicles.add_odometerreading %}
-          <a class="btn btn-sm btn-outline-primary" href="{% url 'web:vehicle_odometer' vehicle.pk %}">Record reading</a>
-        {% endif %}
-      </div>
-      <table class="table table-sm align-middle mb-0">
-        <tbody>
-        {% for r in readings %}
-          <tr><td class="text-nowrap">{{ r.reading_on|date:"d M Y" }}</td><td class="text-end text-nowrap">{{ r.odometer }} km</td>
-              <td class="small text-body-secondary">{{ r.note|default:r.get_source_display }}</td></tr>
-        {% empty %}
-          <tr><td class="text-body-secondary">No readings yet.</td></tr>
-        {% endfor %}
-        </tbody>
-      </table>
     </div></div>
   </div>
 
@@ -84,7 +65,7 @@
 
     {% include "web/compliance/_doc_table.html" with docs=docs title="Documents" empty="No documents on file for this vehicle." %}
     {% if missing and vehicle.status != "sold" and perms.compliance.add_document %}
-    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+    <div class="card shadow-sm border-0"><div class="card-body">
       <h2>Not on file</h2>
       <div class="d-flex flex-wrap gap-2">
         {% for t in missing %}
@@ -93,28 +74,53 @@
       </div>
     </div></div>
     {% endif %}
+  </div>
+</div>
 
-    <div class="card shadow-sm border-0"><div class="card-header bg-white fw-semibold">Driver history</div>
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light"><tr><th>Driver</th><th>From</th><th>To</th><th class="text-end">Start km</th><th class="text-end">End km</th><th class="text-end">Driven</th></tr></thead>
-          <tbody>
-          {% for a in history %}
-            <tr>
-              <td>{{ a.employee.full_name }}</td>
-              <td class="text-nowrap">{{ a.assigned_from|date:"d M Y" }}</td>
-              <td class="text-nowrap">{% if a.assigned_to %}{{ a.assigned_to|date:"d M Y" }}{% else %}<span class="badge text-bg-success">Current</span>{% endif %}</td>
-              <td class="text-end">{{ a.start_odometer }}</td>
-              <td class="text-end">{{ a.end_odometer|default_if_none:"-" }}</td>
-              <td class="text-end">{% if a.km_driven is not None %}{{ a.km_driven }} km{% else %}-{% endif %}</td>
-            </tr>
-          {% empty %}
-            <tr><td colspan="6" class="text-center text-body-secondary py-3">Nobody has had this vehicle yet.</td></tr>
-          {% endfor %}
-          </tbody>
-        </table>
+<div class="row g-3 mb-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="mb-0">Odometer <span class="fw-normal text-body-secondary">{{ vehicle.odometer }} km</span></h2>
+        {% if vehicle.status != "sold" and perms.vehicles.add_odometerreading %}
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'web:vehicle_odometer' vehicle.pk %}">Record</a>
+        {% endif %}
       </div>
-    </div>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+        {% for r in readings %}
+          <tr><td class="text-nowrap">{{ r.reading_on|date:"d M Y" }}</td><td class="text-end text-nowrap">{{ r.odometer }} km</td>
+              <td class="small text-body-secondary">{{ r.note|default:r.get_source_display }}</td></tr>
+        {% empty %}
+          <tr><td class="text-body-secondary">No readings yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div></div>
+  </div>
+  <div class="col-lg-4">{% service_card vehicle %}</div>
+  <div class="col-lg-4">{% fuel_card vehicle %}</div>
+</div>
+
+<div class="card shadow-sm border-0"><div class="card-header bg-white fw-semibold">Driver history</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr><th>Driver</th><th>From</th><th>To</th><th class="text-end">Start km</th><th class="text-end">End km</th><th class="text-end">Driven</th></tr></thead>
+      <tbody>
+      {% for a in history %}
+        <tr>
+          <td>{{ a.employee.full_name }}</td>
+          <td class="text-nowrap">{{ a.assigned_from|date:"d M Y" }}</td>
+          <td class="text-nowrap">{% if a.assigned_to %}{{ a.assigned_to|date:"d M Y" }}{% else %}<span class="badge text-bg-success">Current</span>{% endif %}</td>
+          <td class="text-end">{{ a.start_odometer }}</td>
+          <td class="text-end">{{ a.end_odometer|default_if_none:"-" }}</td>
+          <td class="text-end">{% if a.km_driven is not None %}{{ a.km_driven }} km{% else %}-{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="text-center text-body-secondary py-3">Nobody has had this vehicle yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 {% endblock %}

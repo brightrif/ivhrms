@@ -15,4 +15,8 @@ app.conf.beat_schedule = {
         "task": "apps.compliance.tasks.daily_scan",
         "schedule": crontab(hour=7, minute=0),
     },
+    "vehicles-daily-service-scan": {
+    "task": "apps.vehicles.tasks.daily_service_scan",
+    "schedule": crontab(hour=7, minute=15),
+},
 }

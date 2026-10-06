@@ -73,6 +73,8 @@ class OdometerReading(BaseModel):
     odometer = models.PositiveIntegerField("Odometer (km)")
     source = models.CharField(max_length=12, choices=Source.choices, default=Source.MANUAL)
     note = models.CharField(max_length=200, blank=True)
+    is_voided = models.BooleanField(default=False)
+    voided_reason = models.CharField(max_length=200, blank=True)
 
     objects = CompanyQuerySet.as_manager()
 
