@@ -1,0 +1,33 @@
+/* Date picker in the IV logo colours. Loaded after air-datepicker.css. */
+.air-datepicker {
+  --adp-font-family: inherit;
+  --adp-font-size: 0.9rem;
+  --adp-accent-color: #31629c;
+  --adp-color-current-date: #31629c;
+  --adp-day-name-color: #31629c;
+  --adp-cell-background-color-selected: #31629c;
+  --adp-cell-background-color-selected-hover: #264c7c;
+  --adp-cell-background-color-in-range: rgba(49, 98, 156, 0.12);
+  --adp-cell-background-color-in-range-hover: rgba(49, 98, 156, 0.2);
+  --adp-cell-border-color-in-range: rgba(49, 98, 156, 0.35);
+  --adp-btn-color: #31629c;
+  --adp-btn-color-hover: #264c7c;
+  --adp-border-radius: 10px;
+  --adp-width: 300px;
+  --adp-z-index: 1080;                 /* above the sticky top bar and the pinned Save bar */
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.18);
+}
+
+/* weekly offs and public holidays (leave pickers) */
+.air-datepicker-cell.-day-.-off-day- { background: #f1f3f6; color: #8b95a5; }
+.air-datepicker-cell.-day-.-holiday- { background: #fdecec; color: #c62828; font-weight: 600; }
+.air-datepicker-cell.-day-.-selected-,
+.air-datepicker-cell.-day-.-range-from-,
+.air-datepicker-cell.-day-.-range-to- { color: #fff; }
+
+/* a small calendar icon on every enhanced date box */
+input.has-datepicker {
+  cursor: pointer;
+  padding-right: 2.25rem;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2331629c' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5M1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4z'/%3E%3C/svg%3E") no-repeat right 0.75rem center / 16px;
+}

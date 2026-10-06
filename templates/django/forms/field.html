@@ -1,0 +1,18 @@
+{% load bs %}
+{% if field.widget_type == "checkbox" %}
+<div class="form-check mb-3">
+  {{ field|bs }}
+  <label class="form-check-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+  {% if field.help_text %}<div class="form-text">{{ field.help_text|safe }}</div>{% endif %}
+</div>
+{% else %}
+<div class="mb-3">
+  {% if field.label %}
+  <label class="form-label fw-medium" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="text-danger"> *</span>{% endif %}</label>
+  {% endif %}
+  {{ field|bs }}
+  {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+  {% if field.help_text %}<div class="form-text">{{ field.help_text|safe }}</div>{% endif %}
+</div>
+{% endif %}

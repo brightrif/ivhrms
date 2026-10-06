@@ -1,0 +1,14 @@
+{% load bs %}
+<tr>
+  <td>{{ l.leave_type.name }}</td>
+  <td>{{ l.start_date|date:"d M Y" }}{% if l.end_date != l.start_date %} to {{ l.end_date|date:"d M Y" }}{% endif %}</td>
+  <td>{{ l.days|floatformat:"-1" }}</td>
+  <td>{% status_badge l.status l.get_status_display %}</td>
+  <td class="text-end">
+    {% if l.can_cancel %}
+    <button class="btn btn-sm btn-outline-danger" hx-post="{% url 'web:leave_cancel' l.pk %}"
+            hx-target="closest tr" hx-swap="outerHTML" hx-confirm="Cancel this leave request?">Cancel</button>
+    {% endif %}
+    {% if error %}<div class="text-danger small mt-1">{{ error }}</div>{% endif %}
+  </td>
+</tr>

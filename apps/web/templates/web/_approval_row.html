@@ -1,0 +1,21 @@
+<tr>
+  <td>
+    <div class="fw-medium">{{ item.approval.employee.full_name }}</div>
+    <div class="small text-body-secondary">{{ item.approval.employee.employee_no }}</div>
+  </td>
+  <td>
+    <span class="badge bg-primary-subtle text-primary-emphasis">{{ item.info.kind }}</span>
+    <div>{{ item.info.title }}</div>
+  </td>
+  <td>{{ item.info.detail }}</td>
+  <td>{{ item.info.reason|default:"-" }}</td>
+  <td class="text-end">
+    <div class="d-flex flex-wrap gap-1 justify-content-end">
+      <button class="btn btn-sm btn-success" hx-post="{% url 'web:approval_decide' item.approval.pk %}"
+              hx-vals='{"decision": "approve"}' hx-target="closest tr" hx-swap="outerHTML">Approve</button>
+      <button class="btn btn-sm btn-outline-danger" hx-get="{% url 'web:approval_reject_form' item.approval.pk %}"
+              hx-target="closest td" hx-swap="innerHTML">Reject</button>
+    </div>
+    {% if error %}<div class="text-danger small mt-1 text-start">{{ error }}</div>{% endif %}
+  </td>
+</tr>

@@ -1,0 +1,114 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}{{ employee.full_name }}{% endblock %}
+{% block content %}
+{% if credentials %}
+<div class="alert alert-warning">
+  <div class="fw-semibold mb-1"><i class="bi bi-key me-1"></i>Temporary login. This is shown only once.</div>
+  <div>Username: <code>{{ credentials.username }}</code></div>
+  <div>Temporary password: <code>{{ credentials.password }}</code></div>
+  <div class="small mt-1">Give it to the employee securely. They must choose a new password at first sign-in.</div>
+</div>
+{% endif %}
+
+{% if employee.user and not employee.reporting_manager %}
+<div class="alert alert-warning">
+  <strong>No reporting manager yet.</strong> Leave and attendance requests from this employee cannot be sent for approval until one is assigned.
+  {% if perms.employees.change_employee %}<a href="{% url 'web:employee_assign' employee.pk %}">Assign one</a>{% endif %}
+</div>
+{% endif %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0 d-flex align-items-center gap-2">{{ employee.full_name }} {% status_badge employee.status employee.get_status_display %}</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:employee_list' %}">All staff</a>
+    {% if perms.employees.change_employee %}
+      <a class="btn btn-outline-primary" href="{% url 'web:employee_edit' employee.pk %}">Edit details</a>
+      <a class="btn btn-primary" href="{% url 'web:employee_assign' employee.pk %}">Change assignment</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <h2>Employment</h2>
+      <dl class="row gy-1 mb-0">
+        <dt class="col-5 fw-normal text-body-secondary">Employee no.</dt><dd class="col-7 mb-0">{{ employee.employee_no }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Company</dt><dd class="col-7 mb-0">{{ employee.company.name }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Department</dt>
+        <dd class="col-7 mb-0">{% if employee.department %}{{ employee.department }}{% else %}<span class="text-body-secondary">Not assigned yet</span>{% endif %}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Designation</dt><dd class="col-7 mb-0">{{ employee.designation|default_if_none:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Grade</dt><dd class="col-7 mb-0">{{ employee.grade|default_if_none:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Location</dt><dd class="col-7 mb-0">{{ employee.location|default_if_none:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Reports to</dt><dd class="col-7 mb-0">{{ employee.reporting_manager.full_name|default:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Contract</dt><dd class="col-7 mb-0">{{ employee.get_employment_type_display }}, {{ employee.get_worker_type_display }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Joined</dt><dd class="col-7 mb-0">{{ employee.joining_date|date:"d M Y" }}</dd>
+      </dl>
+    </div></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <h2>Personal and contact</h2>
+      <dl class="row gy-1 mb-0">
+        <dt class="col-5 fw-normal text-body-secondary">Arabic name</dt><dd class="col-7 mb-0">{{ employee.name_ar|default:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Date of birth</dt><dd class="col-7 mb-0">{{ employee.date_of_birth|date:"d M Y"|default:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Nationality</dt><dd class="col-7 mb-0">{{ employee.nationality|default:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Email</dt><dd class="col-7 mb-0">{{ employee.email|default:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Phone</dt><dd class="col-7 mb-0">{{ employee.phone|default:"-" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">WhatsApp</dt>
+        <dd class="col-7 mb-0">
+          {{ employee.whatsapp_number|default:"-" }}
+          {% if employee.whatsapp_number %}
+            {% if employee.whatsapp_verified %}{% status_badge "approved" "Verified" %}{% else %}{% status_badge "pending" "Not verified" %}{% endif %}
+          {% endif %}
+        </dd>
+      </dl>
+    </div></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <h2>Web login</h2>
+      {% if employee.user %}
+        <p class="mb-2">Username <code>{{ employee.user.username }}</code>
+          {% if employee.user.must_change_password %}{% status_badge "pending" "Waiting for first sign-in" %}{% endif %}</p>
+      {% else %}
+        <p class="text-body-secondary">No login yet.</p>
+      {% endif %}
+      {% if perms.employees.manage_logins %}
+      <form method="post" action="{% url 'web:employee_login' employee.pk %}"
+            onsubmit="return confirm('{% if employee.user %}Issue a new temporary password?{% else %}Create a login for this employee?{% endif %}')">
+        {% csrf_token %}
+        <button class="btn btn-sm btn-outline-primary">{% if employee.user %}Reset password{% else %}Create login{% endif %}</button>
+      </form>
+      {% endif %}
+    </div></div>
+  </div>
+</div>
+
+<h2>Assignment history</h2>
+<div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive">
+  <table class="table align-middle mb-0">
+    <thead class="table-light">
+      <tr><th>From</th><th>To</th><th>Reason</th><th>Department</th><th>Designation</th><th>Reports to</th><th>Contract</th></tr>
+    </thead>
+    <tbody>
+    {% for h in history %}
+      <tr>
+        <td>{{ h.effective_from|date:"d M Y" }}</td>
+        <td>{{ h.effective_to|date:"d M Y"|default:"current" }}</td>
+        <td>{{ h.get_reason_display }}{% if h.remarks %}<div class="small text-body-secondary">{{ h.remarks }}</div>{% endif %}</td>
+        <td>{{ h.department|default_if_none:"-" }}</td>
+        <td>{{ h.designation|default_if_none:"-" }}</td>
+        <td>{{ h.reporting_manager.full_name|default:"-" }}</td>
+        <td>{{ h.get_employment_type_display }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-center text-body-secondary py-4">No history yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div></div>
+{% endblock %}

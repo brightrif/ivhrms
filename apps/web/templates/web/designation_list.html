@@ -1,0 +1,40 @@
+{% extends "web/base.html" %}
+{% block title %}Designations{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Designations</h1>
+  {% if perms.organization.add_designation %}
+  <a class="btn btn-primary" href="{% url 'web:designation_create' %}"><i class="bi bi-plus-lg me-1"></i>Add designation</a>
+  {% endif %}
+</div>
+<div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Designation</th><th class="text-end">Active staff</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for d in designations %}
+      <tr{% if not d.is_active %} class="opacity-75"{% endif %}>
+        <td class="fw-medium">{{ d.name }}</td>
+        <td class="text-end">{{ d.staff }}</td>
+        <td>{% if d.is_active %}<span class="badge text-bg-success">Active</span>{% else %}<span class="badge text-bg-secondary">Inactive</span>{% endif %}</td>
+        <td class="text-end text-nowrap">
+          {% if perms.organization.change_designation %}
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'web:designation_edit' d.pk %}">Edit</a>
+          <form method="post" action="{% url 'web:designation_toggle' d.pk %}" class="d-inline"
+                onsubmit="return confirm('{% if d.is_active %}Deactivate{% else %}Reactivate{% endif %} {{ d.name|escapejs }}?')">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-secondary">{% if d.is_active %}Deactivate{% else %}Reactivate{% endif %}</button>
+          </form>
+          {% endif %}
+          {% if perms.organization.delete_designation %}
+          <a class="btn btn-sm btn-outline-danger" href="{% url 'web:designation_delete' d.pk %}">Delete</a>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="text-center text-body-secondary py-4">No designations yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div></div>
+<p class="small text-body-secondary mt-2">Designations are shared by every company.</p>
+{% endblock %}

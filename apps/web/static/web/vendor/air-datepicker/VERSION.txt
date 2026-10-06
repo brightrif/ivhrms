@@ -1,0 +1,3 @@
+air-datepicker 3.6.0 (MIT) - https://www.npmjs.com/package/air-datepicker
+Files: air-datepicker.js, air-datepicker.css (from the package's dist files, unmodified)
+To update: download the new version from npm, replace these two files, then run the browser checks again.

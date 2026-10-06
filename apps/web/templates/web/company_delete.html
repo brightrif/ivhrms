@@ -1,0 +1,37 @@
+{% extends "web/base.html" %}
+{% block title %}Delete {{ company.name }}{% endblock %}
+{% block content %}
+<h1>Delete company</h1>
+<div class="card shadow-sm border-0" style="max-width:720px">
+  <div class="card-body">
+  {% if blockers %}
+    <div class="alert alert-warning">
+      <strong>{{ company.name }} cannot be deleted.</strong> It still has records that must be kept:
+      <ul class="mb-0 mt-2">
+        {% for label, count in blockers.items %}<li>{{ count }} {{ label }}</li>{% endfor %}
+      </ul>
+    </div>
+    <p>If the company is no longer in use, deactivate it instead. It is hidden from the working screens and its history stays intact.</p>
+    {% if company.is_active and perms.organization.change_company %}
+    <form method="post" action="{% url 'web:company_toggle' company.pk %}" class="d-inline">
+      {% csrf_token %}
+      <button class="btn btn-outline-secondary">Deactivate instead</button>
+    </form>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{% url 'web:company_list' %}">Back</a>
+  {% else %}
+    <p>You are about to permanently delete <strong>{{ company.name }}</strong>. Its setup (departments, projects,
+       shifts, holidays, leave types and approval flows) is deleted with it. This cannot be undone.</p>
+    <form method="post">
+      {% csrf_token %}
+      <label class="form-label fw-medium" for="confirm_code">Type <code>{{ company.code }}</code> to confirm</label>
+      <input class="form-control mb-2{% if error %} is-invalid{% endif %}" id="confirm_code" name="confirm_code"
+             autocomplete="off" required autofocus style="max-width:240px">
+      {% if error %}<div class="invalid-feedback d-block mb-2">{{ error }}</div>{% endif %}
+      <button class="btn btn-danger mt-2">Delete permanently</button>
+      <a class="btn btn-outline-secondary mt-2" href="{% url 'web:company_list' %}">Cancel</a>
+    </form>
+  {% endif %}
+  </div>
+</div>
+{% endblock %}

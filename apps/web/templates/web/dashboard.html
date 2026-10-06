@@ -1,0 +1,55 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Hello, {{ employee.first_name }}</h1>
+  <a class="btn btn-primary" href="{% url 'web:leave_apply' %}"><i class="bi bi-plus-lg me-1"></i>Apply for leave</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <h2>Today</h2>
+      {% if today_rec %}{% status_badge today_rec.status today_rec.get_status_display %}
+      {% else %}<span class="text-body-secondary">No entry yet</span>{% endif %}
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <h2>Leave balance {{ year }}</h2>
+      {% for b in balances %}
+        <div class="d-flex justify-content-between">
+          <span>{{ b.type.name }}</span>
+          <strong>{{ b.available|floatformat:"-1" }} / {{ b.balance|floatformat:"-1" }}</strong>
+        </div>
+      {% empty %}
+        <p class="text-body-secondary mb-0">No balance-tracked leave types.</p>
+      {% endfor %}
+      {% if balances %}<div class="form-text">Available after pending requests / total</div>{% endif %}
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <h2>Waiting on you</h2>
+      <div class="display-6 fw-semibold lh-1 mb-1">{{ pending_count }}</div>
+      <a href="{% url 'web:approvals' %}">Open approvals</a>
+    </div></div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h2 class="mb-0">Recent leave</h2>
+  <a class="small" href="{% url 'web:leave_list' %}">View all</a>
+</div>
+<div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for l in leaves %}{% include "web/_leave_row.html" %}{% empty %}
+      <tr><td colspan="5" class="text-center text-body-secondary py-4">No leave requests yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div></div>
+{% endblock %}

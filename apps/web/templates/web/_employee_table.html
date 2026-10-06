@@ -1,0 +1,44 @@
+{% load bs %}
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>No.</th><th>Name</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Department</th><th>Designation</th><th>Type</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+      {% for e in page %}
+        <tr>
+          <td class="text-nowrap">{{ e.employee_no }}</td>
+          <td><a class="fw-medium text-decoration-none" href="{% url 'web:employee_detail' e.pk %}">{{ e.full_name }}</a></td>
+          {% if multi_company %}<td>{{ e.company.code }}</td>{% endif %}
+          <td>{{ e.department|default_if_none:"-" }}</td>
+          <td>{{ e.designation|default_if_none:"-" }}</td>
+          <td>{{ e.get_employment_type_display }}{% if e.worker_type == 'labor' %} <span class="badge text-bg-light border">Labor</span>{% endif %}</td>
+          <td>{% status_badge e.status e.get_status_display %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="text-center text-body-secondary py-4">No staff match.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% if page.has_other_pages %}
+  <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span class="small text-body-secondary">Page {{ page.number }} of {{ page.paginator.num_pages }} · {{ page.paginator.count }} staff</span>
+    <ul class="pagination pagination-sm mb-0">
+      {% if page.has_previous %}
+      <li class="page-item"><a class="page-link" href="?{{ extra }}&page={{ page.previous_page_number }}"
+          hx-get="?{{ extra }}&page={{ page.previous_page_number }}" hx-target="#results" hx-push-url="true">Previous</a></li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">Previous</span></li>
+      {% endif %}
+      {% if page.has_next %}
+      <li class="page-item"><a class="page-link" href="?{{ extra }}&page={{ page.next_page_number }}"
+          hx-get="?{{ extra }}&page={{ page.next_page_number }}" hx-target="#results" hx-push-url="true">Next</a></li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">Next</span></li>
+      {% endif %}
+    </ul>
+  </div>
+  {% endif %}
+</div>

@@ -1,0 +1,22 @@
+{% load bs %}
+<tr id="att-row-{{ r.date|date:'Y-m-d' }}"{% if r.kind != 'working' %} class="table-light"{% endif %}>
+  <td>{{ r.date|date:"d M" }}</td>
+  <td>{{ r.date|date:"D" }}</td>
+  <td>
+    {% if r.rec %}
+      {% status_badge r.rec.status r.rec.get_status_display %}
+      {% if r.rec.late_minutes %}<span class="small text-body-secondary ms-1">{{ r.rec.late_minutes }} min late</span>{% endif %}
+    {% elif r.kind == 'holiday' %}{% status_badge "holiday" "Holiday" %}
+    {% elif r.kind == 'weekly_off' %}{% status_badge "weekly_off" "Weekly off" %}
+    {% elif r.future %}<span class="text-body-secondary">-</span>
+    {% else %}<span class="text-body-secondary">No entry</span>{% endif %}
+  </td>
+  <td>{% if r.rec.check_in %}{{ r.rec.check_in|time:"H:i" }}{% endif %}{% if r.rec.check_out %} to {{ r.rec.check_out|time:"H:i" }}{% endif %}</td>
+  <td class="text-end">
+    {% if r.pending %}{% status_badge "pending" "Correction pending" %}
+    {% elif r.can_correct %}
+      <button class="btn btn-sm btn-outline-primary" hx-get="{% url 'web:attendance_correct' r.date|date:'Y-m-d' %}"
+              hx-target="closest td" hx-swap="innerHTML">Request correction</button>
+    {% endif %}
+  </td>
+</tr>

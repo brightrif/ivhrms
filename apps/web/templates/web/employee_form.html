@@ -1,0 +1,115 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Add staff member{% endblock %}
+{% block content %}
+<form method="post" class="form-compact">
+  {% csrf_token %}
+  <h1>Add staff member</h1>
+  {{ form.non_field_errors }}
+
+  <div class="row g-3">
+
+    <!-- left column -->
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+        <h2>Employment</h2>
+        <div class="row">
+          <div class="col-md-6">{{ form.company.as_field_group }}</div>
+          <div class="col-md-6">{{ form.worker_type.as_field_group }}</div>
+        </div>
+        <div class="mb-3">
+          <span class="form-label fw-medium d-block">Employee number</span>
+          <div class="form-control-plaintext py-0"
+               hx-get="{% url 'web:employee_next_number' %}"
+               hx-trigger="load, change from:#id_company, change from:#id_worker_type"
+               hx-include="#id_company, #id_worker_type">Assigned automatically when saved.</div>
+        </div>
+        <div class="row">
+          <div class="col-md-6">{{ form.employment_type.as_field_group }}</div>
+          <div class="col-md-6">{{ form.joining_date.as_field_group }}</div>
+        </div>
+        <div class="row">
+          <div class="col-md-6">{{ form.designation.as_field_group }}</div>
+          <div class="col-md-6" id="company-fields">{% include "web/_employee_company_fields.html" %}</div>
+        </div>
+        {% if not form.designation.field.queryset.exists %}
+        <div class="alert alert-warning py-2 mb-2">
+          No designations exist yet.
+          {% if perms.organization.add_designation %}<a href="{% url 'web:designation_create' %}">Add a designation</a> first, then come back.
+          {% else %}Ask an administrator to add one.{% endif %}
+        </div>
+        {% endif %}
+        <div class="small text-body-secondary">
+          Manager, grade, location and shift can be set later.
+          {% if perms.organization.view_department %}<a href="{% url 'web:department_list' %}">Departments</a>{% endif %}
+          {% if perms.organization.view_designation %} · <a href="{% url 'web:designation_list' %}">Designations</a>{% endif %}
+        </div>
+      </div></div>
+
+      <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+        <h2>Personal</h2>
+        <div class="row">
+          <div class="col-md-6">{{ form.first_name.as_field_group }}</div>
+          <div class="col-md-6">{{ form.last_name.as_field_group }}</div>
+        </div>
+        <details{% if form.name_ar.errors or form.date_of_birth.errors or form.nationality.errors %} open{% endif %}>
+          <summary class="text-primary mb-2" style="cursor:pointer">More details (optional)</summary>
+          <div class="row">
+            <div class="col-md-6">{{ form.name_ar.as_field_group }}</div>
+            <div class="col-md-6">{{ form.nationality.as_field_group }}</div>
+          </div>
+          <div class="row"><div class="col-md-6">{{ form.date_of_birth.as_field_group }}</div></div>
+        </details>
+      </div></div>
+    </div>
+
+    <!-- right column -->
+    <div class="col-lg-5">
+      <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+        <h2>Contact</h2>
+        <div class="row">
+          <div class="col-xl-6">{{ form.phone.as_field_group }}</div>
+          <div class="col-xl-6">{{ form.whatsapp_number.as_field_group }}</div>
+        </div>
+        {{ form.email.as_field_group }}
+      </div></div>
+
+      <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+        <h2>Web login</h2>
+        <div class="form-check form-switch">
+          {{ form.create_login|bs }}
+          <label class="form-check-label fw-medium" for="{{ form.create_login.id_for_label }}">Create a web login</label>
+        </div>
+        <div class="form-text mb-2">Lets this person sign in to see their leave, attendance and approvals.</div>
+        <fieldset id="login-fields">
+          {{ form.username.as_field_group }}
+          <div class="form-text">
+            A temporary password is generated and shown once after saving. The employee must change it at first sign-in.
+          </div>
+        </fieldset>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <button class="btn btn-primary">Add staff member</button>
+    <a class="btn btn-outline-secondary" href="{% url 'web:employee_list' %}">Cancel</a>
+  </div>
+</form>
+
+<script>
+  // The whole login section is usable only while the switch is on.
+  (function () {
+    var toggle = document.getElementById("id_create_login");
+    var fields = document.getElementById("login-fields");
+    var name = document.getElementById("id_username");
+    function sync() { fields.disabled = !toggle.checked; }
+    toggle.addEventListener("change", function () {
+      sync();
+      if (toggle.checked) name.focus();
+    });
+    window.addEventListener("pageshow", sync);   // the Back button restores the switch, so re-check
+    sync();
+  })();
+</script>
+{% endblock %}

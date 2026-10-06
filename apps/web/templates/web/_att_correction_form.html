@@ -1,0 +1,8 @@
+<div id="corr-{{ iso }}" class="form-compact text-start" style="min-width:260px">
+  <form hx-post="{% url 'web:attendance_correct' iso %}" hx-target="#corr-{{ iso }}" hx-swap="outerHTML">
+    {{ form }}
+    <button class="btn btn-primary btn-sm">Submit for approval</button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" hx-get="{% url 'web:attendance_row' iso %}"
+            hx-target="#att-row-{{ iso }}" hx-swap="outerHTML">Cancel</button>
+  </form>
+</div>

@@ -1,0 +1,18 @@
+{% extends "web/base.html" %}
+{% block title %}My leave{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">My leave</h1>
+  <a class="btn btn-primary" href="{% url 'web:leave_apply' %}"><i class="bi bi-plus-lg me-1"></i>Apply for leave</a>
+</div>
+<div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for l in leaves %}{% include "web/_leave_row.html" %}{% empty %}
+      <tr><td colspan="5" class="text-center text-body-secondary py-4">No leave requests yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div></div>
+{% endblock %}

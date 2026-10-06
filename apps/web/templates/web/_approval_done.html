@@ -1,0 +1,6 @@
+<tr class="{% if not item %}table-light{% elif item.approval.status == 'rejected' %}table-danger{% else %}table-success{% endif %}">
+  <td colspan="5">
+    <i class="bi {% if item.approval.status == 'rejected' %}bi-x-circle{% else %}bi-check-circle{% endif %} me-1"></i>{{ message }}
+    {% if item %}<span class="text-body-secondary"> {{ item.approval.employee.full_name }}: {{ item.info.title }}</span>{% endif %}
+  </td>
+</tr>

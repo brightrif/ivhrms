@@ -1,0 +1,35 @@
+{% extends "web/base.html" %}
+{% block title %}My attendance{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Attendance <span class="text-body-secondary fw-normal">{{ month|date:"F Y" }}</span></h1>
+  <div class="btn-group" role="group" aria-label="Change month">
+    <a class="btn btn-outline-secondary btn-sm" href="?month={{ prev_month }}"><i class="bi bi-chevron-left"></i> Previous</a>
+    {% if next_month %}
+      <a class="btn btn-outline-secondary btn-sm" href="?month={{ next_month }}">Next <i class="bi bi-chevron-right"></i></a>
+    {% else %}
+      <span class="btn btn-outline-secondary btn-sm disabled">Next <i class="bi bi-chevron-right"></i></span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row row-cols-2 row-cols-md-5 g-2 mb-3">
+  <div class="col"><div class="card shadow-sm border-0"><div class="card-body py-2">
+    <div class="small text-body-secondary">Worked</div><div class="fs-4 fw-semibold">{{ summary.worked }}</div></div></div></div>
+  <div class="col"><div class="card shadow-sm border-0"><div class="card-body py-2">
+    <div class="small text-body-secondary">Half days</div><div class="fs-4 fw-semibold">{{ summary.half }}</div></div></div></div>
+  <div class="col"><div class="card shadow-sm border-0"><div class="card-body py-2">
+    <div class="small text-body-secondary">Absent</div><div class="fs-4 fw-semibold">{{ summary.absent }}</div></div></div></div>
+  <div class="col"><div class="card shadow-sm border-0"><div class="card-body py-2">
+    <div class="small text-body-secondary">Leave</div><div class="fs-4 fw-semibold">{{ summary.leave }}</div></div></div></div>
+  <div class="col"><div class="card shadow-sm border-0"><div class="card-body py-2">
+    <div class="small text-body-secondary">Late</div><div class="fs-4 fw-semibold">{{ summary.late }}</div></div></div></div>
+</div>
+
+<div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive">
+  <table class="table align-middle mb-0">
+    <thead class="table-light"><tr><th>Date</th><th>Day</th><th>Status</th><th>In / out</th><th></th></tr></thead>
+    <tbody>{% for r in rows %}{% include "web/_att_row.html" %}{% endfor %}</tbody>
+  </table>
+</div></div></div>
+{% endblock %}

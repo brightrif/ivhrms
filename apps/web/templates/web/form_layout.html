@@ -1,0 +1,41 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}{{ title }}{% endblock %}
+{% comment %}
+  Full-page form. The view passes `layout`, a list of cards:
+    {"title": "Document", "width": "col-lg-7", "rows": [["company", "document_type"], ["number"]]}
+  Fields in the same row share the width equally. Hidden fields are rendered automatically.
+{% endcomment %}
+{% block content %}
+<form method="post" enctype="multipart/form-data" class="form-compact">
+  {% csrf_token %}
+  <div class="mb-2">
+    <h1 class="mb-0">{{ title }}</h1>
+    {% if intro %}<div class="small text-body-secondary mt-1">{{ intro }}</div>{% endif %}
+  </div>
+  {{ form.non_field_errors }}
+  {% for h in form.hidden_fields %}{{ h }}{{ h.errors }}{% endfor %}
+
+  <div class="row g-3">
+    {% for card in layout %}
+    <div class="{{ card.width|default:'col-12' }}">
+      <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+        {% if card.title %}<h2>{{ card.title }}</h2>{% endif %}
+        {% for row in card.rows %}
+        <div class="row g-2">
+          {% for name in row %}{% with bf=form|bound:name %}{% if bf and not bf.is_hidden %}
+          <div class="col-md">{{ bf.as_field_group }}</div>
+          {% endif %}{% endwith %}{% endfor %}
+        </div>
+        {% endfor %}
+      </div></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="form-actions">
+    <button class="btn btn-primary">{{ submit_label|default:"Save" }}</button>
+    <a class="btn btn-outline-secondary" href="{{ back_url }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

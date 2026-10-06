@@ -1,0 +1,28 @@
+{% extends "web/base.html" %}
+{% block title %}Delete {{ name }}{% endblock %}
+{% block content %}
+<h1>Delete {{ kind }}</h1>
+<div class="card shadow-sm border-0" style="max-width:640px">
+  <div class="card-body">
+  {% if blockers %}
+    <div class="alert alert-warning">
+      <strong>{{ name }} cannot be deleted.</strong> It is still used by:
+      <ul class="mb-0 mt-2">{% for label, count in blockers.items %}<li>{{ count }} {{ label }}</li>{% endfor %}</ul>
+    </div>
+    <p>Deactivate it instead. It disappears from new selections, and existing records keep it.</p>
+    {% if active and can_change %}
+    <form method="post" action="{{ toggle_url }}" class="d-inline">{% csrf_token %}
+      <button class="btn btn-outline-secondary">Deactivate instead</button>
+    </form>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{{ back_url }}">Back</a>
+  {% else %}
+    <p>Permanently delete <strong>{{ name }}</strong>? Nothing uses it. This cannot be undone.</p>
+    <form method="post">{% csrf_token %}
+      <button class="btn btn-danger">Delete permanently</button>
+      <a class="btn btn-outline-secondary" href="{{ back_url }}">Cancel</a>
+    </form>
+  {% endif %}
+  </div>
+</div>
+{% endblock %}

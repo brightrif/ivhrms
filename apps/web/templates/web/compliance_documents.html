@@ -1,0 +1,55 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Compliance documents{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Compliance documents</h1>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:compliance_dashboard' %}">Dashboard</a>
+    {% if perms.compliance.add_document %}<a class="btn btn-primary" href="{% url 'web:compliance_create' %}"><i class="bi bi-plus-lg me-1"></i>Add document</a>{% endif %}
+  </div>
+</div>
+
+<form method="get" class="row g-2 mb-3 align-items-center">
+  <div class="col-md-4"><input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Search type, number or reference"></div>
+  {% if multi_company %}
+  <div class="col-6 col-md-2"><select name="company" class="form-select">
+    <option value="">All companies</option>
+    {% for c in companies %}<option value="{{ c.pk }}"{% if c.pk|stringformat:"s" == company %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+  </select></div>
+  {% endif %}
+  <div class="col-6 col-md-2"><select name="type" class="form-select">
+    <option value="">All types</option>
+    {% for t in types %}<option value="{{ t.pk }}"{% if t.pk|stringformat:"s" == dtype %} selected{% endif %}>{{ t.name }}</option>{% endfor %}
+  </select></div>
+  <div class="col-6 col-md-2"><select name="state" class="form-select">
+    <option value="">Any status</option>
+    {% for value, label in states %}<option value="{{ value }}"{% if value == state %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></div>
+  <div class="col-6 col-md-auto">
+    <div class="form-check"><input class="form-check-input" type="checkbox" name="history" value="1" id="history"{% if history %} checked{% endif %}>
+      <label class="form-check-label" for="history">Include older versions</label></div>
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-primary">Filter</button></div>
+</form>
+
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Document</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Number</th><th>Expires</th><th>Responsible</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for d in docs %}
+      <tr{% if not d.is_current %} class="table-light text-body-secondary"{% endif %}>
+        <td><a class="fw-medium text-decoration-none" href="{% url 'web:compliance_detail' d.pk %}">{{ d.label }}</a></td>
+        {% if multi_company %}<td>{{ d.company.code }}</td>{% endif %}
+        <td>{{ d.number|default:"-" }}</td>
+        <td class="text-nowrap">{{ d.expiry_date|date:"d M Y" }}</td>
+        <td>{% if d.responsible %}{{ d.responsible.get_full_name|default:d.responsible.username }}{% else %}-{% endif %}</td>
+        <td>{% if d.is_current %}{% status_badge d.state d.due_text %}{% else %}{% status_badge "cancelled" "Older version" %}{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="text-center text-body-secondary py-4">No documents match.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

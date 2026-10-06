@@ -1,0 +1,9 @@
+<form hx-post="{% url 'web:approval_decide' a.pk %}" hx-target="closest tr" hx-swap="outerHTML"
+      class="text-start" style="min-width:240px">
+  <input type="hidden" name="decision" value="reject">
+  <textarea name="comment" rows="2" class="form-control form-control-sm mb-2"
+            placeholder="Reason for rejecting (required)" required></textarea>
+  <button class="btn btn-sm btn-danger">Confirm reject</button>
+  <button type="button" class="btn btn-sm btn-outline-secondary" hx-get="{% url 'web:approval_row' a.pk %}"
+          hx-target="closest tr" hx-swap="outerHTML">Cancel</button>
+</form>

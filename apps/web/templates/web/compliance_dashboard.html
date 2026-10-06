@@ -1,0 +1,68 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Compliance{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Compliance</h1>
+  <div class="d-flex flex-wrap gap-2">
+    {% if perms.compliance.view_renewalpayment %}<a class="btn btn-outline-secondary" href="{% url 'web:compliance_costs' %}">Renewal costs</a>{% endif %}
+    {% if perms.compliance.view_documenttype %}<a class="btn btn-outline-secondary" href="{% url 'web:compliance_types' %}">Document types</a>{% endif %}
+    <a class="btn btn-outline-secondary" href="{% url 'web:compliance_documents' %}">All documents</a>
+    {% if perms.compliance.add_document %}<a class="btn btn-primary" href="{% url 'web:compliance_create' %}"><i class="bi bi-plus-lg me-1"></i>Add document</a>{% endif %}
+  </div>
+</div>
+
+<div class="row row-cols-2 row-cols-lg-4 g-3 mb-4">
+  <div class="col"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>Overdue</h2><div class="display-6 fw-semibold lh-1 {% if overdue %}text-danger{% endif %}">{{ overdue|length }}</div></div></div></div>
+  <div class="col"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>Due soon</h2><div class="display-6 fw-semibold lh-1 {% if due %}text-warning-emphasis{% endif %}">{{ due|length }}</div></div></div></div>
+  <div class="col"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>Open renewals</h2><div class="display-6 fw-semibold lh-1">{{ open_tasks|length }}</div></div></div></div>
+  <div class="col"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>Missing</h2><div class="display-6 fw-semibold lh-1 {% if missing %}text-danger{% endif %}">{{ missing|length }}</div></div></div></div>
+</div>
+
+{% if missing %}
+<div class="alert alert-danger">
+  <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>Required documents with nothing on file</div>
+  <ul class="mb-0">
+    {% for company, dtype in missing %}
+    <li>{{ dtype.name }} for {{ company.name }}
+      {% if perms.compliance.add_document %}<a class="ms-1" href="{% url 'web:compliance_create' %}?company={{ company.pk }}&type={{ dtype.pk }}">Add it</a>{% endif %}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% include "web/_compliance_doc_table.html" with docs=overdue title="Overdue" empty="Nothing is overdue." %}
+{% include "web/_compliance_doc_table.html" with docs=due title="Due soon" empty="Nothing is inside its alert window." %}
+
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">Open renewals</span><span class="badge text-bg-light border">{{ open_tasks|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr><th>Renewal</th><th>Assigned to</th><th>Due</th><th class="text-end">Estimate (BHD)</th><th class="text-end">Paid so far (BHD)</th><th></th></tr></thead>
+      <tbody>
+      {% for t in open_tasks %}
+        <tr>
+          <td><a class="fw-medium text-decoration-none" href="{% url 'web:compliance_detail' t.document_id %}">{{ t.document.label }}</a>
+              <div class="small text-body-secondary">{{ t.company.name }}</div></td>
+          <td>{% if t.assignee %}{{ t.assignee.get_full_name|default:t.assignee.username }}{% else %}<span class="text-body-secondary">Not assigned</span>{% endif %}</td>
+          <td class="text-nowrap">{{ t.due_date|date:"d M Y" }}</td>
+          <td class="text-end">{% if t.estimated_cost is not None %}{{ t.estimated_cost|floatformat:3 }}{% else %}-{% endif %}</td>
+          <td class="text-end">{{ t.paid_total|floatformat:3 }}</td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'web:compliance_detail' t.document_id %}">Open</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="text-center text-body-secondary py-3">No renewals in progress.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% include "web/_compliance_doc_table.html" with docs=upcoming title="Coming up (next 90 days)" empty="Nothing else expires in the next 90 days." %}
+{% endblock %}

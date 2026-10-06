@@ -1,0 +1,34 @@
+{% extends "web/base.html" %}
+{% block title %}Apply for leave{% endblock %}
+{% block content %}
+<h1>Apply for leave</h1>
+<div class="row"><div class="col-xl-8">
+  <div class="card shadow-sm border-0">
+    <form method="post" enctype="multipart/form-data" class="card-body form-compact">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div hx-post="{% url 'web:leave_preview' %}" hx-trigger="change" hx-target="#preview" hx-include="closest form">
+        <div class="row g-2">
+          <div class="col-md-6">{{ form.leave_type.as_field_group }}</div>
+          <div class="col-md-6">
+            <div class="row g-2">
+              <div class="col">{{ form.start_date.as_field_group }}</div>
+              <div class="col">{{ form.end_date.as_field_group }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-6">{{ form.attachment.as_field_group }}</div>
+          <div class="col-md-6 d-md-flex align-items-md-end">{{ form.is_half_day.as_field_group }}</div>
+        </div>
+        {{ form.reason.as_field_group }}
+      </div>
+      <div id="preview" class="alert alert-light border py-2 mb-3 text-body-secondary">
+        Choose a leave type and dates to see how many days will be charged.
+      </div>
+      <button class="btn btn-primary">Submit for approval</button>
+      <a class="btn btn-outline-secondary" href="{% url 'web:leave_list' %}">Back</a>
+    </form>
+  </div>
+</div></div>
+{% endblock %}

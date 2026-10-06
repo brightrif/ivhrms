@@ -1,0 +1,11 @@
+{% if error %}
+  <div class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>{{ error }}</div>
+{% elif hint %}
+  <span class="text-body-secondary">{{ hint }}</span>
+{% else %}
+  <div class="text-success">
+    <i class="bi bi-check-circle me-1"></i>This request uses <strong>{{ days|floatformat:"-1" }}</strong> day{{ days|pluralize }}.
+    {% if tracked %}Available now: <strong>{{ available|floatformat:"-1" }}</strong>, after this request: <strong>{{ after|floatformat:"-1" }}</strong>.{% endif %}
+  </div>
+  {% if short %}<div class="text-danger mt-1"><i class="bi bi-exclamation-circle me-1"></i>Not enough balance for this request.</div>{% endif %}
+{% endif %}

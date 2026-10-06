@@ -1,0 +1,32 @@
+{% extends "web/base.html" %}
+{% block title %}Renewal costs{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Renewal costs</h1>
+  <form method="get" class="d-flex gap-2">
+    <select name="year" class="form-select" onchange="this.form.submit()">
+      {% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}
+    </select>
+    <a class="btn btn-outline-secondary" href="{% url 'web:compliance_dashboard' %}">Dashboard</a>
+  </form>
+</div>
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Company</th><th>Document type</th><th class="text-end">Payments</th><th class="text-end">Government</th><th class="text-end">Service</th><th class="text-end">Fines</th><th class="text-end">Total (BHD)</th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr><td>{{ r.company.name }}</td><td>{{ r.type.name }}</td><td class="text-end">{{ r.count }}</td>
+          <td class="text-end">{{ r.government|floatformat:3 }}</td><td class="text-end">{{ r.service|floatformat:3 }}</td>
+          <td class="text-end{% if r.fine %} text-danger{% endif %}">{{ r.fine|floatformat:3 }}</td>
+          <td class="text-end fw-medium">{{ r.total|floatformat:3 }}</td></tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-center text-body-secondary py-4">No payments recorded in {{ year }}.</td></tr>
+    {% endfor %}
+    </tbody>
+    {% if rows %}<tfoot><tr class="table-light fw-semibold"><td colspan="3" class="text-end">All</td>
+      <td class="text-end">{{ grand.government|floatformat:3 }}</td><td class="text-end">{{ grand.service|floatformat:3 }}</td>
+      <td class="text-end">{{ grand.fine|floatformat:3 }}</td><td class="text-end">{{ grand.total|floatformat:3 }}</td></tr></tfoot>{% endif %}
+  </table>
+</div></div>
+<p class="small text-body-secondary mt-2">Fines are shown on their own so you can see what late renewals cost.</p>
+{% endblock %}
