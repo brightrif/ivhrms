@@ -1,0 +1,110 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}{{ emp.full_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h1 class="mb-0">{{ emp.full_name }}</h1>
+    <div class="text-body-secondary">{{ emp.employee_no }} &middot; {{ profile.trade.name }} {% status_badge emp.status emp.get_status_display %}</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:labor_list' %}">All workers</a>
+    <a class="btn btn-outline-secondary" href="{% url 'web:employee_detail' emp.pk %}">Employee record</a>
+    {% if perms.labor.change_laborprofile and emp.status != 'separated' %}<a class="btn btn-outline-primary" href="{% url 'web:labor_edit' profile.pk %}">Edit</a>{% endif %}
+    {% if perms.labor.add_laborrate and emp.status != 'separated' %}<a class="btn btn-primary" href="{% url 'web:labor_rate_change' profile.pk %}">Change pay</a>{% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>Worker</h2>
+    <dl class="row mb-0 small">
+      <dt class="col-5">Company</dt><dd class="col-7">{{ profile.company.name }}</dd>
+      <dt class="col-5">Joined</dt><dd class="col-7">{{ emp.joining_date|date:"d M Y" }}</dd>
+      <dt class="col-5">Nationality</dt><dd class="col-7">{{ emp.nationality|default:"-" }}</dd>
+      <dt class="col-5">Phone</dt><dd class="col-7">{{ emp.phone|default:"-" }}</dd>
+    </dl>
+  </div></div></div>
+
+  <div class="col-lg-4"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>Engagement</h2>
+    <dl class="row mb-0 small">
+      <dt class="col-5">Engaged as</dt><dd class="col-7">{{ profile.get_engagement_display }}</dd>
+      <dt class="col-5">Contractor</dt><dd class="col-7">{{ profile.contractor.name|default:"None (engaged directly)" }}</dd>
+      <dt class="col-5">Trade</dt><dd class="col-7">{{ profile.trade.name }}</dd>
+      <dt class="col-5">Notes</dt><dd class="col-7">{{ profile.notes|default:"-" }}</dd>
+    </dl>
+  </div></div></div>
+
+  <div class="col-lg-4"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>Pay</h2>
+    {% if show_rates %}
+      {% with r=profile.current_rate %}
+      {% if r %}
+      <div class="fs-4">{{ r.rate|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD / {{ r.unit }}</span></div>
+      <div class="small text-body-secondary">{{ r.get_wage_basis_display }} &middot; {{ r.standard_hours|floatformat:"-2" }} h a day &middot; {% if r.overtime_eligible %}overtime allowed{% else %}no overtime{% endif %}</div>
+      {% else %}<div class="text-body-secondary">No pay terms yet.</div>{% endif %}
+      {% endwith %}
+    {% else %}<div class="text-body-secondary small">You do not have access to pay details.</div>{% endif %}
+  </div></div></div>
+</div>
+
+{% if perms.labor.view_laborallocation %}
+<div class="card shadow-sm border-0 mt-3">
+  <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
+    <span class="fw-semibold">Site</span>
+    {% if emp.status != 'separated' %}
+    <span class="d-flex gap-2">
+      {% if perms.labor.add_laborallocation %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:labor_allocate' profile.pk %}">{% if current_allocation %}Move{% else %}Allocate{% endif %}</a>{% endif %}
+      {% if current_allocation and perms.labor.change_laborallocation %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:labor_release' profile.pk %}">Release</a>{% endif %}
+    </span>
+    {% endif %}
+  </div>
+  <div class="card-body py-2">
+    {% if current_allocation %}
+      <div class="fw-medium">{{ current_allocation.project.code }} {{ current_allocation.project.name }}</div>
+      <div class="small text-body-secondary">{{ current_allocation.location.name }}{% if current_allocation.work_order %} &middot; work order {{ current_allocation.work_order.code }}{% endif %} &middot; since {{ current_allocation.effective_from|date:"d M Y" }}</div>
+    {% else %}<div class="text-body-secondary">Not on any site.</div>{% endif %}
+  </div>
+  {% if allocations|length > 1 or not current_allocation and allocations %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light"><tr><th>From</th><th>To</th><th>Project</th><th>Site</th><th>Work order</th></tr></thead>
+      <tbody>
+      {% for a in allocations %}
+        <tr>
+          <td class="text-nowrap">{{ a.effective_from|date:"d M Y" }}</td>
+          <td class="text-nowrap">{% if a.effective_to %}{{ a.effective_to|date:"d M Y" }}{% else %}<span class="badge text-bg-light border">Current</span>{% endif %}</td>
+          <td>{{ a.project.code }} {{ a.project.name }}</td><td>{{ a.location.name }}</td><td>{{ a.work_order.code|default:"-" }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if show_rates %}
+<div class="card shadow-sm border-0 mt-3">
+  <div class="card-header bg-white py-2"><span class="fw-semibold">Pay history</span></div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light"><tr><th>From</th><th>To</th><th>Basis</th><th class="text-end">Rate (BHD)</th><th class="text-end">Standard hours</th><th>Overtime</th></tr></thead>
+      <tbody>
+      {% for r in rates %}
+        <tr>
+          <td class="text-nowrap">{{ r.effective_from|date:"d M Y" }}</td>
+          <td class="text-nowrap">{% if r.effective_to %}{{ r.effective_to|date:"d M Y" }}{% else %}<span class="badge text-bg-light border">Current</span>{% endif %}</td>
+          <td>{{ r.get_wage_basis_display }}</td>
+          <td class="text-end">{{ r.rate|floatformat:3 }}</td>
+          <td class="text-end">{{ r.standard_hours|floatformat:"-2" }}</td>
+          <td>{% if r.overtime_eligible %}Yes{% else %}No{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

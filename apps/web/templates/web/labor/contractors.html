@@ -1,0 +1,36 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Contractors{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Labor</h1>
+  {% if perms.labor.add_contractor %}<a class="btn btn-primary" href="{% url 'web:labor_contractor_create' %}"><i class="bi bi-plus-lg me-1"></i>Add contractor</a>{% endif %}
+</div>
+{% include "web/labor/_tabs.html" with tab="contractors" %}
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Contractor</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Contact</th><th>CR no.</th><th class="text-end">Workers</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for c in contractors %}
+      <tr{% if not c.is_active %} class="table-light text-body-secondary"{% endif %}>
+        <td class="fw-medium">{{ c.name }}{% if c.name_ar %}<div class="small text-body-secondary">{{ c.name_ar }}</div>{% endif %}</td>
+        {% if multi_company %}<td>{{ c.company.code }}</td>{% endif %}
+        <td>{{ c.contact_person|default:"-" }}{% if c.phone %}<div class="small text-body-secondary">{{ c.phone }}</div>{% endif %}</td>
+        <td>{{ c.cr_number|default:"-" }}</td>
+        <td class="text-end">{{ c.worker_count }}</td>
+        <td>{% if c.is_active %}{% status_badge "active" "Active" %}{% else %}{% status_badge "separated" "Inactive" %}{% endif %}</td>
+        <td class="text-end text-nowrap">
+          {% if perms.labor.change_contractor %}
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'web:labor_contractor_edit' c.pk %}">Edit</a>
+          <form method="post" action="{% url 'web:labor_contractor_toggle' c.pk %}" class="d-inline">{% csrf_token %}
+            <button class="btn btn-sm btn-outline-secondary">{% if c.is_active %}Deactivate{% else %}Reactivate{% endif %}</button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-center text-body-secondary py-4">No contractors yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

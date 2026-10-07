@@ -75,6 +75,10 @@
           <a class="nav-link {% if u|slice:':8' == 'vehicle_' %}active{% endif %}" href="{% url 'web:vehicle_list' %}">
             <i class="bi bi-car-front"></i> Vehicles</a>
           {% endif %}
+          {% if perms.labor.view_laborprofile %}
+          <a class="nav-link {% if u|slice:':6' == 'labor_' %}active{% endif %}" href="{% url 'web:labor_list' %}">
+            <i class="bi bi-people"></i> Labor</a>
+          {% endif %}
         </nav>
         {% endwith %}
       </div>

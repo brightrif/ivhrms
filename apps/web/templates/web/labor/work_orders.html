@@ -1,0 +1,36 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Work orders{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Labor</h1>
+  {% if perms.labor.add_workorder %}<a class="btn btn-primary" href="{% url 'web:labor_work_order_create' %}"><i class="bi bi-plus-lg me-1"></i>Add work order</a>{% endif %}
+</div>
+{% include "web/labor/_tabs.html" with tab="work_orders" %}
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Work order</th><th>Project</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Dates</th><th class="text-end">Workers now</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for o in orders %}
+      <tr{% if o.status == 'closed' %} class="table-light text-body-secondary"{% endif %}>
+        <td class="fw-medium">{{ o.code }}<div class="small text-body-secondary">{{ o.name }}</div></td>
+        <td>{{ o.project.code }}</td>
+        {% if multi_company %}<td>{{ o.company.code }}</td>{% endif %}
+        <td class="text-nowrap">{% if o.start_date %}{{ o.start_date|date:"d M Y" }}{% else %}-{% endif %}{% if o.end_date %} to {{ o.end_date|date:"d M Y" }}{% endif %}</td>
+        <td class="text-end">{{ o.worker_count }}</td>
+        <td>{% if o.status == 'open' %}{% status_badge "open" "Open" %}{% else %}{% status_badge "cancelled" "Closed" %}{% endif %}</td>
+        <td class="text-end text-nowrap">
+          {% if perms.labor.change_workorder %}
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'web:labor_work_order_edit' o.pk %}">Edit</a>
+          <form method="post" action="{% url 'web:labor_work_order_toggle' o.pk %}" class="d-inline">{% csrf_token %}
+            <button class="btn btn-sm btn-outline-secondary">{% if o.status == 'open' %}Close{% else %}Reopen{% endif %}</button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-center text-body-secondary py-4">No work orders yet. They are optional: add one only if labor cost is charged to a contract or work order inside a project.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

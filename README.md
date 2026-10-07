@@ -1,24 +1,23 @@
-# ivhrms
+# Labor Management, phase 1
 
-# Virtual environment information
+Contractors, trades, labor workers and their pay terms.
 
-## create new venv
+## Install (on a new git branch)
 
-python -m venv ivenv
+    git checkout -b labor-phase1
+    python install_labor.py            # run from the project root, the folder with manage.py
+    python manage.py migrate
+    python manage.py makemigrations --check --dry-run     # should say: No changes detected
+    python manage.py test apps.labor apps.web
 
-## Activate env
+The installer copies new files, makes three small edits (LOCAL_APPS, web/urls/__init__.py, the sidebar in base.html)
+and never overwrites a file that already exists with different content. Running it twice changes nothing.
 
-source ivenv/Scripts/activate
+## What is in it
 
-# Istalled package
+- apps/labor: Trade, Contractor, LaborProfile, LaborRate (effective-dated pay), services, group permissions (set up
+  automatically after migrate), tests.
+- apps/web: pages under /labor/ (workers, contractors, trades), forms, tests.
 
-pip install django django-environ "psycopg[binary]" celery redis
-pip freeze > requirements.txt
-
-# Colour roles
-
-Colour Hex Used for
-Deep blue #31629C Primary buttons, links, focus rings
-Navy #233460 Sidebar, headings
-Sky blue #55AED0 Active-menu marker and icons on the navy sidebar
-Mid blue #4EA0C6 Spare accent for charts and highlights later
+HR can add and change everything, and add new pay terms. Finance and Management can view. Pay is shown only to those
+with the view_laborrate permission.

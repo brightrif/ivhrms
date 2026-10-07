@@ -1,0 +1,93 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Labor{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Labor</h1>
+  {% if perms.labor.add_laborprofile and perms.employees.add_employee %}
+  <a class="btn btn-primary" href="{% url 'web:labor_create' %}"><i class="bi bi-plus-lg me-1"></i>Add worker</a>
+  {% endif %}
+</div>
+{% include "web/labor/_tabs.html" with tab="workers" %}
+
+{% if unassigned_total and perms.labor.add_laborprofile %}
+<div class="alert alert-warning py-2">
+  <strong>{{ unassigned_total }} labor worker{{ unassigned_total|pluralize }} without a labor profile.</strong>
+  They are not in the list below until a profile is added:
+  {% for e in unassigned %}<a class="ms-1" href="{% url 'web:labor_setup' e.pk %}">{{ e.employee_no }} {{ e.full_name }}</a>{% if not forloop.last %},{% endif %}{% endfor %}{% if unassigned_total > unassigned|length %} and more{% endif %}.
+</div>
+{% endif %}
+
+<form method="get" class="row g-2 mb-3 align-items-center">
+  <div class="col-md-2"><input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Search name, number, phone or contractor"></div>
+  {% if multi_company %}
+  <div class="col-6 col-md-2"><select name="company" class="form-select">
+    <option value="">All companies</option>
+    {% for c in companies %}<option value="{{ c.pk }}"{% if c.pk|stringformat:"s" == company %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+  </select></div>
+  {% endif %}
+  <div class="col-6 col-md-2"><select name="engagement" class="form-select">
+    <option value="">All engagements</option>
+    {% for value, label in engagements %}<option value="{{ value }}"{% if value == engagement %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></div>
+  <div class="col-6 col-md-2"><select name="trade" class="form-select">
+    <option value="">All trades</option>
+    {% for t in trades %}<option value="{{ t.pk }}"{% if t.pk|stringformat:"s" == trade %} selected{% endif %}>{{ t.name }}</option>{% endfor %}
+  </select></div>
+  <div class="col-6 col-md-2"><select name="project" class="form-select">
+    <option value="">All projects</option>
+    <option value="none"{% if project == "none" %} selected{% endif %}>Not on any site</option>
+    {% for pr in projects %}<option value="{{ pr.pk }}"{% if pr.pk|stringformat:"s" == project %} selected{% endif %}>{{ pr.code }}</option>{% endfor %}
+  </select></div>
+  <div class="col-6 col-md-2"><select name="status" class="form-select">
+    <option value="">Not left</option>
+    {% for value, label in statuses %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></div>
+  <div class="col-auto"><button class="btn btn-outline-primary">Filter</button></div>
+</form>
+
+<form method="get" action="{% url 'web:labor_transfer' %}">
+{% if can_allocate %}
+<div class="mb-2"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-geo-alt me-1"></i>Allocate / move ticked workers</button></div>
+{% endif %}
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr>
+      {% if can_allocate %}<th style="width:2rem"><input type="checkbox" class="form-check-input" aria-label="Tick all"
+        onclick="this.closest('table').querySelectorAll('input[name=profiles]').forEach(function(c){c.checked=this.checked}, this)"></th>{% endif %}
+      <th>No.</th><th>Name</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Trade</th><th>Engagement</th><th>Site</th>
+      {% if show_rates %}<th class="text-end">Pay</th>{% endif %}<th>Status</th></tr></thead>
+    <tbody>
+    {% for p in page %}
+      <tr>
+        {% if can_allocate %}<td><input type="checkbox" class="form-check-input" name="profiles" value="{{ p.pk }}" aria-label="Tick {{ p.employee.full_name }}"></td>{% endif %}
+        <td class="text-nowrap">{{ p.employee.employee_no }}</td>
+        <td><a class="fw-medium text-decoration-none" href="{% url 'web:labor_detail' p.pk %}">{{ p.employee.full_name }}</a>
+          {% if p.employee.phone %}<div class="small text-body-secondary">{{ p.employee.phone }}</div>{% endif %}</td>
+        {% if multi_company %}<td>{{ p.company.code }}</td>{% endif %}
+        <td>{{ p.trade.name }}</td>
+        <td>{{ p.get_engagement_display }}{% if p.contractor %}<div class="small text-body-secondary">{{ p.contractor.name }}</div>{% endif %}</td>
+        <td>{% with a=p.employee.open_allocs.0 %}{% if a %}{{ a.project.code }}<div class="small text-body-secondary">{{ a.location.name }}{% if a.work_order %} &middot; {{ a.work_order.code }}{% endif %}</div>{% else %}<span class="text-body-secondary">-</span>{% endif %}{% endwith %}</td>
+        {% if show_rates %}<td class="text-end text-nowrap">{% with r=p.current_rate %}{% if r %}{{ r.rate|floatformat:3 }} <span class="small text-body-secondary">/ {{ r.unit }}</span>{% else %}-{% endif %}{% endwith %}</td>{% endif %}
+        <td>{% status_badge p.employee.status p.employee.get_status_display %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="9" class="text-center text-body-secondary py-4">No labor workers match.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if page.has_other_pages %}
+<div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <span class="small text-body-secondary">Page {{ page.number }} of {{ page.paginator.num_pages }} &middot; {{ page.paginator.count }} workers</span>
+  <ul class="pagination pagination-sm mb-0">
+    {% if page.has_previous %}<li class="page-item"><a class="page-link" href="?{{ extra }}&page={{ page.previous_page_number }}">Previous</a></li>
+    {% else %}<li class="page-item disabled"><span class="page-link">Previous</span></li>{% endif %}
+    {% if page.has_next %}<li class="page-item"><a class="page-link" href="?{{ extra }}&page={{ page.next_page_number }}">Next</a></li>
+    {% else %}<li class="page-item disabled"><span class="page-link">Next</span></li>{% endif %}
+  </ul>
+</div>
+{% endif %}
+</div>
+</form>
+{% endblock %}

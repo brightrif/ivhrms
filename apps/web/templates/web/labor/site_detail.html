@@ -1,0 +1,42 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}{{ project.code }} / {{ location.name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h1 class="mb-0">{{ project.code }} &middot; {{ location.name }}</h1>
+    <div class="text-body-secondary">{{ project.name }} &middot; {{ allocations|length }} worker{{ allocations|length|pluralize }} now ({{ direct }} direct, {{ contracted }} contracted)</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'web:labor_site_list' %}">All sites</a>
+</div>
+<form method="get" action="{% url 'web:labor_transfer' %}">
+{% if perms.labor.add_laborallocation and allocations %}
+<div class="mb-2"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-left-right me-1"></i>Move ticked workers</button></div>
+{% endif %}
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr>
+      {% if perms.labor.add_laborallocation %}<th style="width:2rem"><input type="checkbox" class="form-check-input" aria-label="Tick all"
+        onclick="this.closest('table').querySelectorAll('input[name=profiles]').forEach(function(c){c.checked=this.checked}, this)"></th>{% endif %}
+      <th>No.</th><th>Name</th><th>Trade</th><th>Engagement</th><th>Work order</th><th>Since</th></tr></thead>
+    <tbody>
+    {% for a in allocations %}
+      {% with p=a.employee.labor_profile %}
+      <tr>
+        {% if perms.labor.add_laborallocation %}<td><input type="checkbox" class="form-check-input" name="profiles" value="{{ p.pk }}" aria-label="Tick {{ a.employee.full_name }}"></td>{% endif %}
+        <td class="text-nowrap">{{ a.employee.employee_no }}</td>
+        <td><a class="fw-medium text-decoration-none" href="{% url 'web:labor_detail' p.pk %}">{{ a.employee.full_name }}</a></td>
+        <td>{{ p.trade.name }}</td>
+        <td>{{ p.get_engagement_display }}{% if p.contractor %}<div class="small text-body-secondary">{{ p.contractor.name }}</div>{% endif %}</td>
+        <td>{{ a.work_order.code|default:"-" }}</td>
+        <td class="text-nowrap">{{ a.effective_from|date:"d M Y" }}</td>
+      </tr>
+      {% endwith %}
+    {% empty %}
+      <tr><td colspan="7" class="text-center text-body-secondary py-4">Nobody is on this site. Tick workers on the Workers tab and choose "Allocate / move".</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+</form>
+{% endblock %}
