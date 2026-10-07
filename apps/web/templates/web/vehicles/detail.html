@@ -9,6 +9,11 @@
     <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_list' %}">All vehicles</a>
     {% if vehicle.status != "sold" %}
       {% if perms.vehicles.change_vehicle %}
+        {% if vehicle.status == "active" %}
+          <form method="post" action="{% url 'web:vehicle_workshop_send' vehicle.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-secondary">Send to workshop</button></form>
+        {% elif vehicle.status == "workshop" %}
+          <form method="post" action="{% url 'web:vehicle_workshop_back' vehicle.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-success">Back from workshop</button></form>
+        {% endif %}
         <a class="btn btn-outline-primary" href="{% url 'web:vehicle_edit' vehicle.pk %}">Edit</a>
         <a class="btn btn-outline-danger" href="{% url 'web:vehicle_sell' vehicle.pk %}">Mark as sold</a>
       {% endif %}
@@ -46,16 +51,22 @@
             <div class="fw-medium"><a class="text-decoration-none" href="{% url 'web:employee_detail' current.employee.pk %}">{{ current.employee.full_name }}</a>
               <span class="text-body-secondary small">{{ current.employee.employee_no }}</span></div>
             <div class="small text-body-secondary">Since {{ current.assigned_from|date:"d M Y" }}, handed over at {{ current.start_odometer }} km</div>
-            {% if current.employee.status == "separated" %}
-              <div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle me-1"></i>This person has left the company. The vehicle should be returned.</div>
-            {% endif %}
+            {% custody_panel current vehicle %}
           {% else %}
             <div class="text-body-secondary">Not assigned</div>
           {% endif %}
         </div>
         <div>
-          {% if current and perms.vehicles.change_vehicleassignment %}
-            <a class="btn btn-outline-primary" href="{% url 'web:vehicle_return' current.pk %}">Return</a>
+          {% if current %}
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+              {% if vehicle.status != "sold" and perms.vehicles.add_vehicleassignment %}
+                <a class="btn btn-outline-primary" href="{% url 'web:vehicle_handover' vehicle.pk %}">Hand over</a>
+                {% if history|length > 1 %}{% with prev=history.1 %}{% if prev.employee.status == "active" and prev.employee_id != current.employee_id %}
+                  <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_handover' vehicle.pk %}?employee={{ prev.employee_id }}">Hand back to {{ prev.employee.first_name }}</a>
+                {% endif %}{% endwith %}{% endif %}
+              {% endif %}
+              {% if perms.vehicles.change_vehicleassignment %}<a class="btn btn-outline-primary" href="{% url 'web:vehicle_return' current.pk %}">Return</a>{% endif %}
+            </div>
           {% elif not current and vehicle.status != "sold" and perms.vehicles.add_vehicleassignment %}
             <a class="btn btn-primary" href="{% url 'web:vehicle_assign' vehicle.pk %}">Assign driver</a>
           {% endif %}

@@ -34,6 +34,8 @@ class Fine(BaseModel):
     payment_reference = models.CharField(max_length=60, blank=True)
     charged_to_employee = models.BooleanField(
         default=False, help_text="The driver bears this cost (payroll will deduct it once payroll exists).")
+    recovered_on = models.DateField(null=True, blank=True, help_text="When the driver paid the company back.")
+    recovered_note = models.CharField(max_length=200, blank=True)
     notes = models.TextField(blank=True)
     is_voided = models.BooleanField(default=False)
     voided_reason = models.CharField(max_length=200, blank=True)
@@ -47,6 +49,9 @@ class Fine(BaseModel):
             models.CheckConstraint(condition=models.Q(amount__gt=0), name="fine_amount_positive"),
             models.CheckConstraint(
                 condition=models.Q(status="unpaid") | models.Q(paid_on__isnull=False), name="fine_paid_has_a_date"),
+            models.CheckConstraint(
+                condition=models.Q(recovered_on__isnull=True) | models.Q(charged_to_employee=True),
+                name="fine_recovered_only_if_charged"),
             models.UniqueConstraint(
                 fields=["vehicle", "reference"], name="uniq_fine_reference_per_vehicle",
                 condition=~models.Q(reference="") & models.Q(is_voided=False),

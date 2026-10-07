@@ -8,5 +8,6 @@ class VehiclesConfig(AppConfig):
     verbose_name = "Vehicles"
 
     def ready(self):
+        from . import signals  # noqa: F401  (reacts to approval outcomes)
         from .defaults import ensure_system_defaults
         post_migrate.connect(ensure_system_defaults, sender=self)

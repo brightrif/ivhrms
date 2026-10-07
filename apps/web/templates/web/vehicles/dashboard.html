@@ -68,11 +68,18 @@
       </tbody></table></div>
     {% endif %}
     {% if leavers %}
-    <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white fw-semibold text-danger">Held by someone who has left</div>
+    <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white fw-semibold text-danger">Held by people on notice or who have left</div>
       <table class="table table-sm align-middle mb-0"><tbody>
       {% for a in leavers %}
         <tr><td><a class="text-decoration-none fw-medium" href="{% url 'web:vehicle_detail' a.vehicle.pk %}">{{ a.vehicle.plate_number }}</a> with {{ a.employee.full_name }}
-              <div class="small text-body-secondary">since {{ a.assigned_from|date:"d M Y" }}</div></td></tr>
+              {% if a.state == "left" %}<span class="badge text-bg-secondary">Left</span>{% else %}<span class="badge text-bg-warning">On notice</span>{% endif %}
+              <div class="small text-body-secondary">since {{ a.assigned_from|date:"d M Y" }}</div></td>
+            <td class="text-end small">
+              {% if a.decision.status == "pending" %}{% status_badge "pending" "Waiting for approval" %}
+              {% elif a.decision.status == "approved" %}{% status_badge "valid" "Approved" %} {{ a.decision.get_decision_display|lower }}
+              {% elif perms.vehicles.add_custodyrequest %}<a href="{% url 'web:vehicle_custody_request' a.vehicle.pk %}">Decide</a>
+              {% else %}<span class="text-body-secondary">Decision needed</span>{% endif %}
+            </td></tr>
       {% endfor %}
       </tbody></table></div>
     {% endif %}

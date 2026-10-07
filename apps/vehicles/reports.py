@@ -12,7 +12,7 @@ from apps.compliance import services as compliance_services
 from apps.compliance.models import RenewalPayment
 from apps.compliance.services import add_months
 
-from . import financing, maintenance
+from . import financing, handovers, maintenance
 from .incidents import Accident, Fine
 from .loans import LoanInstallment, VehicleLoan
 from .models import Vehicle
@@ -57,11 +57,11 @@ def cost_events(user, start, end, vehicle_id=None):
         events.append((vid, day, "service", parts + labour))
 
     fines = Fine.objects.for_user(user).filter(is_voided=False, fined_on__range=(start, end))
-    for vid, day, amount, paid, status, charged in only(fines).values_list(
-            "vehicle_id", "fined_on", "amount", "paid_amount", "status", "charged_to_employee"):
+    for vid, day, amount, paid, status, charged, recovered in only(fines).values_list(
+            "vehicle_id", "fined_on", "amount", "paid_amount", "status", "charged_to_employee", "recovered_on"):
         cost = paid if (status == Fine.Status.PAID and paid is not None) else amount
         events.append((vid, day, "fines", cost))
-        if charged:
+        if charged and recovered is None:                       # still to be recovered from the driver
             events.append((vid, day, INFO, cost))
 
     accidents = Accident.objects.for_user(user).filter(is_voided=False, occurred_on__range=(start, end))
@@ -170,9 +170,14 @@ def dashboard(user, today=None):
     data = {"can": can, "today": today, "vehicles_total": sum(counts.values()),
             "counts": {s: counts[s] for s in (Vehicle.Status.ACTIVE, Vehicle.Status.WORKSHOP, Vehicle.Status.SOLD)}}
 
-    data["leavers"] = list(
-        VehicleAssignment.objects.for_user(user).filter(assigned_to__isnull=True, employee__status="separated")
+    leavers = list(
+        VehicleAssignment.objects.for_user(user).filter(assigned_to__isnull=True,
+                                                        employee__status__in=("on_notice", "separated"))
         .exclude(vehicle__status=Vehicle.Status.SOLD).select_related("vehicle", "employee"))
+    for a in leavers:
+        a.state = "left" if a.employee.status == "separated" else "notice"
+        a.decision = handovers.current_decision(a)               # a request waiting for approval, or approved, or rejected
+    data["leavers"] = leavers
 
     if can["services"]:
         plans = maintenance.due_plans(user, today)

@@ -10,6 +10,7 @@ from .usage import OdometerReading, VehicleAssignment  # noqa: E402,F401  (regis
 from .upkeep import FuelFill, PlanAlertLog, ServicePlan, ServiceRecord  # noqa: E402,F401
 from .incidents import Accident, Fine  # noqa: E402,F401
 from .loans import LoanAlertLog, LoanInstallment, VehicleLoan  # noqa: E402,F401
+from .custody import CustodyRequest, LeaverAlertLog  # noqa: E402,F401
 
 def normalise_plate(value):
     """Upper case with single spaces: '  ab  123 ' -> 'AB 123'."""

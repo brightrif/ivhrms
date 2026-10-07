@@ -25,6 +25,8 @@ def save_fine(fine):
             raise VehicleError("A cancelled fine cannot be edited.")
         if current.status == Fine.Status.PAID:
             raise VehicleError("A paid fine cannot be edited. Cancel it and enter it again if it is wrong.")
+        if current.recovered_on:
+            raise VehicleError("A recovered fine cannot be edited. Undo the recovery first.")
     if fine.amount is None or fine.amount <= 0:
         raise VehicleError("The amount must be more than zero.")
     if fine.fined_on > timezone.localdate():

@@ -1,0 +1,25 @@
+{% if state %}
+<div class="alert alert-warning small mt-2 mb-0">
+  <div class="fw-semibold"><i class="bi bi-exclamation-triangle me-1"></i>{{ employee.full_name }} {% if state == "left" %}has left the company{% else %}is on notice{% endif %} and still holds this vehicle.</div>
+  {% if decision and decision.status == "pending" %}
+    <div>Waiting for Management's approval: {{ decision.get_decision_display|lower }}{% if decision.new_driver %} ({{ decision.new_driver.full_name }}){% endif %}.</div>
+    {% if perms.vehicles.add_custodyrequest %}
+      <form method="post" action="{% url 'web:vehicle_custody_cancel' decision.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary mt-1">Cancel the request</button></form>
+    {% endif %}
+  {% elif decision and decision.status == "approved" %}
+    {% if decision.decision == "keep" %}
+      <div>Approved: it stays with {{ employee.full_name }}. {{ decision.reason }}</div>
+    {% elif decision.decision == "handover" %}
+      <div>Approved: hand it over to {{ decision.new_driver.full_name }}{% if decision.planned_on %} (planned for {{ decision.planned_on|date:"d M Y" }}){% endif %}.</div>
+      {% if perms.vehicles.add_vehicleassignment %}<a class="btn btn-sm btn-primary mt-1" href="{% url 'web:vehicle_handover' vehicle.pk %}?employee={{ decision.new_driver_id }}">Carry out the hand-over</a>{% endif %}
+    {% else %}
+      <div>Approved: return it to the company{% if decision.planned_on %} (planned for {{ decision.planned_on|date:"d M Y" }}){% endif %}.</div>
+      {% if perms.vehicles.change_vehicleassignment %}<a class="btn btn-sm btn-primary mt-1" href="{% url 'web:vehicle_return' assignment.pk %}">Record the return</a>{% endif %}
+    {% endif %}
+  {% else %}
+    {% if decision and decision.status == "rejected" %}<div>The last request was rejected.</div>{% endif %}
+    {% if perms.vehicles.add_custodyrequest %}<a class="btn btn-sm btn-warning mt-1" href="{% url 'web:vehicle_custody_request' vehicle.pk %}">Decide what happens to it</a>
+    {% else %}<div>HR needs to decide what happens to it.</div>{% endif %}
+  {% endif %}
+</div>
+{% endif %}

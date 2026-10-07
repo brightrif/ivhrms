@@ -1,7 +1,7 @@
 from django import template
 from django.utils import timezone
 
-from apps.vehicles import financing, fines, fuel, maintenance, reports
+from apps.vehicles import financing, fines, fuel, handovers, maintenance, reports
 
 register = template.Library()
 
@@ -41,3 +41,12 @@ def cost_card(context, vehicle):
     report = reports.cost_report(user, year, vehicle_id=vehicle.pk) if user else {"rows": []}
     return {"vehicle": vehicle, "year": year, "row": report["rows"][0] if report["rows"] else None,
             "perms": context.get("perms")}
+
+
+@register.inclusion_tag("web/vehicles/_custody_panel.html", takes_context=True)
+def custody_panel(context, assignment, vehicle):
+    """What is being done about a vehicle whose holder is on notice or has left. Empty for an active holder."""
+    employee = assignment.employee
+    state = {"on_notice": "notice", "separated": "left"}.get(employee.status)
+    return {"assignment": assignment, "vehicle": vehicle, "employee": employee, "state": state,
+            "decision": handovers.current_decision(assignment) if state else None, "perms": context.get("perms")}

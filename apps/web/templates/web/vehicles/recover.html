@@ -1,0 +1,45 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Fines to recover{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Fines to recover from drivers</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_fines' %}">All fines</a>
+  </div>
+</div>
+<p class="text-body-secondary">Fines the company has charged to the driver. Mark each one once the driver has paid it back. When payroll exists it will deduct these automatically.</p>
+
+{% for p in people %}
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">{{ p.employee.full_name }} <span class="text-body-secondary small">{{ p.employee.employee_no }}</span>
+    {% if p.employee.status == "separated" %}<span class="badge text-bg-secondary">Left</span>{% elif p.employee.status == "on_notice" %}<span class="badge text-bg-warning">On notice</span>{% endif %}</span>
+    <span class="fw-semibold">{{ p.total|floatformat:3 }} BHD</span></div>
+  <table class="table table-sm align-middle mb-0"><tbody>
+  {% for f in p.fines %}
+    <tr><td class="text-nowrap">{{ f.fined_on|date:"d M Y" }}</td>
+        <td>{{ f.vehicle.plate_number }}, {{ f.offence }}{% if f.reference %} <span class="small text-body-secondary">No. {{ f.reference }}</span>{% endif %}</td>
+        <td>{% if f.status == "paid" %}{% status_badge "valid" "Paid by the company" %}{% else %}{% status_badge "due" "Not paid yet" %}{% endif %}</td>
+        <td class="text-end">{{ f.display_amount|floatformat:3 }}</td>
+        <td class="text-end">{% if perms.vehicles.pay_fine %}<a class="btn btn-sm btn-primary" href="{% url 'web:vehicle_fine_recover' f.pk %}">Recovered</a>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody></table>
+</div>
+{% empty %}
+<div class="card shadow-sm border-0 mb-3"><div class="card-body text-body-secondary">Nothing is waiting to be recovered.</div></div>
+{% endfor %}
+{% if people %}<p class="fw-semibold text-end">Total to recover: {{ total|floatformat:3 }} BHD</p>{% endif %}
+
+{% if recovered %}
+<div class="card shadow-sm border-0"><div class="card-header bg-white fw-semibold">Recently recovered</div>
+  <table class="table table-sm align-middle mb-0"><tbody>
+  {% for f in recovered %}
+    <tr><td class="text-nowrap">{{ f.recovered_on|date:"d M Y" }}</td>
+        <td>{{ f.driver.full_name }}: {{ f.vehicle.plate_number }}, {{ f.offence }}{% if f.recovered_note %} <span class="small text-body-secondary">({{ f.recovered_note }})</span>{% endif %}</td>
+        <td class="text-end">{{ f.display_amount|floatformat:3 }}</td>
+        <td class="text-end">{% if perms.vehicles.pay_fine %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:vehicle_fine_unrecover' f.pk %}">Undo</a>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody></table>
+</div>
+{% endif %}
+{% endblock %}

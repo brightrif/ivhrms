@@ -7,7 +7,7 @@
       <td class="text-nowrap">{{ f.fined_on|date:"d M Y" }}</td>
       {% if show_vehicle %}<td><a class="fw-medium text-decoration-none" href="{% url 'web:vehicle_incidents' f.vehicle.pk %}">{{ f.vehicle.plate_number }}</a></td>{% endif %}
       <td>{{ f.offence }}{% if f.reference %}<div class="small text-body-secondary">No. {{ f.reference }}</div>{% endif %}{% if f.location %}<div class="small text-body-secondary">{{ f.location }}</div>{% endif %}</td>
-      <td>{{ f.driver.full_name|default:"-" }}{% if f.driver and f.driver.status == "separated" %} <span class="badge text-bg-secondary">Left</span>{% endif %}{% if f.charged_to_employee %}<div class="small text-body-secondary">Charged to the driver</div>{% endif %}</td>
+      <td>{{ f.driver.full_name|default:"-" }}{% if f.driver and f.driver.status == "separated" %} <span class="badge text-bg-secondary">Left</span>{% endif %}{% if f.charged_to_employee %}<div class="small text-body-secondary">Charged to the driver{% if f.recovered_on %}, recovered {{ f.recovered_on|date:"d M Y" }}{% endif %}</div>{% endif %}</td>
       <td class="text-end">{{ f.display_amount|floatformat:3 }}</td>
       <td>{% if f.is_voided %}<span class="badge text-bg-secondary">Cancelled</span><div class="small">{{ f.voided_reason }}</div>
           {% elif f.status == "paid" %}{% status_badge "valid" "Paid" %}<div class="small text-body-secondary">{{ f.paid_on|date:"d M Y" }}</div>
