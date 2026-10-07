@@ -1,0 +1,125 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Fleet dashboard{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Fleet dashboard</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_list' %}">All vehicles</a>
+    {% if can.finance %}<a class="btn btn-outline-secondary" href="{% url 'web:vehicle_costs' %}">Cost report</a>{% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Vehicles</div><div class="fs-3">{{ vehicles_total }}</div>
+    <div class="small text-body-secondary">{{ counts.active }} active, {{ counts.workshop }} in workshop, {{ counts.sold }} sold</div></div></div></div>
+  {% if can.services %}
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Services due</div><div class="fs-3{% if services_overdue %} text-danger{% endif %}">{{ services_total }}</div>
+    <div class="small text-body-secondary">{{ services_overdue }} overdue</div></div></div></div>
+  {% endif %}
+  {% if can.documents %}
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Vehicle documents</div><div class="fs-3{% if documents_expired %} text-danger{% endif %}">{{ documents_total }}</div>
+    <div class="small text-body-secondary">{{ documents_expired }} expired, rest due soon</div></div></div></div>
+  {% endif %}
+  {% if can.fines %}
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Unpaid fines</div><div class="fs-3{% if fines_total %} text-danger{% endif %}">{{ fines_total }}</div>
+    <div class="small text-body-secondary">{{ fines_amount|floatformat:3 }} BHD</div></div></div></div>
+  {% endif %}
+  {% if can.accidents %}
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Open accidents</div><div class="fs-3{% if accidents_total %} text-danger{% endif %}">{{ accidents_total }}</div></div></div></div>
+  {% endif %}
+  {% if can.finance %}
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Overdue installments</div><div class="fs-3{% if loans.overdue %} text-danger{% endif %}">{{ loans.overdue }}</div>
+    <div class="small text-body-secondary">{{ loans.outstanding|floatformat:3 }} BHD outstanding</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Running cost this month</div><div class="fs-3">{{ cost_month|floatformat:3 }}</div>
+    <div class="small text-body-secondary">{{ cost_ytd|floatformat:3 }} BHD this year</div></div></div></div>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    {% if can.services %}
+    <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">Services due</span>
+      <a class="small" href="{% url 'web:vehicle_service_due' %}">See all</a></div>
+      <table class="table table-sm align-middle mb-0"><tbody>
+      {% for p in services %}
+        <tr><td><a class="text-decoration-none fw-medium" href="{% url 'web:vehicle_service' p.vehicle.pk %}">{{ p.vehicle.plate_number }}</a> {{ p.name }}
+              <div class="small text-body-secondary">{{ p.status.summary }}</div></td>
+            <td class="text-end">{% status_badge p.status.state p.status.text %}</td></tr>
+      {% empty %}<tr><td class="text-body-secondary p-3">Nothing is due.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% endif %}
+    {% if can.documents %}
+    <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">Vehicle documents</span>
+      <a class="small" href="{% url 'web:compliance_dashboard' %}">Compliance</a></div>
+      <table class="table table-sm align-middle mb-0"><tbody>
+      {% for d in documents %}
+        <tr><td><a class="text-decoration-none fw-medium" href="{% url 'web:compliance_detail' d.pk %}">{{ d.label }}</a>
+              <div class="small text-body-secondary">expires {{ d.expiry_date|date:"d M Y" }} ({{ d.due_text }})</div></td>
+            <td class="text-end">{% if d.state == "expired" %}{% status_badge "expired" "Expired" %}{% else %}{% status_badge "due" "Due soon" %}{% endif %}</td></tr>
+      {% empty %}<tr><td class="text-body-secondary p-3">Every vehicle document is valid.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% endif %}
+    {% if leavers %}
+    <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white fw-semibold text-danger">Held by someone who has left</div>
+      <table class="table table-sm align-middle mb-0"><tbody>
+      {% for a in leavers %}
+        <tr><td><a class="text-decoration-none fw-medium" href="{% url 'web:vehicle_detail' a.vehicle.pk %}">{{ a.vehicle.plate_number }}</a> with {{ a.employee.full_name }}
+              <div class="small text-body-secondary">since {{ a.assigned_from|date:"d M Y" }}</div></td></tr>
+      {% endfor %}
+      </tbody></table></div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-6">
+    {% if can.fines %}
+    <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">Unpaid fines</span>
+      <a class="small" href="{% url 'web:vehicle_fines' %}">See all</a></div>
+      <table class="table table-sm align-middle mb-0"><tbody>
+      {% for f in fines %}
+        <tr><td><a class="text-decoration-none fw-medium" href="{% url 'web:vehicle_incidents' f.vehicle.pk %}">{{ f.vehicle.plate_number }}</a> {{ f.offence }}
+              <div class="small text-body-secondary">{{ f.fined_on|date:"d M Y" }}{% if f.driver %}, {{ f.driver.full_name }}{% endif %}</div></td>
+            <td class="text-end">{{ f.amount|floatformat:3 }}</td></tr>
+      {% empty %}<tr><td class="text-body-secondary p-3">No unpaid fines.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% endif %}
+    {% if can.accidents %}
+    <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white fw-semibold">Open accidents</div>
+      <table class="table table-sm align-middle mb-0"><tbody>
+      {% for a in accidents %}
+        <tr><td><a class="text-decoration-none fw-medium" href="{% url 'web:vehicle_accident' a.pk %}">{{ a.vehicle.plate_number }}</a> {{ a.description|truncatechars:60 }}
+              <div class="small text-body-secondary">{{ a.occurred_on|date:"d M Y" }}{% if a.driver %}, {{ a.driver.full_name }}{% endif %}</div></td>
+            <td class="text-end">{{ a.get_claim_status_display }}</td></tr>
+      {% empty %}<tr><td class="text-body-secondary p-3">No open accidents.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% endif %}
+    {% if can.finance %}
+    <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">Overdue loan installments</span>
+      <a class="small" href="{% url 'web:vehicle_loans' %}">All loans</a></div>
+      <table class="table table-sm align-middle mb-0"><tbody>
+      {% for l in loans_late %}
+        <tr><td><a class="text-decoration-none fw-medium" href="{% url 'web:vehicle_loan' l.vehicle.pk %}">{{ l.vehicle.plate_number }}</a> {{ l.lender }}
+              <div class="small text-body-secondary">{{ l.summary.overdue_count }} overdue, next due {{ l.summary.next_due.due_on|date:"d M Y" }}</div></td>
+            <td class="text-end">{{ l.summary.overdue_total|floatformat:3 }}</td></tr>
+      {% empty %}<tr><td class="text-body-secondary p-3">No installment is overdue.</td></tr>{% endfor %}
+      </tbody></table></div>
+    <div class="card shadow-sm border-0"><div class="card-header bg-white fw-semibold">Last 12 months</div>
+      <table class="table table-sm align-middle mb-0"><tbody>
+      {% for m in trend %}
+        <tr><td class="text-nowrap">{{ m.month|date:"M Y" }}</td>
+            <td class="w-100"><progress class="w-100" value="{{ m.pct }}" max="100"></progress></td>
+            <td class="text-end text-nowrap" title="Running {{ m.running|floatformat:3 }}, loan {{ m.loan|floatformat:3 }}">{{ m.total|floatformat:0 }}</td></tr>
+      {% endfor %}
+      </tbody></table>
+      <div class="card-footer bg-white small text-body-secondary">Running cost plus loan payments, in BHD.</div></div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

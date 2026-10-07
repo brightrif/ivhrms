@@ -1,6 +1,7 @@
 from django import template
+from django.utils import timezone
 
-from apps.vehicles import financing, fines, fuel, maintenance
+from apps.vehicles import financing, fines, fuel, maintenance, reports
 
 register = template.Library()
 
@@ -29,4 +30,14 @@ def loan_card(context, vehicle):
     """Loan figures are for Finance and Management: the detail page only calls this for people who may see them."""
     loan = financing.current_loan(vehicle)
     return {"vehicle": vehicle, "loan": loan, "summary": financing.loan_summary(loan) if loan else None,
+            "perms": context.get("perms")}
+
+
+@register.inclusion_tag("web/vehicles/_cost_card.html", takes_context=True)
+def cost_card(context, vehicle):
+    """This year's running cost of one vehicle. Money, so the detail page only calls it for Finance and Management."""
+    user = context.get("user") or getattr(context.get("request"), "user", None)
+    year = timezone.localdate().year
+    report = reports.cost_report(user, year, vehicle_id=vehicle.pk) if user else {"rows": []}
+    return {"vehicle": vehicle, "year": year, "row": report["rows"][0] if report["rows"] else None,
             "perms": context.get("perms")}

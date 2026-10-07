@@ -128,7 +128,7 @@
   </div>
   <div class="col-lg-4">
     <div class="mb-3">{% incident_card vehicle %}</div>
-    {% if perms.vehicles.view_vehicleloan %}<div>{% loan_card vehicle %}</div>{% endif %}
+    {% if perms.vehicles.view_vehicleloan %}<div class="mb-3">{% loan_card vehicle %}</div><div>{% cost_card vehicle %}</div>{% endif %}
   </div>
 </div>
 {% endblock %}

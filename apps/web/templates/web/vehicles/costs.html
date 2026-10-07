@@ -1,0 +1,99 @@
+{% extends "web/base.html" %}
+{% block title %}Vehicle costs {{ period_label }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Vehicle costs <span class="fw-normal text-body-secondary">{{ period_label }}</span></h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_dashboard' %}">Dashboard</a>
+    <a class="btn btn-outline-primary" href="?year={{ year }}&month={{ month }}&company={{ company }}&export=csv"><i class="bi bi-download me-1"></i>Download CSV</a>
+  </div>
+</div>
+
+<form method="get" class="row g-2 mb-3 align-items-center">
+  <div class="col-6 col-md-2"><select name="year" class="form-select">
+    {% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}
+  </select></div>
+  <div class="col-6 col-md-2"><select name="month" class="form-select">
+    <option value="0"{% if not month %} selected{% endif %}>Whole year</option>
+    {% for value, label in month_choices %}<option value="{{ value }}"{% if value == month %} selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></div>
+  {% if multi_company %}
+  <div class="col-md-3"><select name="company" class="form-select">
+    <option value="">All companies</option>
+    {% for c in companies %}<option value="{{ c.pk }}"{% if c.pk == company %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+  </select></div>
+  {% endif %}
+  <div class="col-auto"><button class="btn btn-outline-primary">Show</button></div>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Running cost</div>
+    <div class="fs-4">{{ totals.running|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD</span></div>
+    <div class="small text-body-secondary">fuel, service, fines, renewals, less insurance</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Loan payments</div>
+    <div class="fs-4">{{ totals.loan|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD</span></div>
+    <div class="small text-body-secondary">buying the vehicles, not running them</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Total cash out</div>
+    <div class="fs-4">{{ totals.total|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD</span></div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Running cost per km</div>
+    <div class="fs-4">{% if totals.per_km %}{{ totals.per_km|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD</span>{% else %}-{% endif %}</div>
+    <div class="small text-body-secondary">{{ totals.km }} km measured</div></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="{% if months %}col-xl-9{% else %}col-12{% endif %}">
+    <div class="card shadow-sm border-0"><div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light"><tr><th>Vehicle</th><th class="text-end">Fuel</th><th class="text-end">Service</th><th class="text-end">Fines</th><th class="text-end">Renewals</th><th class="text-end">Insurance</th><th class="text-end">Running cost</th><th class="text-end">Loan</th><th class="text-end">Total</th><th class="text-end">km</th><th class="text-end">per km</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td><a class="fw-medium text-decoration-none" href="{% url 'web:vehicle_detail' r.vehicle.pk %}">{{ r.vehicle.plate_number }}</a>
+              <div class="small text-body-secondary">{{ r.vehicle.description }}</div></td>
+            <td class="text-end">{{ r.fuel|floatformat:3 }}</td>
+            <td class="text-end">{{ r.service|floatformat:3 }}</td>
+            <td class="text-end">{{ r.fines|floatformat:3 }}{% if r.recoverable %}<div class="small text-body-secondary" title="Charged to the driver">{{ r.recoverable|floatformat:3 }} to recover</div>{% endif %}</td>
+            <td class="text-end">{{ r.renewals|floatformat:3 }}</td>
+            <td class="text-end">{{ r.insurance|floatformat:3 }}</td>
+            <td class="text-end fw-semibold">{{ r.running|floatformat:3 }}</td>
+            <td class="text-end">{{ r.loan|floatformat:3 }}</td>
+            <td class="text-end fw-semibold">{{ r.total|floatformat:3 }}</td>
+            <td class="text-end">{% if r.km is not None %}{{ r.km }}{% else %}-{% endif %}</td>
+            <td class="text-end">{% if r.per_km %}{{ r.per_km|floatformat:3 }}{% else %}-{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="11" class="text-center text-body-secondary py-4">Nothing was recorded for {{ period_label }}.</td></tr>
+        {% endfor %}
+        </tbody>
+        {% if rows %}
+        <tfoot class="table-light fw-semibold"><tr>
+          <td>Total</td><td class="text-end">{{ totals.fuel|floatformat:3 }}</td><td class="text-end">{{ totals.service|floatformat:3 }}</td>
+          <td class="text-end">{{ totals.fines|floatformat:3 }}</td><td class="text-end">{{ totals.renewals|floatformat:3 }}</td>
+          <td class="text-end">{{ totals.insurance|floatformat:3 }}</td><td class="text-end">{{ totals.running|floatformat:3 }}</td>
+          <td class="text-end">{{ totals.loan|floatformat:3 }}</td><td class="text-end">{{ totals.total|floatformat:3 }}</td>
+          <td class="text-end">{{ totals.km }}</td><td class="text-end">{% if totals.per_km %}{{ totals.per_km|floatformat:3 }}{% else %}-{% endif %}</td>
+        </tr></tfoot>
+        {% endif %}
+      </table>
+    </div></div>
+  </div>
+  {% if months %}
+  <div class="col-xl-3">
+    <div class="card shadow-sm border-0"><div class="card-header bg-white fw-semibold">By month</div>
+      <table class="table table-sm align-middle mb-0"><tbody>
+      {% for m in months %}
+        <tr><td class="text-nowrap">{{ m.month|date:"M" }}</td>
+            <td class="w-100"><progress class="w-100" value="{{ m.pct }}" max="100"></progress></td>
+            <td class="text-end text-nowrap" title="Running {{ m.running|floatformat:3 }}, loan {{ m.loan|floatformat:3 }}">{{ m.total|floatformat:0 }}</td></tr>
+      {% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+<p class="small text-body-secondary mt-2 mb-0">Fines count at the amount paid once paid. Insurance money recovered is subtracted. Accident repairs are counted once, as service. Distance is the odometer reading at the end of the period less the last one before it.</p>
+{% endblock %}
