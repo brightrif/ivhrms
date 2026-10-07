@@ -1,5 +1,5 @@
 {% extends "web/base.html" %}
-{% load bs %}
+{% load bs vehicle_cards %}
 {% block title %}Maintenance: {{ vehicle.plate_number }}{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -51,7 +51,7 @@
           <td class="text-nowrap">{{ r.serviced_on|date:"d M Y" }}</td>
           <td>{{ r.get_kind_display }}{% if r.description %}<div class="small text-body-secondary">{{ r.description }}</div>{% endif %}</td>
           <td class="text-end text-nowrap">{{ r.odometer }} km</td>
-          <td>{{ r.garage|default:"-" }}{% if r.invoice_no %}<div class="small text-body-secondary">Invoice {{ r.invoice_no }}</div>{% endif %}</td>
+          <td>{{ r.garage|default:"-" }}{% if r.invoice_no %}<div class="small text-body-secondary">Invoice {{ r.invoice_no }}</div>{% endif %}<div>{% file_links r "service" %}</div></td>
           <td>{% for p in r.plans.all %}{{ p.name }}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}</td>
           <td class="text-end">{{ r.total_cost|floatformat:3 }}</td>
           <td class="text-end text-nowrap">

@@ -1,5 +1,5 @@
 {% extends "web/base.html" %}
-{% load bs %}
+{% load bs vehicle_cards %}
 {% block title %}Loan: {{ vehicle.plate_number }}{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -47,6 +47,7 @@
   <div class="alert alert-success">Settled early on {{ loan.settled_on|date:"d M Y" }} for {{ loan.settlement_amount|floatformat:3 }} BHD{% if loan.settlement_reference %} ({{ loan.settlement_reference }}){% endif %}.</div>
 {% endif %}
 {% if loan.notes %}<p class="text-body-secondary">{{ loan.notes|linebreaksbr }}</p>{% endif %}
+<div class="mb-3">{% file_panel loan "loan" %}</div>
 
 <div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white fw-semibold">Installments</div>
   <div class="table-responsive">

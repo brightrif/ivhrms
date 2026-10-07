@@ -7,6 +7,7 @@
     {% status_badge vehicle.badge_state vehicle.get_status_display %}</h1>
   <div class="d-flex flex-wrap gap-2">
     <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_list' %}">All vehicles</a>
+    <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_files' vehicle.pk %}"><i class="bi bi-paperclip me-1"></i>Files</a>
     {% if vehicle.status != "sold" %}
       {% if perms.vehicles.change_vehicle %}
         {% if vehicle.status == "active" %}

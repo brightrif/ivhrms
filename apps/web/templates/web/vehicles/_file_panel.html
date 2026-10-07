@@ -1,0 +1,18 @@
+{% if can_view or can_add %}
+<div class="card shadow-sm border-0"><div class="card-header bg-white d-flex justify-content-between align-items-center">
+  <span class="fw-semibold">Files</span>
+  {% if can_add %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:vehicle_file_add' target_kind obj.pk %}">Attach a file</a>{% endif %}
+</div>
+  <table class="table table-sm align-middle mb-0"><tbody>
+  {% for f in files %}
+    <tr><td><a class="text-decoration-none" target="_blank" href="{% url 'web:vehicle_file' f.pk %}"><i class="bi bi-paperclip me-1"></i>{{ f.label }}</a>
+          <div class="small text-body-secondary">{{ f.get_kind_display }}, added {{ f.created_at|date:"d M Y" }}</div></td>
+        <td class="text-end text-nowrap">
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'web:vehicle_file' f.pk %}?download=1"><i class="bi bi-download"></i></a>
+          {% if can_add %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:vehicle_file_remove' f.pk %}">Remove</a>{% endif %}</td></tr>
+  {% empty %}
+    <tr><td class="text-body-secondary p-3">No files attached.</td></tr>
+  {% endfor %}
+  </tbody></table>
+</div>
+{% endif %}

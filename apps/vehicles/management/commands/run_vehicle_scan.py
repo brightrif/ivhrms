@@ -2,13 +2,14 @@ from datetime import date
 
 from django.core.management.base import BaseCommand
 
-from apps.vehicles import financing, handovers, maintenance
+from apps.vehicles import financing, finereminders, handovers, maintenance
 
 
 class Command(BaseCommand):
     help = ("Email any vehicle service that has become due or overdue, any loan installment that is due soon or "
-            "overdue, and a notice about vehicles held by people on notice or who have left. The daily Celery job "
-            "does this automatically; run it by hand only to test or on a server without Celery.")
+            "overdue, a notice about vehicles held by people on notice or who have left, and the weekly reminder "
+            "about unpaid fines. The daily Celery job does this automatically; run it by hand only to test or on a "
+            "server without Celery.")
 
     def add_arguments(self, parser):
         parser.add_argument("--date", help="Pretend today is YYYY-MM-DD (for testing)")
@@ -19,3 +20,4 @@ class Command(BaseCommand):
         self.stdout.write("Service plans: " + line.format(**maintenance.run_service_scan(today)))
         self.stdout.write("Loan installments: " + line.format(**financing.run_loan_scan(today)))
         self.stdout.write("Holders leaving: " + line.format(**handovers.run_leaver_scan(today)))
+        self.stdout.write("Unpaid fines: " + line.format(**finereminders.run_fine_scan(today)))

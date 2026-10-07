@@ -1,5 +1,5 @@
 {% extends "web/base.html" %}
-{% load bs %}
+{% load bs vehicle_cards %}
 {% block title %}Fuel: {{ vehicle.plate_number }}{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -45,7 +45,7 @@
         <td class="text-end">{% if f.km_per_litre %}{{ f.km_per_litre|floatformat:1 }}{% else %}-{% endif %}</td>
         <td>{% if f.full_tank %}Full{% else %}Part{% endif %}</td>
         <td>{{ f.driver.full_name|default:"-" }}</td>
-        <td>{{ f.station|default:"-" }}{% if f.notes %}<div class="small text-body-secondary">{{ f.notes }}</div>{% endif %}</td>
+        <td>{{ f.station|default:"-" }}{% if f.notes %}<div class="small text-body-secondary">{{ f.notes }}</div>{% endif %}<div>{% file_links f "fuel" %}</div></td>
         <td class="text-end text-nowrap">
           {% if f.is_voided %}<span class="badge text-bg-secondary" title="{{ f.voided_reason }}">Cancelled</span><div class="small">{{ f.voided_reason }}</div>
           {% elif perms.vehicles.change_fuelfill %}<a class="btn btn-sm btn-outline-danger" href="{% url 'web:vehicle_fuel_void' f.pk %}">Cancel</a>{% endif %}

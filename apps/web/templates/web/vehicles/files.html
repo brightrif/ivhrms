@@ -1,0 +1,27 @@
+{% extends "web/base.html" %}
+{% block title %}Files: {{ vehicle.plate_number }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Files <span class="fw-normal text-body-secondary">{{ vehicle.plate_number }}</span></h1>
+  <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_detail' vehicle.pk %}">Back to vehicle</a>
+</div>
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>File</th><th>Type</th><th>Attached to</th><th>Added</th><th></th></tr></thead>
+    <tbody>
+    {% for f in files %}
+      <tr>
+        <td><a class="text-decoration-none fw-medium" target="_blank" href="{% url 'web:vehicle_file' f.pk %}"><i class="bi bi-paperclip me-1"></i>{{ f.label }}</a></td>
+        <td>{{ f.get_kind_display }}</td>
+        <td>{{ f.describe }}</td>
+        <td class="text-nowrap">{{ f.created_at|date:"d M Y" }}</td>
+        <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{% url 'web:vehicle_file' f.pk %}?download=1"><i class="bi bi-download"></i></a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-center text-body-secondary py-4">No files yet. Attach them from the fuel, service, fine, accident or loan entry they belong to.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% if hidden %}<p class="small text-body-secondary mt-2 mb-0">{{ hidden }} more file{{ hidden|pluralize }} {{ hidden|pluralize:"is,are" }} only visible to people who may see that kind of record.</p>{% endif %}
+{% endblock %}

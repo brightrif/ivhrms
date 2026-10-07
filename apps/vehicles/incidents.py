@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 from apps.audit.registry import audited
 from apps.core.models import BaseModel
@@ -147,3 +148,15 @@ class Accident(BaseModel):
 
     def __str__(self):
         return f"{self.vehicle.plate_number} accident on {self.occurred_on}"
+
+
+class FineReminderLog(models.Model):
+    """Which weekly reminder went out for which fine. The unique key is what stops duplicate emails."""
+    fine = models.ForeignKey(Fine, on_delete=models.CASCADE, related_name="reminders")
+    week = models.PositiveSmallIntegerField()                 # whole weeks since the offence: 1 = a week old
+    sent_at = models.DateTimeField(default=timezone.now)
+    recipients = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-sent_at"]
+        constraints = [models.UniqueConstraint(fields=["fine", "week"], name="uniq_fine_reminder_per_week")]

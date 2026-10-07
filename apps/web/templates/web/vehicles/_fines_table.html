@@ -1,4 +1,4 @@
-{% load bs %}
+{% load bs vehicle_cards %}
 <div class="table-responsive"><table class="table table-hover align-middle mb-0">
   <thead class="table-light"><tr><th>Date</th>{% if show_vehicle %}<th>Vehicle</th>{% endif %}<th>Offence</th><th>Driver</th><th class="text-end">Amount (BHD)</th><th>Status</th><th></th></tr></thead>
   <tbody>
@@ -6,7 +6,7 @@
     <tr{% if f.is_voided %} class="table-light text-body-secondary"{% endif %}>
       <td class="text-nowrap">{{ f.fined_on|date:"d M Y" }}</td>
       {% if show_vehicle %}<td><a class="fw-medium text-decoration-none" href="{% url 'web:vehicle_incidents' f.vehicle.pk %}">{{ f.vehicle.plate_number }}</a></td>{% endif %}
-      <td>{{ f.offence }}{% if f.reference %}<div class="small text-body-secondary">No. {{ f.reference }}</div>{% endif %}{% if f.location %}<div class="small text-body-secondary">{{ f.location }}</div>{% endif %}</td>
+      <td>{{ f.offence }}{% if f.reference %}<div class="small text-body-secondary">No. {{ f.reference }}</div>{% endif %}{% if f.location %}<div class="small text-body-secondary">{{ f.location }}</div>{% endif %}<div>{% file_links f "fine" %}</div></td>
       <td>{{ f.driver.full_name|default:"-" }}{% if f.driver and f.driver.status == "separated" %} <span class="badge text-bg-secondary">Left</span>{% endif %}{% if f.charged_to_employee %}<div class="small text-body-secondary">Charged to the driver{% if f.recovered_on %}, recovered {{ f.recovered_on|date:"d M Y" }}{% endif %}</div>{% endif %}</td>
       <td class="text-end">{{ f.display_amount|floatformat:3 }}</td>
       <td>{% if f.is_voided %}<span class="badge text-bg-secondary">Cancelled</span><div class="small">{{ f.voided_reason }}</div>
