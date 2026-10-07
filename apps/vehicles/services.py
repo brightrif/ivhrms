@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from .models import Vehicle, normalise_chassis, normalise_plate
 from .usage import OdometerReading
+from .loans import VehicleLoan
 
 class VehicleError(Exception):
     pass
@@ -66,6 +67,8 @@ def mark_sold(vehicle, sold_on):
         raise VehicleError("This vehicle is already marked as sold.")
     if sold_on > timezone.localdate():
         raise VehicleError("The sale date cannot be in the future.")
+    if VehicleLoan.objects.filter(vehicle=vehicle, status=VehicleLoan.Status.ACTIVE, is_voided=False).exists():
+        raise VehicleError("This vehicle has an active bank loan. Record the early settlement first.")
     vehicle.status, vehicle.sold_on = Vehicle.Status.SOLD, sold_on
     vehicle.save()
     return vehicle

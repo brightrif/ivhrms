@@ -102,7 +102,9 @@
   <div class="col-lg-4">{% fuel_card vehicle %}</div>
 </div>
 
-<div class="card shadow-sm border-0"><div class="card-header bg-white fw-semibold">Driver history</div>
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0"><div class="card-header bg-white fw-semibold">Driver history</div>
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light"><tr><th>Driver</th><th>From</th><th>To</th><th class="text-end">Start km</th><th class="text-end">End km</th><th class="text-end">Driven</th></tr></thead>
@@ -121,6 +123,12 @@
       {% endfor %}
       </tbody>
     </table>
+  </div>
+</div>
+  </div>
+  <div class="col-lg-4">
+    <div class="mb-3">{% incident_card vehicle %}</div>
+    {% if perms.vehicles.view_vehicleloan %}<div>{% loan_card vehicle %}</div>{% endif %}
   </div>
 </div>
 {% endblock %}

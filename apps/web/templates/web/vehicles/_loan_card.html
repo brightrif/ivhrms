@@ -1,0 +1,19 @@
+{% load bs %}
+<div class="card shadow-sm border-0 h-100"><div class="card-body">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="mb-0">Bank loan</h2>
+    {% if perms.vehicles.view_vehicleloan %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:vehicle_loan' vehicle.pk %}">{% if loan %}Details{% else %}Open{% endif %}</a>{% endif %}
+  </div>
+  {% if loan %}
+    <div class="fw-medium">{{ loan.lender }} {% if loan.status == "active" %}{% elif loan.status == "completed" %}<span class="badge text-bg-success">Fully paid</span>{% else %}<span class="badge text-bg-success">Settled early</span>{% endif %}</div>
+    <table class="table table-sm align-middle mb-0 mt-1"><tbody>
+      <tr><td>Installment</td><td class="text-end">{{ loan.installment_amount|floatformat:3 }} BHD</td></tr>
+      <tr><td>Paid</td><td class="text-end">{{ summary.paid_count }} of {{ loan.installment_count }}</td></tr>
+      <tr><td>Next due</td><td class="text-end">{% if summary.next_due %}{{ summary.next_due.due_on|date:"d M Y" }}{% if summary.overdue_count %} {% status_badge "expired" "Overdue" %}{% endif %}{% else %}-{% endif %}</td></tr>
+      <tr><td>Outstanding</td><td class="text-end">{{ summary.outstanding|floatformat:3 }} BHD</td></tr>
+    </tbody></table>
+  {% else %}
+    <div class="text-body-secondary small mb-2">No loan recorded.</div>
+    {% if vehicle.status != "sold" and perms.vehicles.add_vehicleloan %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:vehicle_loan_add' vehicle.pk %}">Add loan</a>{% endif %}
+  {% endif %}
+</div></div>

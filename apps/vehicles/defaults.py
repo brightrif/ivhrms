@@ -3,16 +3,21 @@
 Permissions are given to the standard groups once per model, the first time that model's permissions are
 missing from the group, so anything changed later in the admin survives future migrations (and a model
 added in a later phase still gets its permissions).
+
+Loan details are for Finance and Management only: HR is deliberately left out.
 """
 from django.db import DEFAULT_DB_ALIAS, connections
 
 _HR = ["view", "add", "change"]
-_MODELS = ["vehicle", "vehicleassignment", "odometerreading", "fuelfill", "serviceplan", "servicerecord"]
+_FLEET = ["vehicle", "vehicleassignment", "odometerreading", "fuelfill", "serviceplan", "servicerecord",
+          "fine", "accident"]
+_LOANS = ["vehicleloan", "loaninstallment"]
 GROUP_PERMISSIONS = {
-    "HR": {"vehicle": _HR, "vehicleassignment": _HR, "odometerreading": ["view", "add"],
-           "fuelfill": _HR, "serviceplan": _HR, "servicerecord": _HR},
-    "Finance": {m: ["view"] for m in _MODELS},
-    "Management": {m: ["view"] for m in _MODELS},
+    "HR": {"vehicle": _HR, "vehicleassignment": _HR, "odometerreading": ["view", "add"], "fuelfill": _HR,
+           "serviceplan": _HR, "servicerecord": _HR, "fine": _HR + ["pay"], "accident": _HR},
+    "Finance": {**{m: ["view"] for m in _FLEET}, "fine": ["view", "pay"],
+                "vehicleloan": _HR, "loaninstallment": ["view", "pay"]},          # Finance runs the loans
+    "Management": {m: ["view"] for m in _FLEET + _LOANS},
 }
 
 

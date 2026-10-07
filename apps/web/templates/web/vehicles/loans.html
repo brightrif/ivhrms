@@ -1,0 +1,40 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Vehicle loans{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Vehicle loans</h1>
+  <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_list' %}">All vehicles</a>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Active loans</div><div class="fs-4">{{ loans|length }}</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Monthly installments</div><div class="fs-4">{{ monthly|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD</span></div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Total outstanding</div><div class="fs-4">{{ outstanding|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD</span></div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Overdue installments</div><div class="fs-4{% if overdue %} text-danger{% endif %}">{{ overdue }}</div></div></div></div>
+</div>
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Vehicle</th><th>Lender</th><th class="text-end">Installment</th><th>Next due</th><th class="text-end">Left</th><th class="text-end">Outstanding (BHD)</th><th></th></tr></thead>
+    <tbody>
+    {% for l in loans %}
+      <tr>
+        <td><a class="fw-medium text-decoration-none" href="{% url 'web:vehicle_loan' l.vehicle.pk %}">{{ l.vehicle.plate_number }}</a>
+          <div class="small text-body-secondary">{{ l.vehicle.description }}</div></td>
+        <td>{{ l.lender }}</td>
+        <td class="text-end">{{ l.installment_amount|floatformat:3 }}</td>
+        <td class="text-nowrap">{% if l.summary.next_due %}{{ l.summary.next_due.due_on|date:"d M Y" }}{% else %}-{% endif %}</td>
+        <td class="text-end">{{ l.summary.left_count }}</td>
+        <td class="text-end">{{ l.summary.outstanding|floatformat:3 }}</td>
+        <td>{% if l.summary.overdue_count %}{% status_badge "expired" "Overdue" %}{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-center text-body-secondary py-4">No active loans.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

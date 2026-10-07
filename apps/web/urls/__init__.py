@@ -4,7 +4,8 @@ from . import (
     account, approvals, attendance, 
     companies, compliance, dashboard, 
     leave, organization, staff,
-    vehicles,vehicle_usage,vehicle_upkeep)
+    vehicles,vehicle_usage,vehicle_upkeep,
+    vehicle_incidents,vehicle_loans)
 
 app_name = "web"
 
@@ -21,4 +22,6 @@ urlpatterns = [
     *vehicles.urlpatterns,
     *vehicle_usage.urlpatterns,
     *vehicle_upkeep.urlpatterns,
+    *vehicle_incidents.urlpatterns,
+    *vehicle_loans.urlpatterns,
 ]

@@ -1,0 +1,42 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Fines and accidents: {{ vehicle.plate_number }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Fines and accidents <span class="fw-normal text-body-secondary">{{ vehicle.plate_number }}</span></h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_detail' vehicle.pk %}">Back to vehicle</a>
+    {% if perms.vehicles.add_accident %}<a class="btn btn-outline-primary" href="{% url 'web:vehicle_accident_add' vehicle.pk %}">Report accident</a>{% endif %}
+    {% if perms.vehicles.add_fine %}<a class="btn btn-primary" href="{% url 'web:vehicle_fine_add' vehicle.pk %}"><i class="bi bi-plus-lg me-1"></i>Add fine</a>{% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">Fines</span>
+    <span class="text-body-secondary">Unpaid: {{ unpaid_total|floatformat:3 }} BHD</span></div>
+  {% include "web/vehicles/_fines_table.html" with fines=fines show_vehicle=False %}
+</div>
+
+<div class="card shadow-sm border-0"><div class="card-header bg-white fw-semibold">Accidents</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr><th>Date</th><th>What happened</th><th>Driver</th><th>Fault</th><th>Insurance</th><th class="text-end">Net cost (BHD)</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for a in accidents %}
+        <tr{% if a.is_voided %} class="table-light text-body-secondary"{% endif %}>
+          <td class="text-nowrap"><a class="text-decoration-none" href="{% url 'web:vehicle_accident' a.pk %}">{{ a.occurred_on|date:"d M Y" }}</a></td>
+          <td>{{ a.description|truncatechars:80 }}{% if a.police_report_no %}<div class="small text-body-secondary">Police report {{ a.police_report_no }}</div>{% endif %}</td>
+          <td>{{ a.driver.full_name|default:"-" }}</td>
+          <td>{{ a.get_fault_display }}</td>
+          <td>{{ a.get_claim_status_display }}</td>
+          <td class="text-end">{{ a.net_cost|floatformat:3 }}</td>
+          <td>{% if a.is_voided %}<span class="badge text-bg-secondary">Cancelled</span>{% elif a.status == "closed" %}{% status_badge "valid" "Closed" %}{% else %}{% status_badge "due" "Open" %}{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="text-center text-body-secondary py-4">No accidents recorded.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

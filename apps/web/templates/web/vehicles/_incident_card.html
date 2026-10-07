@@ -1,0 +1,14 @@
+<div class="card shadow-sm border-0 h-100"><div class="card-body">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="mb-0">Fines and accidents</h2>
+    {% if perms.vehicles.view_fine %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:vehicle_incidents' vehicle.pk %}">Open</a>{% endif %}
+  </div>
+  <table class="table table-sm align-middle mb-2"><tbody>
+    <tr><td>Unpaid fines</td><td class="text-end">{% if unpaid.count %}<span class="fw-semibold text-danger">{{ unpaid.count }}</span> ({{ unpaid.total|floatformat:3 }} BHD){% else %}<span class="text-body-secondary">None</span>{% endif %}</td></tr>
+    <tr><td>Open accidents</td><td class="text-end">{% if open_accidents %}<span class="fw-semibold text-danger">{{ open_accidents }}</span>{% else %}<span class="text-body-secondary">None</span>{% endif %}</td></tr>
+  </tbody></table>
+  <div class="d-flex gap-2">
+    {% if perms.vehicles.add_fine %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:vehicle_fine_add' vehicle.pk %}">Add fine</a>{% endif %}
+    {% if perms.vehicles.add_accident %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:vehicle_accident_add' vehicle.pk %}">Report accident</a>{% endif %}
+  </div>
+</div></div>

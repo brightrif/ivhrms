@@ -1,0 +1,85 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Loan: {{ vehicle.plate_number }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0 d-flex flex-wrap align-items-center gap-2">Loan <span class="fw-normal text-body-secondary">{{ vehicle.plate_number }}</span>
+    {% if loan %}{% if loan.status == "active" %}{% status_badge "due" "Active" %}{% elif loan.status == "completed" %}{% status_badge "valid" "Fully paid" %}{% else %}{% status_badge "valid" "Settled early" %}{% endif %}{% endif %}</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_detail' vehicle.pk %}">Back to vehicle</a>
+    {% if loan and loan.status == "active" and perms.vehicles.change_vehicleloan %}
+      <a class="btn btn-outline-primary" href="{% url 'web:vehicle_loan_settle' loan.pk %}">Settle early</a>
+      <a class="btn btn-outline-danger" href="{% url 'web:vehicle_loan_void' loan.pk %}">Cancel loan</a>
+    {% endif %}
+    {% if not has_active and vehicle.status != "sold" and perms.vehicles.add_vehicleloan %}
+      <a class="btn btn-primary" href="{% url 'web:vehicle_loan_add' vehicle.pk %}"><i class="bi bi-plus-lg me-1"></i>Add loan</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if not loan %}
+  <div class="card shadow-sm border-0"><div class="card-body text-body-secondary">No loan is recorded for this vehicle.</div></div>
+{% else %}
+<div class="row g-3 mb-3">
+  <div class="col-md-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Lender</div>
+    <div class="fs-5">{{ loan.lender }}</div>
+    {% if loan.account_no %}<div class="small text-body-secondary">{{ loan.account_no }}</div>{% endif %}
+  </div></div></div>
+  <div class="col-md-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Financed</div>
+    <div class="fs-5">{{ loan.financed_amount|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD</span></div>
+    <div class="small text-body-secondary">Down payment {{ loan.down_payment|floatformat:3 }} &middot; price {{ loan.purchase_price|floatformat:3 }}</div>
+  </div></div></div>
+  <div class="col-md-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Repayment</div>
+    <div class="fs-5">{{ loan.installment_count }} &times; {{ loan.installment_amount|floatformat:3 }}</div>
+    <div class="small text-body-secondary">Total {{ loan.scheduled_total|floatformat:3 }} &middot; finance cost {{ loan.cost_of_finance|floatformat:3 }} BHD</div>
+  </div></div></div>
+  <div class="col-md-6 col-lg-3"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="small text-body-secondary">Progress</div>
+    <div class="fs-5">{{ summary.paid_count }} of {{ loan.installment_count }} paid</div>
+    <div class="small text-body-secondary">Paid {{ summary.paid_total|floatformat:3 }} &middot; outstanding {{ summary.outstanding|floatformat:3 }} BHD</div>
+    {% if summary.overdue_count %}<div class="small text-danger"><i class="bi bi-exclamation-triangle me-1"></i>{{ summary.overdue_count }} overdue ({{ summary.overdue_total|floatformat:3 }} BHD)</div>{% endif %}
+  </div></div></div>
+</div>
+{% if loan.status == "settled" %}
+  <div class="alert alert-success">Settled early on {{ loan.settled_on|date:"d M Y" }} for {{ loan.settlement_amount|floatformat:3 }} BHD{% if loan.settlement_reference %} ({{ loan.settlement_reference }}){% endif %}.</div>
+{% endif %}
+{% if loan.notes %}<p class="text-body-secondary">{{ loan.notes|linebreaksbr }}</p>{% endif %}
+
+<div class="card shadow-sm border-0 mb-3"><div class="card-header bg-white fw-semibold">Installments</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr><th>#</th><th>Due</th><th class="text-end">Amount (BHD)</th><th>Status</th><th>Paid on</th><th class="text-end">Paid (BHD)</th><th>Reference</th><th></th></tr></thead>
+      <tbody>
+      {% for i in summary.rows %}
+        <tr{% if i.status == "settled" %} class="table-light text-body-secondary"{% endif %}>
+          <td>{{ i.number }}</td>
+          <td class="text-nowrap">{{ i.due_on|date:"d M Y" }}</td>
+          <td class="text-end">{{ i.amount|floatformat:3 }}</td>
+          <td>{% if i.status == "paid" %}{% status_badge "valid" "Paid" %}{% elif i.status == "settled" %}<span class="badge text-bg-secondary">Cleared early</span>{% elif i.due_on < today %}{% status_badge "expired" "Overdue" %}{% else %}{% status_badge "due" "Due" %}{% endif %}</td>
+          <td class="text-nowrap">{{ i.paid_on|date:"d M Y"|default:"-" }}</td>
+          <td class="text-end">{% if i.paid_amount is not None %}{{ i.paid_amount|floatformat:3 }}{% else %}-{% endif %}</td>
+          <td>{{ i.reference|default:"-" }}</td>
+          <td class="text-end text-nowrap">
+            {% if i.status == "due" and loan.status == "active" and perms.vehicles.pay_loaninstallment %}<a class="btn btn-sm btn-primary" href="{% url 'web:vehicle_installment_pay' i.pk %}">Pay</a>{% endif %}
+            {% if i.status == "paid" and loan.status != "settled" and perms.vehicles.change_vehicleloan %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:vehicle_installment_undo' i.pk %}">Undo</a>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if loans|length > 1 %}
+<div class="card shadow-sm border-0"><div class="card-header bg-white fw-semibold">Other loans on this vehicle</div>
+  <ul class="list-group list-group-flush">
+  {% for l in loans %}{% if l.pk != loan.pk %}
+    <li class="list-group-item"><a class="text-decoration-none" href="{% url 'web:vehicle_loan' vehicle.pk %}?loan={{ l.pk }}">{{ l.lender }}, from {{ l.first_due_on|date:"M Y" }}</a> <span class="text-body-secondary">({{ l.get_status_display }})</span></li>
+  {% endif %}{% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

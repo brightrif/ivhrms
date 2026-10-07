@@ -1,0 +1,29 @@
+{% load bs %}
+<div class="table-responsive"><table class="table table-hover align-middle mb-0">
+  <thead class="table-light"><tr><th>Date</th>{% if show_vehicle %}<th>Vehicle</th>{% endif %}<th>Offence</th><th>Driver</th><th class="text-end">Amount (BHD)</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for f in fines %}
+    <tr{% if f.is_voided %} class="table-light text-body-secondary"{% endif %}>
+      <td class="text-nowrap">{{ f.fined_on|date:"d M Y" }}</td>
+      {% if show_vehicle %}<td><a class="fw-medium text-decoration-none" href="{% url 'web:vehicle_incidents' f.vehicle.pk %}">{{ f.vehicle.plate_number }}</a></td>{% endif %}
+      <td>{{ f.offence }}{% if f.reference %}<div class="small text-body-secondary">No. {{ f.reference }}</div>{% endif %}{% if f.location %}<div class="small text-body-secondary">{{ f.location }}</div>{% endif %}</td>
+      <td>{{ f.driver.full_name|default:"-" }}{% if f.driver and f.driver.status == "separated" %} <span class="badge text-bg-secondary">Left</span>{% endif %}{% if f.charged_to_employee %}<div class="small text-body-secondary">Charged to the driver</div>{% endif %}</td>
+      <td class="text-end">{{ f.display_amount|floatformat:3 }}</td>
+      <td>{% if f.is_voided %}<span class="badge text-bg-secondary">Cancelled</span><div class="small">{{ f.voided_reason }}</div>
+          {% elif f.status == "paid" %}{% status_badge "valid" "Paid" %}<div class="small text-body-secondary">{{ f.paid_on|date:"d M Y" }}</div>
+          {% else %}{% status_badge "due" "Unpaid" %}{% endif %}</td>
+      <td class="text-end text-nowrap">
+        {% if not f.is_voided %}
+          {% if f.status == "unpaid" %}
+            {% if perms.vehicles.pay_fine %}<a class="btn btn-sm btn-primary" href="{% url 'web:vehicle_fine_pay' f.pk %}">Pay</a>{% endif %}
+            {% if perms.vehicles.change_fine %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:vehicle_fine_edit' f.pk %}">Edit</a>{% endif %}
+          {% endif %}
+          {% if perms.vehicles.change_fine %}<a class="btn btn-sm btn-outline-danger" href="{% url 'web:vehicle_fine_void' f.pk %}">Cancel</a>{% endif %}
+        {% endif %}
+      </td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="7" class="text-center text-body-secondary py-4">No fines.</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>

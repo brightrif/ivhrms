@@ -1,0 +1,23 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Fines{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Fines</h1>
+  <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_list' %}">All vehicles</a>
+</div>
+<form method="get" class="row g-2 mb-3 align-items-center">
+  <div class="col-md-4"><input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Search plate, ticket number, offence or driver"></div>
+  <div class="col-6 col-md-2"><select name="status" class="form-select">
+    <option value="unpaid"{% if status == "unpaid" %} selected{% endif %}>Unpaid</option>
+    <option value="paid"{% if status == "paid" %} selected{% endif %}>Paid</option>
+    <option value="all"{% if status == "all" %} selected{% endif %}>All</option>
+  </select></div>
+  <div class="col-auto"><button class="btn btn-outline-primary">Filter</button></div>
+  <div class="col-auto ms-auto text-body-secondary">Total shown: <span class="fw-semibold text-body">{{ total|floatformat:3 }} BHD</span></div>
+</form>
+<div class="card shadow-sm border-0">
+  {% include "web/vehicles/_fines_table.html" with fines=fines show_vehicle=True %}
+</div>
+<p class="small text-body-secondary mt-2 mb-0">Cancelled fines are not listed here. Add a fine from the vehicle's own page.</p>
+{% endblock %}

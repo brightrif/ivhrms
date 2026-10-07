@@ -1,0 +1,71 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Accident: {{ vehicle.plate_number }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0 d-flex flex-wrap align-items-center gap-2">Accident <span class="fw-normal text-body-secondary">{{ vehicle.plate_number }}, {{ accident.occurred_on|date:"d M Y" }}</span>
+    {% if accident.is_voided %}<span class="badge text-bg-secondary">Cancelled</span>
+    {% elif accident.status == "closed" %}{% status_badge "valid" "Closed" %}{% else %}{% status_badge "due" "Open" %}{% endif %}</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:vehicle_incidents' vehicle.pk %}">Fines and accidents</a>
+    {% if not accident.is_voided and perms.vehicles.change_accident %}
+      <a class="btn btn-outline-primary" href="{% url 'web:vehicle_accident_edit' accident.pk %}">Edit</a>
+      {% if accident.status == "open" %}
+        <a class="btn btn-primary" href="{% url 'web:vehicle_accident_close' accident.pk %}">Close</a>
+      {% else %}
+        <form method="post" action="{% url 'web:vehicle_accident_reopen' accident.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-primary">Reopen</button></form>
+      {% endif %}
+      <a class="btn btn-outline-danger" href="{% url 'web:vehicle_accident_void' accident.pk %}">Cancel</a>
+    {% endif %}
+  </div>
+</div>
+{% if accident.is_voided %}<div class="alert alert-secondary">Cancelled: {{ accident.voided_reason }}</div>{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>What happened</h2>
+      <p>{{ accident.description|linebreaksbr }}</p>
+      <dl class="row gy-1 mb-0">
+        <dt class="col-4 fw-normal text-body-secondary">Driver</dt><dd class="col-8 mb-0">{{ accident.driver.full_name|default:"Not recorded" }}{% if accident.driver and accident.driver.status == "separated" %} <span class="badge text-bg-secondary">Left</span>{% endif %}</dd>
+        <dt class="col-4 fw-normal text-body-secondary">Location</dt><dd class="col-8 mb-0">{{ accident.location|default:"-" }}</dd>
+        <dt class="col-4 fw-normal text-body-secondary">Police report</dt><dd class="col-8 mb-0">{{ accident.police_report_no|default:"-" }}</dd>
+        <dt class="col-4 fw-normal text-body-secondary">Fault</dt><dd class="col-8 mb-0">{{ accident.get_fault_display }}</dd>
+        <dt class="col-4 fw-normal text-body-secondary">Injuries</dt><dd class="col-8 mb-0">{% if accident.injuries %}Yes{% else %}No{% endif %}</dd>
+        <dt class="col-4 fw-normal text-body-secondary">Other party</dt><dd class="col-8 mb-0">{% if accident.third_party %}{{ accident.third_party_details|default:"Involved, details not recorded"|linebreaksbr }}{% else %}None{% endif %}</dd>
+        {% if accident.closed_on %}<dt class="col-4 fw-normal text-body-secondary">Closed on</dt><dd class="col-8 mb-0">{{ accident.closed_on|date:"d M Y" }}</dd>{% endif %}
+        {% if accident.notes %}<dt class="col-4 fw-normal text-body-secondary">Notes</dt><dd class="col-8 mb-0">{{ accident.notes|linebreaksbr }}</dd>{% endif %}
+      </dl>
+    </div></div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>Insurance and cost</h2>
+      <dl class="row gy-1 mb-0">
+        <dt class="col-6 fw-normal text-body-secondary">Claim</dt><dd class="col-6 mb-0 text-end">{{ accident.get_claim_status_display }}{% if accident.claim_no %} ({{ accident.claim_no }}){% endif %}</dd>
+        <dt class="col-6 fw-normal text-body-secondary">Repairs</dt><dd class="col-6 mb-0 text-end">{{ accident.repair_cost|floatformat:3 }} BHD</dd>
+        <dt class="col-6 fw-normal text-body-secondary">Recovered from insurance</dt><dd class="col-6 mb-0 text-end">{{ accident.insurance_recovered|floatformat:3 }} BHD</dd>
+        <dt class="col-6 fw-semibold">Net cost to the company</dt><dd class="col-6 mb-0 text-end fw-semibold">{{ accident.net_cost|floatformat:3 }} BHD</dd>
+      </dl>
+    </div></div>
+
+    <div class="card shadow-sm border-0"><div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <span class="fw-semibold">Repairs</span>
+      {% if not accident.is_voided and perms.vehicles.change_accident %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:vehicle_accident_link' accident.pk %}">Link a repair</a>{% endif %}
+    </div>
+      <table class="table table-sm align-middle mb-0"><tbody>
+      {% for r in repairs %}
+        <tr><td class="text-nowrap">{{ r.serviced_on|date:"d M Y" }}</td>
+            <td>{{ r.garage|default:"Repair" }}{% if r.description %}<div class="small text-body-secondary">{{ r.description|truncatechars:60 }}</div>{% endif %}</td>
+            <td class="text-end">{{ r.total_cost|floatformat:3 }}</td>
+            <td class="text-end">{% if not accident.is_voided and perms.vehicles.change_accident %}
+              <form method="post" action="{% url 'web:vehicle_accident_unlink' accident.pk r.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">Unlink</button></form>{% endif %}</td></tr>
+      {% empty %}
+        <tr><td class="text-body-secondary p-3">No repair linked yet. Log it under Maintenance as a repair, then link it here.</td></tr>
+      {% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+</div>
+{% endblock %}
