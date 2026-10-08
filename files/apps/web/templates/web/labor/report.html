@@ -1,0 +1,80 @@
+{% extends "web/base.html" %}
+{% block title %}{{ report.title }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Labor</h1>
+</div>
+{% include "web/labor/_tabs.html" with tab="reports" %}
+
+<ul class="nav nav-pills mb-3">
+  {% for name, label in pills %}<li class="nav-item"><a class="nav-link py-1{% if name == key %} active{% endif %}" href="{% url 'web:'|add:name %}">{{ label }}</a></li>{% endfor %}
+</ul>
+
+<form method="get" class="row g-2 mb-3 align-items-center">
+  {% if key == "labor_report_deployment" %}
+    <div class="col-6 col-md-2"><input type="date" name="date" value="{{ on|date:'Y-m-d' }}" class="form-control" aria-label="As of date"></div>
+  {% elif key == "labor_report_manpower" %}
+    <div class="col-6 col-md-2"><select name="period" class="form-select">
+      {% for value, label in periods %}<option value="{{ value }}"{% if value == period %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></div>
+    <div class="col-6 col-md-2"><input type="date" name="date" value="{{ anchor|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" class="form-control"></div>
+  {% else %}
+    <div class="col-6 col-md-2"><input type="date" name="from" value="{{ first|date:'Y-m-d' }}" class="form-control" aria-label="From"></div>
+    <div class="col-6 col-md-2"><input type="date" name="to" value="{{ last|date:'Y-m-d' }}" class="form-control" aria-label="To"></div>
+    {% if key == "labor_report_cost" %}
+      <div class="col-6 col-md-2"><select name="group" class="form-select" aria-label="Group by">
+        {% for value, label in groups %}<option value="{{ value }}"{% if value == group %} selected{% endif %}>By {{ label|lower }}</option>{% endfor %}
+      </select></div>
+      <div class="col-6 col-md-2"><select name="engagement" class="form-select" aria-label="Engagement">
+        <option value="">All workers</option>
+        {% for value, label in engagements %}<option value="{{ value }}"{% if value == engagement %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select></div>
+      {% if multi_company %}<div class="col-6 col-md-2"><select name="company" class="form-select" aria-label="Company">
+        <option value="">All companies</option>
+        {% for c in companies %}<option value="{{ c.pk }}"{% if c.pk|stringformat:"s" == company %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      </select></div>{% endif %}
+    {% else %}
+      <div class="col-md-3"><select name="contractor" class="form-select" aria-label="Contractor">
+        {% for c in contractors %}<option value="{{ c.pk }}"{% if c.pk|stringformat:"s" == contractor %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+        <option value="none"{% if contractor == "none" %} selected{% endif %}>Contracted, engaged directly</option>
+      </select></div>
+    {% endif %}
+  {% endif %}
+  <div class="col-auto"><button class="btn btn-outline-primary">Show</button></div>
+  {% if key == "labor_report_manpower" %}
+  <div class="col-auto d-flex align-items-center gap-2">
+    <a class="btn btn-outline-secondary btn-sm" href="?{{ prev_query }}" aria-label="Previous period"><i class="bi bi-chevron-left"></i></a>
+    <span class="fw-medium">{{ first|date:"d M" }}{% if first != last %} &ndash; {{ last|date:"d M Y" }}{% else %} {{ first|date:"Y" }}{% endif %}</span>
+    {% if not next_is_future %}<a class="btn btn-outline-secondary btn-sm" href="?{{ next_query }}" aria-label="Next period"><i class="bi bi-chevron-right"></i></a>{% endif %}
+  </div>
+  {% endif %}
+  <div class="col-auto ms-md-auto"><a class="btn btn-success" href="?{{ export_query }}"><i class="bi bi-file-earmark-excel me-1"></i>Export to Excel</a></div>
+</form>
+
+<div class="mb-2"><span class="fw-semibold fs-5">{{ report.title }}</span> <span class="text-body-secondary">{{ report.subtitle }}</span></div>
+
+{% for t in tables %}
+<div class="card shadow-sm border-0 mb-3">
+  {% if tables|length > 1 %}<div class="card-header bg-white py-2"><span class="fw-semibold">{{ t.title }}</span></div>{% endif %}
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-light"><tr>{% for c in t.columns %}<th class="{% if c.kind != 'text' %}text-end {% endif %}text-nowrap">{{ c.label }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for row in t.rows %}
+        <tr>{% for text, number in row %}<td class="{% if number %}text-end {% endif %}text-nowrap">{{ text }}</td>{% endfor %}</tr>
+      {% empty %}
+        <tr><td colspan="{{ t.columns|length }}" class="text-center text-body-secondary py-4">Nothing to show for this selection.</td></tr>
+      {% endfor %}
+      </tbody>
+      {% if t.total %}<tfoot class="table-light"><tr>{% for text, number in t.total %}<th class="{% if number %}text-end {% endif %}text-nowrap">{{ text }}</th>{% endfor %}</tr></tfoot>{% endif %}
+    </table>
+  </div>
+</div>
+{% endfor %}
+
+{% if report.notes %}
+<div class="small text-body-secondary">
+  {% for note in report.notes %}<div class="mb-1">{{ note }}</div>{% endfor %}
+</div>
+{% endif %}
+{% endblock %}
