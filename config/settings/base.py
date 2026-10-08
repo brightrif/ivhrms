@@ -62,6 +62,7 @@ LOCAL_APPS = [
     "apps.vehicles",
     "apps.compliance",
     "apps.labor",
+    "apps.configuration",
     "apps.web",
 ]
 

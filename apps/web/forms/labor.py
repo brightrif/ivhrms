@@ -4,6 +4,7 @@ from django import forms
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.configuration import services as settings_service
 from apps.labor.models import Contractor, LaborProfile, LaborRate, Trade
 from apps.organization.models import Company
 from apps.organization.services import companies_for
@@ -11,6 +12,12 @@ from apps.organization.services import companies_for
 from apps.web.forms.common import date_input
 
 DAILY = LaborRate.WageBasis.DAILY
+
+
+def _worker_defaults():
+    """What the add-worker forms start with, from Settings."""
+    return {"standard_hours": settings_service.get("labor.default_standard_hours"),
+            "overtime_eligible": settings_service.get("labor.new_worker_overtime_eligible")}
 
 
 def _contractor_label(c):
@@ -75,6 +82,8 @@ class LaborWorkerForm(_EngagementForm, _TermsForm):
             self.initial.setdefault("company", ids[0])
             self.fields["company"].widget = forms.HiddenInput()
         self.initial.setdefault("joining_date", timezone.localdate())
+        for name, value in _worker_defaults().items():
+            self.initial.setdefault(name, value)
         self._set_choices(Contractor.objects.for_user(user))
 
     def clean(self):
@@ -92,6 +101,8 @@ class ProfileSetupForm(_EngagementForm, _TermsForm):
     def __init__(self, *args, employee, user, **kwargs):
         super().__init__(*args, **kwargs)
         self.initial.setdefault("effective_from", employee.joining_date)
+        for name, value in _worker_defaults().items():
+            self.initial.setdefault(name, value)
         self._set_choices(Contractor.objects.for_user(user).filter(company_id=employee.company_id))
 
 

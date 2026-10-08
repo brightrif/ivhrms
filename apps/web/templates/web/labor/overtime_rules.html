@@ -1,0 +1,42 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Overtime rules{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Labor</h1>
+  <span class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:labor_overtime' %}">Overtime claims</a>
+    {% if perms.labor.add_overtimepolicy %}<a class="btn btn-primary" href="{% url 'web:labor_overtime_rules_new' %}"><i class="bi bi-plus-lg me-1"></i>New rules</a>{% endif %}
+  </span>
+</div>
+{% include "web/labor/_tabs.html" with tab="overtime" %}
+{% for c in without_rules %}
+<div class="alert alert-warning py-2"><strong>{{ c.name }}</strong> has no overtime decision yet. Say whether it pays overtime, so there is a clear answer on record.</div>
+{% endfor %}
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table align-middle mb-0">
+    <thead class="table-light"><tr>{% if multi_company %}<th>Company</th>{% endif %}<th>From</th><th>To</th><th class="text-end">Working day</th><th class="text-end">Weekly off</th><th class="text-end">Holiday</th><th>Days off</th><th class="text-end">Days / month</th><th class="text-end">Claims</th></tr></thead>
+    <tbody>
+    {% for p in policies %}
+      <tr>
+        {% if multi_company %}<td>{{ p.company.code }}</td>{% endif %}
+        <td class="text-nowrap">{{ p.effective_from|date:"d M Y" }}</td>
+        <td class="text-nowrap">{% if p.effective_to %}{{ p.effective_to|date:"d M Y" }}{% else %}<span class="badge text-bg-light border">Current</span>{% endif %}</td>
+        {% if p.overtime_applies %}
+        <td class="text-end">&times;{{ p.working_day_multiplier|floatformat:"-2" }}</td>
+        <td class="text-end">&times;{{ p.weekly_off_multiplier|floatformat:"-2" }}</td>
+        <td class="text-end">&times;{{ p.holiday_multiplier|floatformat:"-2" }}</td>
+        <td>{% if p.all_hours_on_days_off %}All hours{% else %}Beyond standard day{% endif %}</td>
+        <td class="text-end">{{ p.monthly_divisor }}</td>
+        {% else %}
+        <td colspan="5" class="text-center"><span class="badge text-bg-secondary">No overtime paid</span></td>
+        {% endif %}
+        <td class="text-end">{{ p.claim_count }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="9" class="text-center text-body-secondary py-4">No overtime decision yet. Add rules, or record that the company pays no overtime.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

@@ -1,6 +1,9 @@
 <ul class="nav nav-tabs mb-3">
   <li class="nav-item"><a class="nav-link{% if tab == 'workers' %} active{% endif %}" href="{% url 'web:labor_list' %}">Workers</a></li>
   {% if perms.labor.view_laborallocation %}<li class="nav-item"><a class="nav-link{% if tab == 'sites' %} active{% endif %}" href="{% url 'web:labor_site_list' %}">Sites</a></li>{% endif %}
+  {% if perms.labor.view_laborallocation %}<li class="nav-item"><a class="nav-link{% if tab == 'attendance' %} active{% endif %}" href="{% url 'web:labor_attendance' %}">Attendance</a></li>{% endif %}
+  {% if perms.labor.view_timeentry %}<li class="nav-item"><a class="nav-link{% if tab == 'timesheets' %} active{% endif %}" href="{% url 'web:labor_timesheet' %}">Timesheets</a></li>{% endif %}
+  {% if perms.labor.view_overtimeclaim %}<li class="nav-item"><a class="nav-link{% if tab == 'overtime' %} active{% endif %}" href="{% url 'web:labor_overtime' %}">Overtime</a></li>{% endif %}
   {% if perms.labor.view_workorder %}<li class="nav-item"><a class="nav-link{% if tab == 'work_orders' %} active{% endif %}" href="{% url 'web:labor_work_order_list' %}">Work orders</a></li>{% endif %}
   {% if perms.labor.view_contractor %}<li class="nav-item"><a class="nav-link{% if tab == 'contractors' %} active{% endif %}" href="{% url 'web:labor_contractor_list' %}">Contractors</a></li>{% endif %}
   {% if perms.labor.view_trade %}<li class="nav-item"><a class="nav-link{% if tab == 'trades' %} active{% endif %}" href="{% url 'web:labor_trade_list' %}">Trades</a></li>{% endif %}

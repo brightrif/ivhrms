@@ -1,0 +1,34 @@
+{% extends "web/base.html" %}
+{% block title %}Access{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Settings</h1>
+</div>
+{% include "web/settings/_tabs.html" %}
+<p class="text-body-secondary">Choose which groups may do what. A superuser can always do everything. Which company someone can act in is set separately, under their company access.</p>
+<form method="post">
+  {% csrf_token %}
+  <div class="card shadow-sm border-0"><div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light"><tr><th>Right</th>{% for g in groups %}<th class="text-center">{{ g.name }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% regroup rows by module as by_module %}
+      {% for block in by_module %}
+        <tr class="table-secondary"><th colspan="{{ groups|length|add:1 }}">{{ block.grouper.label }}</th></tr>
+        {% for row in block.list %}
+        <tr>
+          <td>{{ row.label }}{% if row.hint %}<div class="small text-body-secondary">{{ row.hint }}</div>{% endif %}</td>
+          {% for g in groups %}
+          <td class="text-center"><input type="checkbox" class="form-check-input" name="grant" value="{{ row.perm }}|{{ g.pk }}"{% if g.pk in row.granted %} checked{% endif %} aria-label="{{ g.name }}: {{ row.label }}"></td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      {% empty %}
+        <tr><td class="text-body-secondary py-4">Nothing to control yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  <div class="form-actions mt-3"><button class="btn btn-primary">Save access</button></div>
+</form>
+{% endblock %}

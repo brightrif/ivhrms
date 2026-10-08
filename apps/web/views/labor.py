@@ -3,10 +3,12 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from apps.employees.models import Employee
 from apps.labor import deployment, services
+from apps.labor.overtime_services import overtime_mode
 from apps.labor.allocation import LaborAllocation
 from apps.labor.models import Contractor, LaborProfile, Trade
 from apps.organization.models import Project
@@ -120,6 +122,7 @@ def labor_detail(request, pk):
     return render(request, "web/labor/detail.html", {
         "profile": profile, "emp": profile.employee, "rates": list(profile.rates.all()),
         "allocations": allocations, "current_allocation": next((a for a in allocations if a.is_open), None),
+        "overtime_mode": overtime_mode(profile.company, timezone.localdate())[0],
         "show_rates": request.user.has_perm("labor.view_laborrate")})
 
 

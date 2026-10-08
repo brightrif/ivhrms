@@ -1,0 +1,4 @@
+<ul class="nav nav-tabs mb-3">
+  {% for m in tabs %}<li class="nav-item"><a class="nav-link{% if tab == m.key %} active{% endif %}" href="{% url 'web:settings_module' m.key %}"><i class="bi {{ m.icon }} me-1"></i>{{ m.label }}</a></li>{% endfor %}
+  {% if show_access %}<li class="nav-item ms-auto"><a class="nav-link{% if tab == 'access' %} active{% endif %}" href="{% url 'web:settings_access' %}"><i class="bi bi-shield-lock me-1"></i>Access</a></li>{% endif %}
+</ul>

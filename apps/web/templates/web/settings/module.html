@@ -1,0 +1,63 @@
+{% extends "web/base.html" %}
+{% block title %}{{ module.label }} settings{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Settings</h1>
+  {% if per_company and companies|length > 1 %}
+  <form method="get" class="d-flex align-items-center gap-2">
+    <label class="small text-body-secondary mb-0" for="scope">Showing</label>
+    <select name="company" id="scope" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+      <option value="">Default for all companies</option>
+      {% for c in companies %}<option value="{{ c.pk }}"{% if scope and scope.pk == c.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</div>
+{% include "web/settings/_tabs.html" %}
+
+<form method="post">
+  {% csrf_token %}
+  {% if scope %}<input type="hidden" name="company" value="{{ scope.pk }}">{% endif %}
+  <div class="row g-3">
+  {% for section in sections %}
+    <div class="col-lg-6"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <h2>{{ section.title }}</h2>
+      {% if section.intro %}<p class="small text-body-secondary">{{ section.intro }}</p>{% endif %}
+      {% if section.template %}{% include section.template %}{% endif %}
+      {% for row in section.rows %}
+      <div class="mb-3">
+        {% if row.setting.kind == "bool" %}
+          <div class="form-check form-switch">
+            <input class="form-check-input{% if row.error %} is-invalid{% endif %}" type="checkbox" role="switch" id="{{ row.name }}" name="{{ row.name }}"{% if row.value %} checked{% endif %}{% if not row.editable %} disabled{% endif %}>
+            <label class="form-check-label" for="{{ row.name }}">{{ row.setting.label }}</label>
+          </div>
+        {% else %}
+          <label class="form-label" for="{{ row.name }}">{{ row.setting.label }}</label>
+          {% if row.setting.kind == "choice" %}
+          <select class="form-select{% if row.error %} is-invalid{% endif %}" id="{{ row.name }}" name="{{ row.name }}"{% if not row.editable %} disabled{% endif %}>
+            {% for value, label in row.setting.choices %}<option value="{{ value }}"{% if value == row.value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+          {% else %}
+          <input class="form-control{% if row.error %} is-invalid{% endif %}" id="{{ row.name }}" name="{{ row.name }}" inputmode="decimal" autocomplete="off" value="{{ row.value }}"{% if not row.editable %} disabled{% endif %}>
+          {% endif %}
+        {% endif %}
+        {% if row.error %}<div class="text-danger small">{{ row.error }}</div>{% endif %}
+        {% if row.setting.help %}<div class="form-text">{{ row.setting.help }}</div>{% endif %}
+        {% if scope and row.setting.per_company %}
+          <div class="form-text">{% if row.source == "company" %}Set for {{ scope.name }}.{% else %}Following the default.{% endif %}
+          {% if row.source == "company" and can_edit %}<label class="ms-2"><input type="checkbox" class="form-check-input" name="{{ row.revert }}"> Go back to the default</label>{% endif %}</div>
+        {% elif scope and not row.setting.per_company %}
+          <div class="form-text">Applies to every company. Change it under "Default for all companies".</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div></div></div>
+  {% endfor %}
+  </div>
+  {% if can_edit %}
+  <div class="form-actions mt-3"><button class="btn btn-primary">Save settings</button></div>
+  {% else %}
+  <div class="text-body-secondary small mt-3">You can see these settings but not change them.</div>
+  {% endif %}
+</form>
+{% endblock %}

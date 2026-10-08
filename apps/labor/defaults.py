@@ -6,13 +6,18 @@ from the group, so anything changed later in the admin survives future migration
 HR runs labor day to day, including pay rates. Finance and Management can look at everything."""
 from django.db import DEFAULT_DB_ALIAS, connections
 
-_ALL = ["trade", "contractor", "laborprofile", "laborrate", "workorder", "laborallocation"]
+_ALL = ["trade", "contractor", "laborprofile", "laborrate", "workorder", "laborallocation", "timeentry",
+        "overtimepolicy", "overtimeclaim"]
 _HR = ["view", "add", "change"]
 GROUP_PERMISSIONS = {
     "HR": {"trade": _HR, "contractor": _HR, "laborprofile": _HR, "laborrate": ["view", "add"],
-           "workorder": _HR, "laborallocation": ["view", "add", "change"]},
+           "workorder": _HR, "laborallocation": ["view", "add", "change"],
+           "timeentry": ["view", "add", "change"],
+           "overtimepolicy": ["view", "add"], "overtimeclaim": ["view", "add"]},
     "Finance": {m: ["view"] for m in _ALL},
-    "Management": {m: ["view"] for m in _ALL},
+    # Management sets the overtime rules and decides the claims; HR prepares them
+    "Management": {**{m: ["view"] for m in _ALL}, "overtimepolicy": ["view", "add"],
+                   "overtimeclaim": ["view", "change"]},
 }
 
 

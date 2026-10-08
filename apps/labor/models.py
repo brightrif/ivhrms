@@ -158,3 +158,5 @@ class LaborRate(BaseModel):
 
 
 from .allocation import LaborAllocation, WorkOrder  # noqa: E402,F401  (registers the two models)
+from .timesheet import TimeEntry  # noqa: E402,F401  (registers the hours model)
+from .overtime import OvertimeClaim, OvertimePolicy  # noqa: E402,F401  (registers the overtime models)

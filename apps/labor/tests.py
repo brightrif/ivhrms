@@ -201,9 +201,11 @@ class DefaultsTests(TestCase):
         self.assertLessEqual({"add_laborprofile", "change_laborprofile", "add_laborrate", "view_laborrate",
                               "add_contractor", "change_trade"}, hr)
         self.assertNotIn("change_laborrate", hr)             # pay terms are replaced by a new row, never edited
-        for group in (fin, mgmt):
-            self.assertEqual({c.split("_")[0] for c in group}, {"view"})
-            self.assertIn("view_laborrate", group)
+        self.assertEqual({c.split("_")[0] for c in fin}, {"view"})
+        self.assertIn("view_laborrate", fin)
+        self.assertIn("view_laborrate", mgmt)
+        # Management also sets the overtime rules and decides overtime claims; nothing else beyond viewing
+        self.assertEqual({c for c in mgmt if not c.startswith("view_")}, {"add_overtimepolicy", "change_overtimeclaim"})
 
     def test_running_it_again_keeps_a_permission_removed_in_the_admin(self):
         from django.contrib.auth.models import Permission

@@ -42,7 +42,7 @@
       {% with r=profile.current_rate %}
       {% if r %}
       <div class="fs-4">{{ r.rate|floatformat:3 }} <span class="fs-6 text-body-secondary">BHD / {{ r.unit }}</span></div>
-      <div class="small text-body-secondary">{{ r.get_wage_basis_display }} &middot; {{ r.standard_hours|floatformat:"-2" }} h a day &middot; {% if r.overtime_eligible %}overtime allowed{% else %}no overtime{% endif %}</div>
+      <div class="small text-body-secondary">{{ r.get_wage_basis_display }} &middot; {{ r.standard_hours|floatformat:"-2" }} h a day &middot; {% if overtime_mode == 'none' %}company pays no overtime{% elif r.overtime_eligible %}overtime allowed{% else %}no overtime{% endif %}</div>
       {% else %}<div class="text-body-secondary">No pay terms yet.</div>{% endif %}
       {% endwith %}
     {% else %}<div class="text-body-secondary small">You do not have access to pay details.</div>{% endif %}

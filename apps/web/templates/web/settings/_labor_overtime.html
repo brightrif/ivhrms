@@ -1,0 +1,21 @@
+<div class="table-responsive mb-2">
+  <table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>Company</th><th>Overtime today</th><th></th></tr></thead>
+    <tbody>
+    {% for r in section.extra.overtime_rows %}
+      <tr>
+        <td class="fw-medium">{{ r.company.name }}</td>
+        <td>{% if r.mode == "applies" %}Paid: &times;{{ r.policy.working_day_multiplier|floatformat:"-2" }} normal day, &times;{{ r.policy.weekly_off_multiplier|floatformat:"-2" }} weekly off, &times;{{ r.policy.holiday_multiplier|floatformat:"-2" }} holiday
+            {% elif r.mode == "none" %}<span class="badge text-bg-secondary">No overtime paid</span>
+            {% else %}<span class="badge text-bg-warning">Not decided yet</span>{% endif %}</td>
+        <td class="text-end text-nowrap">
+          {% if perms.labor.view_overtimepolicy %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:labor_overtime_rules' %}">History</a>{% endif %}
+          {% if perms.labor.add_overtimepolicy %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:labor_overtime_rules_new' %}">Change rules</a>{% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="3" class="text-body-secondary">No companies available.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
