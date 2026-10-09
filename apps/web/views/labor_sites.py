@@ -48,7 +48,7 @@ def _site_url(project, location):
 def site_list(request):
     rows = deployment.site_overview(request.user)
     return render(request, "web/labor/sites.html", {
-        "rows": rows, "totals": {k: sum(r[k] for r in rows) for k in ("total", "direct", "contracted")},
+        "rows": rows, "totals": deployment.headcount(request.user),
         "unallocated": deployment.unallocated_profiles(request.user).count()})
 
 
@@ -85,8 +85,14 @@ def labor_allocate(request, pk):
         else:
             messages.success(request, f"{profile.employee.full_name} is now on {cd['project'].code}, {cd['location'].name}.")
             return redirect(back)
-    current = deployment.open_allocation(profile.employee)
-    intro = f"Now at {current.place}, since {current.effective_from:%d %b %Y}." if current else "Not on any site yet."
+    mine = deployment.open_allocations(profile.employee)
+    if len(mine) > 1:
+        intro = (f"On {len(mine)} projects: {', '.join(a.project.code for a in mine)}. "
+                 "To change them, use each project's Team page.")
+    elif mine:
+        intro = f"Now at {mine[0].place}, since {mine[0].effective_from:%d %b %Y}."
+    else:
+        intro = "Not on any site yet."
     return _form_page(request, form, f"Allocate: {profile.employee.full_name}", back, "allocate", intro=intro)
 
 

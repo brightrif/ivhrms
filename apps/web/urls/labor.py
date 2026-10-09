@@ -1,6 +1,9 @@
 from django.urls import path
 
 from apps.web.views import labor, labor_attendance, labor_overtime, labor_reports, labor_sites, labor_timesheet
+from apps.web.views import labor_team
+from apps.web.views import labor_split
+from apps.web.views import labor_projects
 
 urlpatterns = [
     path("labor/", labor.labor_list, name="labor_list"),
@@ -10,12 +13,18 @@ urlpatterns = [
     path("labor/<int:pk>/edit/", labor.labor_edit, name="labor_edit"),
     path("labor/<int:pk>/pay/", labor.labor_rate_change, name="labor_rate_change"),
     path("labor/<int:pk>/allocate/", labor_sites.labor_allocate, name="labor_allocate"),
+    path("labor/<int:pk>/projects/add/", labor_projects.labor_project_add, name="labor_project_add"),
+    path("labor/allocations/<int:pk>/remove/", labor_projects.labor_project_remove, name="labor_project_remove"),
+    path("labor/projects/add-many/", labor_projects.labor_projects_add_many, name="labor_projects_add_many"),
+    path("labor/<int:pk>/shared/", labor_projects.labor_shared_set, name="labor_shared_set"),
     path("labor/<int:pk>/release/", labor_sites.labor_release, name="labor_release"),
     path("labor/transfer/", labor_sites.labor_transfer, name="labor_transfer"),
     path("labor/sites/", labor_sites.site_list, name="labor_site_list"),
     path("labor/sites/<int:project_pk>/<int:location_pk>/", labor_sites.site_detail, name="labor_site_detail"),
+    path("labor/projects/<int:project_pk>/team/", labor_team.team, name="labor_team"),
     path("labor/attendance/", labor_attendance.labor_attendance, name="labor_attendance"),
     path("labor/timesheets/", labor_timesheet.labor_timesheet, name="labor_timesheet"),
+    path("labor/timesheet/split/", labor_split.split, name="labor_split"),
     path("labor/overtime/", labor_overtime.labor_overtime, name="labor_overtime"),
     path("labor/overtime/rules/", labor_overtime.labor_overtime_rules, name="labor_overtime_rules"),
     path("labor/overtime/rules/new/", labor_overtime.labor_overtime_rules_new, name="labor_overtime_rules_new"),

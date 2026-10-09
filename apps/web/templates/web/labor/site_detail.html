@@ -7,11 +7,14 @@
     <h1 class="mb-0">{{ project.code }} &middot; {{ location.name }}</h1>
     <div class="text-body-secondary">{{ project.name }} &middot; {{ allocations|length }} worker{{ allocations|length|pluralize }} now ({{ direct }} direct, {{ contracted }} contracted)</div>
   </div>
-  <a class="btn btn-outline-secondary" href="{% url 'web:labor_site_list' %}">All sites</a>
+    <div class="d-flex gap-2">
+    <a class="btn btn-outline-primary" href="{% url 'web:labor_team' project.pk %}">Team</a>
+    <a class="btn btn-outline-secondary" href="{% url 'web:labor_site_list' %}">All sites</a>
+  </div>
 </div>
-<form method="get" action="{% url 'web:labor_transfer' %}">
+<form method="get" action="{% url 'web:labor_projects_add_many' %}">
 {% if perms.labor.add_laborallocation and allocations %}
-<div class="mb-2"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-left-right me-1"></i>Move ticked workers</button></div>
+<div class="mb-2"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-left-right me-1"></i>Add ticked workers to another project</button></div>
 {% endif %}
 <div class="card shadow-sm border-0"><div class="table-responsive">
   <table class="table table-hover align-middle mb-0">
@@ -33,7 +36,7 @@
       </tr>
       {% endwith %}
     {% empty %}
-      <tr><td colspan="7" class="text-center text-body-secondary py-4">Nobody is on this site. Tick workers on the Workers tab and choose "Allocate / move".</td></tr>
+      <tr><td colspan="7" class="text-center text-body-secondary py-4">Nobody is on this site. Tick workers on the Workers tab and choose "Add ticked workers to a project".</td></tr>
     {% endfor %}
     </tbody>
   </table>

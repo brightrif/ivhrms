@@ -1,0 +1,86 @@
+{% extends "web/base.html" %}
+{% block title %}Split a worker's hours{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Labor</h1>
+</div>
+{% include "web/labor/_tabs.html" with tab="timesheet" %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <div class="fw-medium fs-5">Split a worker's hours between projects</div>
+    <div class="small text-body-secondary">One way of dividing the day, applied to every worked day in a period. Overtime is never shared: each project gets only the overtime it asked for.</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:labor_timesheet' %}">Back to the timesheet</a>
+</div>
+
+{% if not profile %}
+<div class="card shadow-sm border-0"><div class="card-body">
+  <form method="get" class="row g-2 mb-3">
+    <input type="hidden" name="first" value="{{ first|date:'Y-m-d' }}"><input type="hidden" name="last" value="{{ last|date:'Y-m-d' }}">
+    <div class="col-md-6"><input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search by name, number or trade" aria-label="Search workers"></div>
+    <div class="col-auto"><button class="btn btn-outline-primary">Search</button></div>
+  </form>
+  <div class="small text-body-secondary mb-2">Workers on two or more projects, and workers shared with every project.</div>
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>No.</th><th>Worker</th><th>Trade</th><th>Projects</th><th></th></tr></thead>
+    <tbody>
+    {% for p in people %}
+      <tr>
+        <td class="text-nowrap">{{ p.employee.employee_no }}</td>
+        <td class="fw-medium">{{ p.employee.full_name }}</td>
+        <td>{{ p.trade.name }}</td>
+        <td>{% if p.serves_all_projects %}<span class="badge bg-primary-subtle text-primary-emphasis">Every active project</span>{% else %}{{ p.open_projects }}{% endif %}</td>
+        <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="?worker={{ p.pk }}&amp;first={{ first|date:'Y-m-d' }}&amp;last={{ last|date:'Y-m-d' }}">Split hours</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-body-secondary py-3">Nobody is on more than one project yet. Add people to projects on each project's Team page.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div></div>
+{% else %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="worker" value="{{ profile.pk }}">
+  <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+    <div class="fw-medium mb-2">{{ profile.employee.employee_no }} &middot; {{ profile.employee.full_name }} <span class="text-body-secondary">&middot; {{ profile.trade.name }}</span></div>
+    <div class="row g-2 align-items-end">
+      <div class="col-6 col-md-3"><label class="form-label small mb-1" for="first">From</label><input type="date" id="first" name="first" value="{{ first|date:'Y-m-d' }}" class="form-control"></div>
+      <div class="col-6 col-md-3"><label class="form-label small mb-1" for="last">To</label><input type="date" id="last" name="last" value="{{ last|date:'Y-m-d' }}" class="form-control"></div>
+    </div>
+  </div></div>
+
+  <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+    <div class="d-flex flex-wrap gap-4 mb-3">
+      <div class="form-check"><input class="form-check-input" type="radio" name="mode" id="mode-typed" value="typed" checked
+             onchange="document.querySelectorAll('.reg').forEach(function (i) { i.disabled = false })">
+        <label class="form-check-label" for="mode-typed">Use the regular hours I type</label></div>
+      {% if profile.serves_all_projects %}
+      <div class="form-check"><input class="form-check-input" type="radio" name="mode" id="mode-even" value="even"
+             onchange="document.querySelectorAll('.reg').forEach(function (i) { i.disabled = true })">
+        <label class="form-check-label" for="mode-even">Share the day's standard hours evenly between the ticked projects</label></div>
+      {% endif %}
+    </div>
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+      <thead class="table-light"><tr><th style="width:2rem"></th><th>Project</th><th style="width:9rem">Regular hours</th><th style="width:9rem">Overtime hours</th></tr></thead>
+      <tbody>
+      {% for p in projects %}
+        <tr>
+          <td><input type="checkbox" class="form-check-input" name="inc_{{ p.pk }}" value="1" checked aria-label="Include {{ p.code }}"></td>
+          <td><span class="fw-medium">{{ p.code }}</span> <span class="text-body-secondary">{{ p.name }}</span></td>
+          <td><input type="text" inputmode="decimal" name="reg_{{ p.pk }}" class="form-control form-control-sm reg" autocomplete="off" aria-label="Regular hours on {{ p.code }}"></td>
+          <td><input type="text" inputmode="decimal" name="ot_{{ p.pk }}" class="form-control form-control-sm" autocomplete="off" placeholder="0" aria-label="Overtime hours on {{ p.code }}"></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="text-body-secondary py-3">This worker is not on any project in this period.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <div class="small text-body-secondary mt-2">Replaces this worker's draft hours on every worked day in the period. Days with confirmed hours are skipped and listed. The regular hours of all projects together cannot pass the day's standard hours.</div>
+  </div></div>
+  {% if can_apply and projects %}<button class="btn btn-primary">Apply to the days</button>{% endif %}
+  <a class="btn btn-link" href="{% url 'web:labor_split' %}?first={{ first|date:'Y-m-d' }}&amp;last={{ last|date:'Y-m-d' }}">Choose another worker</a>
+</form>
+{% endif %}
+{% endblock %}

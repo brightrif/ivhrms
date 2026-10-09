@@ -21,6 +21,7 @@ from .deployment import unallocated_profiles
 from .models import LaborProfile, LaborRate
 from .overtime import OvertimeClaim, OvertimePolicy
 from .timesheet import TimeEntry
+from .attribution import Attribution
 
 ZERO = Decimal("0")
 THREE, TWO = Decimal("0.001"), Decimal("0.01")
@@ -170,21 +171,32 @@ def deployment_report(user, on_date):
 
 def manpower_report(user, first, last):
     days = [first + timedelta(days=i) for i in range((last - first).days + 1)]
-    records = (Attendance.objects.filter(employee__labor_profile__isnull=False,
-                                         employee__company__in=companies_for(user), date__range=(first, last),
-                                         status__in=Attendance.WORKED).select_related("project", "location"))
+    records = list(Attendance.objects.filter(employee__labor_profile__isnull=False,
+                                             employee__company__in=companies_for(user), date__range=(first, last),
+                                             status__in=Attendance.WORKED).select_related("project", "location"))
+    attribution = Attribution.for_employees({r.employee_id for r in records}, first, last)
     people, mandays = defaultdict(lambda: defaultdict(int)), defaultdict(Decimal)
     for r in records:
-        site = f"{r.project.code} / {r.location.name}" if r.project_id and r.location_id else NO_SITE
-        people[site][r.date] += 1
-        mandays[site] += Decimal(str(Attendance.DAY_FRACTION[r.status]))
+        fraction = Decimal(str(Attendance.DAY_FRACTION[r.status]))
+        parts = attribution.parts(r.employee_id, r.date)
+        if parts is None:                                   # one project that day: where the attendance was marked
+            shares = {f"{r.project.code} / {r.location.name}" if r.project_id and r.location_id else NO_SITE: Decimal("1")}
+        else:                                               # several projects: the person counts on each of them
+            shares = defaultdict(Decimal)
+            for project, location, _order, share in parts:
+                shares[f"{project.code} / {location.name}" if project and location else NO_SITE] += share
+        for site, share in shares.items():
+            people[site][r.date] += 1
+            mandays[site] += fraction * share
     names = sorted(people, key=lambda s: (s == NO_SITE, s))
     columns = [Column("Site")] + [Column(f"{d.day} {d:%a}"[:6], "int") for d in days] + [Column("Man-days", "hours")]
     rows = [[n] + [people[n].get(d, 0) for d in days] + [mandays[n]] for n in names]
     total = ["Total"] + [sum(r[i] for r in rows) for i in range(1, len(days) + 1)] + [sum((r[-1] for r in rows), ZERO)] if rows else None
     return Report("Manpower by day", f"{first:%d %b %Y} to {last:%d %b %Y}",
                   [Table("Manpower", columns, rows, total)],
-                  ["People who worked each day, from attendance. A half day counts as one person and half a man-day."])
+                  ["People who worked each day, from attendance. A half day counts as one person and half a man-day.",
+                   "A worker on several projects counts as one person on each project he worked for that day, "
+                   "and his man-day is divided between them."])
 
 
 # ------------------------------------------------------------------ cost: what the labor on each site costs
@@ -254,41 +266,53 @@ def collect_facts(user, first, last, *, company="", engagement="", contractor=""
 
     kinds = {}
     # days worked, and the wages of daily-rate workers, come from attendance
+    attribution = Attribution(by_emp, spans, first, end)          # who a worker on several projects works for each day
     for (emp_id, d), rec in attendance.items():
         if rec.status not in Attendance.WORKED:
             continue
         emp = by_emp[emp_id].employee
-        span = span_on(emp_id, d)
-        project = rec.project or (span.project if span else None)
-        location = rec.location or (span.location if span else None)
-        order = span.work_order if span and project and span.project_id == project.pk and span.location_id == getattr(location, "pk", None) else None
-        f = fact(emp, project, location, order)
         fraction = Decimal(str(Attendance.DAY_FRACTION[rec.status]))
-        f.days += fraction
+        parts = attribution.parts(emp_id, d)
+        if parts is None:                                          # one project that day: all of it goes there, as always
+            span = span_on(emp_id, d)
+            project = rec.project or (span.project if span else None)
+            location = rec.location or (span.location if span else None)
+            order = span.work_order if span and project and span.project_id == project.pk and span.location_id == getattr(location, "pk", None) else None
+            parts = [(project, location, order, Decimal("1"))]
         rate = rate_on(emp_id, d)
-        if rate and rate.wage_basis == LaborRate.WageBasis.DAILY:
-            if emp_id not in kinds:
-                kinds[emp_id] = day_types(emp, first, end)
-            policy = policy_on(emp.company_id, d)
-            paid_as_overtime = (kinds[emp_id][d] in (HOLIDAY, WEEKLY_OFF) and policy is not None
-                                and policy.overtime_applies and policy.all_hours_on_days_off)
-            if not paid_as_overtime:
-                f.wages += rate.rate * fraction
+        for project, location, order, share in parts:
+            f = fact(emp, project, location, order)
+            f.days += fraction * share
+            if rate and rate.wage_basis == LaborRate.WageBasis.DAILY:
+                if emp_id not in kinds:
+                    kinds[emp_id] = day_types(emp, first, end)
+                policy = policy_on(emp.company_id, d)
+                paid_as_overtime = (kinds[emp_id][d] in (HOLIDAY, WEEKLY_OFF) and policy is not None
+                                    and policy.overtime_applies and policy.all_hours_on_days_off)
+                if not paid_as_overtime:
+                    f.wages += rate.rate * fraction * share
 
     # a monthly salary is spread over every calendar day the worker was allocated, less absences
-    for emp_id, allocation_list in spans.items():
+    for emp_id in ids:
         emp = by_emp[emp_id].employee
-        for a in allocation_list:
-            d, stop = max(a.effective_from, first, emp.joining_date), min(a.effective_to or end, end)
-            while d <= stop:
-                rate = rate_on(emp_id, d)
+        mine, shared = spans.get(emp_id, []), by_emp[emp_id].serves_all_projects
+        if not mine and not shared:
+            continue
+        d = max(first, emp.joining_date)
+        while d <= end:
+            covering = [a for a in mine if a.effective_from <= d and (a.effective_to is None or d <= a.effective_to)]
+            rate = rate_on(emp_id, d)
+            if (covering or shared) and rate and rate.wage_basis == LaborRate.WageBasis.MONTHLY:
                 rec = attendance.get((emp_id, d))
-                if rate and rate.wage_basis == LaborRate.WageBasis.MONTHLY and not (
-                        rec and rec.status in (Attendance.Status.ABSENT, Attendance.Status.UNPAID_LEAVE)):
+                if not (rec and rec.status in (Attendance.Status.ABSENT, Attendance.Status.UNPAID_LEAVE)):
                     policy = policy_on(emp.company_id, d)
-                    divisor = policy.monthly_divisor if policy else 30
-                    fact(emp, a.project, a.location, a.work_order).wages += rate.rate / divisor
-                d += timedelta(days=1)
+                    wage = rate.rate / (policy.monthly_divisor if policy else 30)
+                    parts = attribution.parts(emp_id, d)
+                    if parts is None and covering:
+                        parts = [(covering[0].project, covering[0].location, covering[0].work_order, Decimal("1"))]
+                    for project, location, order, share in parts or ():
+                        fact(emp, project, location, order).wages += wage * share
+            d += timedelta(days=1)
 
     for entry in (TimeEntry.objects.filter(employee_id__in=ids, date__range=(first, end))
                   .select_related("project", "location", "work_order")):
@@ -335,6 +359,11 @@ BASIS = [
     "Hours come from timesheets (draft and confirmed). Overtime pending approval is shown separately and is not in the total; "
     "rejected overtime is ignored.",
 ]
+BASIS.append(
+    "A worker on more than one project: each day's wage and day count are divided between the projects by the regular hours "
+    "on each project's timesheet line. While no hours are entered the day is divided equally between the projects he is on "
+    "(for a worker shared with every project, between the company's active projects): an estimate that firms up as hours "
+    "are entered. Overtime is charged only to the project that asked for it.")
 
 
 def _money(v):

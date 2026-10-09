@@ -46,9 +46,9 @@
   <div class="col-auto"><button class="btn btn-outline-primary">Filter</button></div>
 </form>
 
-<form method="get" action="{% url 'web:labor_transfer' %}">
+<form method="get" action="{% url 'web:labor_projects_add_many' %}">
 {% if can_allocate %}
-<div class="mb-2"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-geo-alt me-1"></i>Allocate / move ticked workers</button></div>
+<div class="mb-2"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-geo-alt me-1"></i>Add ticked workers to a project</button></div>
 {% endif %}
 <div class="card shadow-sm border-0"><div class="table-responsive">
   <table class="table table-hover align-middle mb-0">

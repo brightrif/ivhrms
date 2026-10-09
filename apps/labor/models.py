@@ -72,6 +72,9 @@ class LaborProfile(BaseModel):
                                    help_text="Only if a contractor company supplies this worker.")
     trade = models.ForeignKey(Trade, on_delete=models.PROTECT, related_name="workers")
     notes = models.TextField(blank=True)
+    serves_all_projects = models.BooleanField(
+        default=False, help_text="Drivers, storekeepers and others who work for every project. "
+                                 "They appear on every active project's team.")
 
     objects = CompanyQuerySet.as_manager()
 

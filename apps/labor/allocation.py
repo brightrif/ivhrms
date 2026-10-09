@@ -66,15 +66,21 @@ class LaborAllocation(BaseModel):
     effective_from = models.DateField()
     effective_to = models.DateField(null=True, blank=True, help_text="Last day on this site. Empty = still there.")
     notes = models.CharField(max_length=255, blank=True)
+    is_main = models.BooleanField(default=False,
+                                  help_text="The worker's main project: where attendance and hours start from.")
 
     objects = CompanyQuerySet.as_manager()
 
     class Meta:
         ordering = ["-effective_from", "-id"]
         constraints = [
-            models.UniqueConstraint(fields=["employee", "effective_from"], name="uniq_allocation_start"),
-            models.UniqueConstraint(fields=["employee"], condition=models.Q(effective_to__isnull=True),
-                                    name="one_open_allocation_per_worker"),
+            models.UniqueConstraint(fields=["employee", "project", "effective_from"],
+                                    name="uniq_allocation_start_per_project"),
+            models.UniqueConstraint(fields=["employee", "project"], condition=models.Q(effective_to__isnull=True),
+                                    name="one_open_allocation_per_worker_per_project"),
+            models.UniqueConstraint(fields=["employee"],
+                                    condition=models.Q(effective_to__isnull=True, is_main=True),
+                                    name="one_main_allocation_per_worker"),
             models.CheckConstraint(
                 condition=models.Q(effective_to__isnull=True) | models.Q(effective_to__gte=models.F("effective_from")),
                 name="allocation_ends_after_it_starts"),

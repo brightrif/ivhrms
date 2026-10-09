@@ -1,0 +1,126 @@
+"""A worker on several projects at once, shared workers, and the move rules that must still hold."""
+from datetime import date
+
+from django.contrib.auth import get_user_model
+
+from apps.employees.models import Employee
+
+from . import deployment, services
+from .allocation import LaborAllocation
+from .test_deployment import MAR1, MAR5, MAR10, DeploymentCase
+
+
+class JoinProjectTests(DeploymentCase):
+    def test_a_worker_can_be_on_several_projects_at_once(self):
+        a = deployment.join_project(self.emp, project=self.p1, effective_from=MAR1)
+        b = deployment.join_project(self.emp, project=self.p2, effective_from=MAR5)
+        self.assertEqual((a.is_main, b.is_main), (True, False))
+        self.assertEqual([x.project for x in deployment.open_allocations(self.emp)], [self.p1, self.p2])
+        self.assertEqual(deployment.open_allocation(self.emp), a)             # the main one
+        self.assertEqual(b.location, self.site2)                              # the project's own site
+
+    def test_joining_the_same_project_twice_is_refused(self):
+        deployment.join_project(self.emp, project=self.p1, effective_from=MAR1)
+        with self.assertRaisesMessage(services.LaborError, "already on P1"):
+            deployment.join_project(self.emp, project=self.p1, effective_from=MAR10)
+
+    def test_a_project_without_a_site_cannot_be_joined(self):
+        from apps.organization.models import Project
+        nowhere = Project.objects.create(company=self.co, code="P3", name="No site")
+        with self.assertRaisesMessage(services.LaborError, "no site of its own"):
+            deployment.join_project(self.emp, project=nowhere, effective_from=MAR1)
+
+    def test_rejoining_must_start_after_the_earlier_stint(self):
+        a = deployment.join_project(self.emp, project=self.p1, effective_from=MAR1)
+        deployment.leave_project(a, last_day=MAR10)
+        with self.assertRaisesMessage(services.LaborError, "must be after"):
+            deployment.join_project(self.emp, project=self.p1, effective_from=MAR10)
+        again = deployment.join_project(self.emp, project=self.p1, effective_from=date(2026, 3, 11))
+        self.assertTrue(again.is_main)                                        # nothing else open, so it is the main
+
+
+class LeaveProjectTests(DeploymentCase):
+    def test_leaving_one_project_keeps_the_others_and_passes_on_main(self):
+        a = deployment.join_project(self.emp, project=self.p1, effective_from=MAR1)
+        b = deployment.join_project(self.emp, project=self.p2, effective_from=MAR5)
+        deployment.leave_project(a, last_day=MAR10)
+        a.refresh_from_db()
+        b.refresh_from_db()
+        self.assertEqual(a.effective_to, MAR10)
+        self.assertTrue(b.is_main)
+        self.assertEqual(deployment.open_allocation(self.emp), b)
+
+    def test_leave_rules(self):
+        a = deployment.join_project(self.emp, project=self.p1, effective_from=MAR5)
+        with self.assertRaisesMessage(services.LaborError, "cannot be before"):
+            deployment.leave_project(a, last_day=MAR1)
+        deployment.leave_project(a, last_day=MAR10)
+        with self.assertRaisesMessage(services.LaborError, "already left"):
+            deployment.leave_project(a, last_day=MAR10)
+
+    def test_the_main_project_can_be_changed(self):
+        a = deployment.join_project(self.emp, project=self.p1, effective_from=MAR1)
+        b = deployment.join_project(self.emp, project=self.p2, effective_from=MAR1)
+        deployment.set_main(b)
+        a.refresh_from_db()
+        b.refresh_from_db()
+        self.assertEqual((a.is_main, b.is_main), (False, True))
+        self.assertEqual(deployment.allocation_on(self.emp, MAR5), b)         # attendance and timesheets default to it
+        deployment.set_main(a)
+        self.assertEqual(deployment.allocation_on(self.emp, MAR5), a)
+
+
+class MoveRulesStillHold(DeploymentCase):
+    def test_moving_or_releasing_a_worker_on_several_projects_is_refused(self):
+        deployment.join_project(self.emp, project=self.p1, effective_from=MAR1)
+        deployment.join_project(self.emp, project=self.p2, effective_from=MAR1)
+        with self.assertRaisesMessage(services.LaborError, "is on 2 projects"):
+            self.place(project=self.p2, location=self.site2, on=MAR10)
+        with self.assertRaisesMessage(services.LaborError, "is on 2 projects"):
+            deployment.release(self.emp, last_day=MAR10)
+
+    def test_a_crew_move_lists_the_workers_who_are_on_several_projects(self):
+        deployment.join_project(self.emp, project=self.p1, effective_from=MAR1)
+        deployment.join_project(self.emp, project=self.p2, effective_from=MAR1)
+        with self.assertRaisesMessage(services.LaborError, "Nobody was moved"):
+            deployment.transfer([self.emp], project=self.p2, location=self.site2, effective_from=MAR10)
+
+
+class AddWorkersTests(DeploymentCase):
+    def test_adds_many_and_skips_those_already_there(self):
+        other = self.make_other()
+        deployment.join_project(self.emp, project=self.p1, effective_from=MAR1)
+        added, already = deployment.add_workers([self.emp, other], project=self.p1, effective_from=MAR5)
+        self.assertEqual((added, already), (1, 1))
+        self.assertEqual(LaborAllocation.objects.filter(project=self.p1, effective_to__isnull=True).count(), 2)
+
+    def test_nobody_is_added_if_one_cannot_be(self):
+        other = self.make_other()
+        Employee.objects.filter(pk=other.pk).update(status="separated")
+        other.refresh_from_db()
+        with self.assertRaisesMessage(services.LaborError, "Nobody was added"):
+            deployment.add_workers([self.emp, other], project=self.p1, effective_from=MAR1)
+        self.assertEqual(LaborAllocation.objects.count(), 0)
+
+
+class SharedAndCountingTests(DeploymentCase):
+    def root(self):
+        """A user who sees every company, so the counts are not narrowed."""
+        return get_user_model().objects.create_user("rosterroot", is_superuser=True)
+
+    def test_shared_workers_are_not_listed_as_unallocated(self):
+        other = self.make_other()
+        root = self.root()
+        before = deployment.unallocated_profiles(root).count()
+        deployment.set_shared(other.labor_profile, True)
+        self.assertEqual(deployment.unallocated_profiles(root).count(), before - 1)
+        self.assertEqual([p.employee for p in deployment.shared_profiles(root)], [other])
+        deployment.set_shared(other.labor_profile, False)
+        self.assertEqual(deployment.unallocated_profiles(root).count(), before)
+
+    def test_headcount_counts_a_worker_on_two_projects_once(self):
+        deployment.join_project(self.emp, project=self.p1, effective_from=MAR1)
+        deployment.join_project(self.emp, project=self.p2, effective_from=MAR1)
+        root = self.root()
+        self.assertEqual(sum(r["total"] for r in deployment.site_overview(root)), 2)   # one row per project
+        self.assertEqual(deployment.headcount(root), {"total": 1, "direct": 1, "contracted": 0})

@@ -8,7 +8,7 @@ def company_rows(user):
 
 
 register(Module(
-    key="organization", label="Organization", order=10, icon="bi-diagram-3",
+    key="organization", label="Organization", order=60, icon="bi-diagram-3",
     sections=[
         Section(
             title="Companies that run projects",

@@ -53,6 +53,7 @@
       <option value="standard"{% if fill_default %} selected{% endif %}>fill the day's standard hours</option>
     </select>
     <button class="btn btn-primary btn-sm" name="action" value="save">Save hours</button>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:labor_split' %}?first={{ first|date:'Y-m-d' }}&amp;last={{ last|date:'Y-m-d' }}">Split a worker's hours</a>
     {% endif %}
     {% if can_confirm and sheet.drafts %}
     <button class="btn btn-outline-success btn-sm" name="action" value="confirm"
@@ -87,6 +88,13 @@
                      value="{% if c.entry %}{{ c.entry.hours|floatformat:'-2' }}{% endif %}" placeholder="{{ c.expected|floatformat:'-2' }}"
                      class="form-control form-control-sm px-1 text-center{% if c.entry and c.entry.overtime_hours %} border-warning{% endif %}"
                      style="min-width:3.4rem;max-width:4rem" aria-label="{{ row.employee.full_name }} {{ c.date|date:'j M' }} hours">
+              {% if row.split and sheet.overtime_mode != 'none' %}
+              <input type="text" inputmode="decimal" name="{{ c.ot_key }}" autocomplete="off"
+                     value="{% if c.entry and c.entry.overtime_hours %}{{ c.entry.overtime_hours|floatformat:'-2' }}{% endif %}" placeholder="OT"
+                     class="form-control form-control-sm px-1 text-center mt-1 border-warning-subtle"
+                     style="min-width:3.4rem;max-width:4rem" aria-label="{{ row.employee.full_name }} {{ c.date|date:'j M' }} overtime hours">
+              {% endif %}
+              {% if c.others %}<div class="small text-body-secondary" title="Hours on other projects: {{ c.other_projects }}">+{{ c.other_hours|floatformat:'-2' }}</div>{% endif %}
             {% elif c.entry %}<span class="fw-medium">{{ c.entry.hours|floatformat:"-2" }}</span>
             {% elif c.attendance %}<span class="text-body-secondary" title="{{ c.attendance.get_status_display }}">{{ c.letter }}</span>
             {% else %}<span class="text-body-secondary">{% if c.covered %}&middot;{% else %}&ndash;{% endif %}</span>{% endif %}

@@ -336,7 +336,7 @@ class ProjectPageTests(OrgCase):
         p = Project.objects.create(company=self.co, code="P1", name="One", location=self.site)
         page = self.client.get(reverse("web:project_edit", args=[p.pk]))
         self.assertContains(page, 'value="Alpha Camp"')
-        self.assertNotContains(page, "data-autofill-from")
+        self.assertNotContains(page, 'data-autofill-from="')
 
 
 class SitePageTests(OrgCase):

@@ -110,10 +110,15 @@ class AllocateTests(DeploymentCase):
         with self.assertRaisesMessage(services.LaborError, "has left"):
             self.place()
 
-    def test_database_allows_only_one_open_allocation(self):
-        self.place()
+    def test_database_allows_one_open_allocation_per_project_and_one_main(self):
+        self.place()                                                      # Tower A, the main project
+        LaborAllocation.objects.create(employee=self.emp, project=self.p2, location=self.site2,
+                                       effective_from=MAR10)             # another project is allowed now
         with self.assertRaises(IntegrityError), transaction.atomic():
-            LaborAllocation.objects.create(employee=self.emp, project=self.p2, location=self.site2, effective_from=MAR10)
+            LaborAllocation.objects.create(employee=self.emp, project=self.p1, location=self.site1,
+                                           effective_from=MAR10)         # the same project twice is not
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            LaborAllocation.objects.filter(employee=self.emp, project=self.p2).update(is_main=True)   # two mains
 
 
 class ReleaseTests(DeploymentCase):

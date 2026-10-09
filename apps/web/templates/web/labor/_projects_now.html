@@ -1,0 +1,28 @@
+{% load labor_projects %}
+{% if profile.serves_all_projects %}<div class="fw-medium">Works for every active project</div>{% endif %}
+{% for a in emp|open_projects %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 py-1{% if not forloop.first or profile.serves_all_projects %} border-top{% endif %}">
+  <div>
+    <div class="fw-medium">{{ a.project.code }} {{ a.project.name }}</div>
+    <div class="small text-body-secondary">{{ a.location.name }}{% if a.work_order %} &middot; work order {{ a.work_order.code }}{% endif %} &middot; since {{ a.effective_from|date:"d M Y" }}</div>
+  </div>
+  {% if perms.labor.change_laborallocation and emp.status != 'separated' %}
+  <details class="text-end">
+    <summary class="btn btn-sm btn-outline-secondary">Remove</summary>
+    <form method="post" action="{% url 'web:labor_project_remove' a.pk %}" class="d-flex gap-2 align-items-center mt-2">{% csrf_token %}
+      <label class="small text-body-secondary mb-0" for="last-{{ a.pk }}">Last day</label>
+      <input type="date" id="last-{{ a.pk }}" name="last_day" value="{% now 'Y-m-d' %}" min="{{ a.effective_from|date:'Y-m-d' }}" class="form-control form-control-sm w-auto">
+      <button class="btn btn-sm btn-danger">Remove</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+{% empty %}
+{% if not profile.serves_all_projects %}<div class="text-body-secondary">Not on any project.</div>{% endif %}
+{% endfor %}
+{% if perms.labor.add_laborprofile and emp.status != 'separated' %}
+<form method="post" action="{% url 'web:labor_shared_set' profile.pk %}" class="form-check form-switch mt-2 mb-0">{% csrf_token %}
+  <input class="form-check-input" type="checkbox" role="switch" id="shared-{{ profile.pk }}" name="shared"{% if profile.serves_all_projects %} checked{% endif %} onchange="this.form.submit()">
+  <label class="form-check-label small" for="shared-{{ profile.pk }}">Works for every project (a driver, for example)</label>
+</form>
+{% endif %}

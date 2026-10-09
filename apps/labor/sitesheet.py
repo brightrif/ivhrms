@@ -19,6 +19,9 @@ from apps.scheduling.services import HOLIDAY, WEEKLY_OFF, day_types
 
 from .allocation import LaborAllocation
 from .services import LaborError
+from apps.employees.models import Employee
+from apps.organization.models import Project
+from .models import LaborProfile
 
 Status = Attendance.Status
 # what HR can enter on the sheet; leave, holidays and corrections have their own routes
@@ -118,16 +121,27 @@ def build_sheet(user, project, location, first, last, today=None):
     by_employee = defaultdict(list)
     for a in allocations:
         by_employee[a.employee_id].append(a)
+    employees = {employee_id: spans[0].employee for employee_id, spans in by_employee.items()}
+    shared = set()                                    # drivers and others who work for every active project
+    if project.status == Project.Status.ACTIVE:
+        for profile in (LaborProfile.objects.for_user(user)
+                        .filter(serves_all_projects=True, company_id=project.company_id)
+                        .exclude(employee__status=Employee.Status.SEPARATED)
+                        .select_related("employee", "employee__labor_profile__trade",
+                                        "employee__labor_profile__contractor")):
+            shared.add(profile.employee_id)
+            employees.setdefault(profile.employee_id, profile.employee)
     records = defaultdict(dict)
-    for rec in Attendance.objects.filter(employee_id__in=list(by_employee), date__range=(first, last)):
+    for rec in Attendance.objects.filter(employee_id__in=list(employees), date__range=(first, last)):
         records[rec.employee_id][rec.date] = rec
     rows = []
-    for employee_id, spans in by_employee.items():
-        employee = spans[0].employee
+    for employee_id, employee in employees.items():
+        spans = by_employee.get(employee_id, [])
         kinds = day_types(employee, first, last)
         row = Row(employee=employee, profile=getattr(employee, "labor_profile", None))
         for d in days:
-            covered = any(a.effective_from <= d and (a.effective_to is None or d <= a.effective_to) for a in spans)
+            covered = employee_id in shared or any(
+                a.effective_from <= d and (a.effective_to is None or d <= a.effective_to) for a in spans)
             rec = records[employee_id].get(d)
             editable = covered and rec is None and d <= today and d >= employee.joining_date
             row.cells.append(Cell(date=d, kind=kinds[d], record=rec, covered=covered, editable=editable,

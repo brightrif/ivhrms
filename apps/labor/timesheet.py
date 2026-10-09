@@ -40,7 +40,7 @@ class TimeEntry(BaseModel):
     class Meta:
         ordering = ["-date", "employee_id"]
         constraints = [
-            models.UniqueConstraint(fields=["employee", "date"], name="uniq_time_entry_employee_date"),
+            models.UniqueConstraint(fields=["employee", "date", "project"], name="uniq_time_entry_employee_date_project"),
             models.CheckConstraint(condition=models.Q(hours__gt=0, hours__lte=24), name="time_entry_hours_in_range"),
         ]
         indexes = [models.Index(fields=["project", "date"]), models.Index(fields=["location", "date"]),

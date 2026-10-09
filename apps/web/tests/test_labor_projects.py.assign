@@ -1,0 +1,173 @@
+"""Putting workers on several projects: adding never moves anyone, and each project is taken off on its own."""
+from datetime import date
+
+from django.contrib.auth.models import Permission
+
+from apps.labor import deployment
+from apps.labor.allocation import LaborAllocation
+
+from .test_labor_sites import SitePageCase
+
+
+class AddCase(SitePageCase):
+    def add(self, project, on="2026-03-01", worker=None, **extra):
+        worker = worker or self.p
+        return self.client.post(self.url("labor_project_add", worker.pk),
+                                {"project": project.pk, "effective_from": on, **extra})
+
+    def projects_of(self, worker=None):
+        return {a.project for a in deployment.open_allocations((worker or self.p).employee)}
+
+
+class AddToProjectTests(AddCase):
+    def test_a_worker_can_be_on_two_projects_at_once(self):
+        self.assertRedirects(self.add(self.p1), self.url("labor_detail", self.p.pk))
+        self.add(self.p2)
+        self.assertEqual(self.projects_of(), {self.p1, self.p2})
+        page = self.client.get(self.url("labor_detail", self.p.pk))
+        self.assertContains(page, "Tower A")
+        self.assertContains(page, "Villa B")
+        self.assertContains(page, "Add to project")
+        self.assertNotContains(page, self.url("labor_release", self.p.pk))      # no Move or Release any more
+
+    def test_adding_a_project_leaves_the_others_alone(self):
+        self.add(self.p1)
+        self.add(self.p2, on="2026-04-01")
+        first = LaborAllocation.objects.get(employee=self.p.employee, project=self.p1)
+        self.assertIsNone(first.effective_to)
+
+    def test_the_form_offers_only_projects_he_can_join(self):
+        offered = lambda: set(self.client.get(self.url("labor_project_add", self.p.pk)).context["form"]
+                              .fields["project"].queryset)
+        self.assertEqual(offered(), {self.p1, self.p2})            # not P3 (no site) and not the other company's
+        self.add(self.p1)
+        self.assertEqual(offered(), {self.p2})                      # not the one he is already on
+        self.p2.status = "closed"
+        self.p2.save()
+        self.assertEqual(offered(), set())                          # not a closed project
+
+    def test_a_project_without_a_site_is_explained_not_offered(self):
+        page = self.client.get(self.url("labor_project_add", self.p.pk))
+        self.assertContains(page, "no site yet")
+        self.assertContains(page, self.nowhere.code)
+        self.assertNotIn(self.nowhere, page.context["form"].fields["project"].queryset)
+
+    def test_a_past_start_date_is_fine_and_one_before_joining_is_refused(self):
+        self.add(self.p1, on="2026-02-01")
+        self.assertEqual(LaborAllocation.objects.get().effective_from, date(2026, 2, 1))
+        r = self.add(self.p2, on="2025-01-01")
+        self.assertContains(r, "joined on")
+        self.assertEqual(LaborAllocation.objects.count(), 1)
+
+    def test_people_who_can_only_look_cannot_add(self):
+        for user in (self.finance, self.boss):
+            self.client.force_login(user)
+            self.assertEqual(self.client.get(self.url("labor_project_add", self.p.pk)).status_code, 403, user.username)
+            self.assertEqual(self.add(self.p1).status_code, 403, user.username)
+        self.assertEqual(LaborAllocation.objects.count(), 0)
+
+    def test_another_companys_worker_is_out_of_reach(self):
+        theirs = self.worker("Theirs", company=self.other_co)
+        self.assertEqual(self.client.get(self.url("labor_project_add", theirs.pk)).status_code, 404)
+
+
+class RemoveTests(AddCase):
+    def setUp(self):
+        super().setUp()
+        self.add(self.p1)
+        self.add(self.p2)
+
+    def allocation(self, project):
+        return LaborAllocation.objects.get(employee=self.p.employee, project=project)
+
+    def remove(self, project, last="2026-03-10"):
+        return self.client.post(self.url("labor_project_remove", self.allocation(project).pk), {"last_day": last})
+
+    def test_removing_ends_only_that_project_on_the_chosen_day(self):
+        self.assertRedirects(self.remove(self.p1), self.url("labor_detail", self.p.pk))
+        self.assertEqual(self.allocation(self.p1).effective_to, date(2026, 3, 10))
+        self.assertIsNone(self.allocation(self.p2).effective_to)
+        self.assertEqual(self.projects_of(), {self.p2})
+
+    def test_a_mistake_is_explained(self):
+        r = self.client.get(self.remove(self.p1, last="2026-02-01").url)
+        self.assertContains(r, "cannot be before")
+        self.assertIsNone(self.allocation(self.p1).effective_to)
+        r = self.client.get(self.remove(self.p1, last="").url)
+        self.assertContains(r, "Enter the last day")
+
+    def test_people_who_can_only_look_cannot_remove(self):
+        for user in (self.finance, self.boss):
+            self.client.force_login(user)
+            self.assertEqual(self.remove(self.p1).status_code, 403, user.username)
+        self.assertIsNone(self.allocation(self.p1).effective_to)
+
+    def test_a_worker_of_another_company_cannot_be_reached(self):
+        self.outsider.user_permissions.add(*Permission.objects.filter(content_type__app_label="labor",
+                                                                      codename="change_laborallocation"))
+        self.client.force_login(self.outsider)                 # may remove, but only in their own company
+        self.assertEqual(self.remove(self.p1).status_code, 404)
+
+    def test_the_worker_page_offers_a_remove_for_each_project(self):
+        page = self.client.get(self.url("labor_detail", self.p.pk))
+        for project in (self.p1, self.p2):
+            self.assertContains(page, self.url("labor_project_remove", self.allocation(project).pk))
+
+
+class SeveralWorkersTests(AddCase):
+    def test_ticked_workers_are_added_and_nobody_is_moved(self):
+        other = self.worker("Imran")
+        self.add(self.p1)
+        r = self.client.post(self.url("labor_projects_add_many"), {
+            "profiles": [self.p.pk, other.pk], "project": self.p2.pk, "effective_from": "2026-03-02"})
+        self.assertRedirects(r, self.url("labor_team", self.p2.pk))
+        self.assertEqual(self.projects_of(), {self.p1, self.p2})
+        self.assertEqual(self.projects_of(other), {self.p2})
+
+    def test_workers_already_on_the_project_are_skipped_and_counted(self):
+        other = self.worker("Imran")
+        self.add(self.p2)
+        r = self.client.post(self.url("labor_projects_add_many"), {
+            "profiles": [self.p.pk, other.pk], "project": self.p2.pk, "effective_from": "2026-03-02"}, follow=True)
+        self.assertContains(r, "1 worker added to P2")
+        self.assertContains(r, "1 was already on it")
+
+    def test_nobody_is_added_if_one_cannot_be(self):
+        other = self.worker("Imran")
+        r = self.client.post(self.url("labor_projects_add_many"), {
+            "profiles": [self.p.pk, other.pk], "project": self.p1.pk, "effective_from": "2025-01-01"})
+        self.assertContains(r, "Nobody was added")
+        self.assertEqual(LaborAllocation.objects.count(), 0)
+
+    def test_the_form_needs_ticked_workers(self):
+        r = self.client.get(self.url("labor_projects_add_many"), follow=True)
+        self.assertContains(r, "Tick at least one worker")
+
+    def test_the_list_and_site_pages_add_instead_of_move(self):
+        self.add(self.p1)
+        for page in (self.client.get(self.url("labor_list")),
+                     self.client.get(self.url("labor_site_detail", self.p1.pk, self.site1.pk))):
+            self.assertContains(page, self.url("labor_projects_add_many"))
+            self.assertNotContains(page, "Allocate / move")
+            self.assertNotContains(page, "Move ticked workers")
+
+
+class SharedSwitchTests(AddCase):
+    def test_a_worker_can_be_marked_as_working_for_every_project(self):
+        self.client.post(self.url("labor_shared_set", self.p.pk), {"shared": "on"})
+        self.p.refresh_from_db()
+        self.assertTrue(self.p.serves_all_projects)
+        page = self.client.get(self.url("labor_detail", self.p.pk))
+        self.assertContains(page, "Works for every active project")
+        self.assertNotContains(page, self.url("labor_project_add", self.p.pk))   # nothing to add: he is on all of them
+        self.client.post(self.url("labor_shared_set", self.p.pk), {})
+        self.p.refresh_from_db()
+        self.assertFalse(self.p.serves_all_projects)
+
+    def test_people_who_can_only_look_cannot_change_it(self):
+        for user in (self.finance, self.boss):
+            self.client.force_login(user)
+            self.assertEqual(self.client.post(self.url("labor_shared_set", self.p.pk), {"shared": "on"}).status_code,
+                             403, user.username)
+        self.p.refresh_from_db()
+        self.assertFalse(self.p.serves_all_projects)

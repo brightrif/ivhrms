@@ -1,0 +1,130 @@
+{% extends "web/base.html" %}
+{% block title %}{{ project.code }} team{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Labor</h1>
+</div>
+{% include "web/labor/_tabs.html" with tab="sites" %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <div class="fw-medium fs-5">{{ project.code }} &middot; {{ project.name }}</div>
+    <div class="small text-body-secondary">
+      {% if project.location %}Site: {{ project.location.name }}{% else %}This project has no site yet. Set one under Organization &rarr; Projects before adding workers.{% endif %}
+    </div>
+  </div>
+  {% if project.location %}<a class="btn btn-outline-secondary btn-sm" href="{% url 'web:labor_site_detail' project.pk project.location.pk %}">Back to site</a>{% endif %}
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3"><div class="card border-0 bg-body-tertiary"><div class="card-body py-2">
+    <div class="small text-body-secondary">On this project</div><div class="fs-4 fw-medium">{{ roster|length }}</div></div></div></div>
+  <div class="col-6 col-md-3"><div class="card border-0 bg-body-tertiary"><div class="card-body py-2">
+    <div class="small text-body-secondary">Shared with all projects</div><div class="fs-4 fw-medium">{{ shared|length }}</div></div></div></div>
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-header bg-white fw-medium">Shared with all projects</div>
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0"><tbody>
+    {% for p in shared %}
+    <tr>
+      <td class="text-nowrap">{{ p.employee.employee_no }}</td>
+      <td class="fw-medium">{{ p.employee.full_name }}</td>
+      <td>{{ p.trade.name }}</td>
+      <td><span class="badge bg-primary-subtle text-primary-emphasis">Every active project</span></td>
+      <td class="text-end">
+        {% if can_share %}
+        <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="q" value="{{ q }}">
+          <button class="btn btn-sm btn-outline-secondary" name="unshare" value="{{ p.pk }}">Stop sharing</button></form>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="text-body-secondary py-3">Nobody is shared yet. Drivers and others who work for every project can be marked shared from the search below.</td></tr>
+    {% endfor %}
+  </tbody></table></div>
+</div>
+
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-header bg-white fw-medium">On this project</div>
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>No.</th><th>Worker</th><th>Trade</th><th>On the team since</th><th>Other projects</th><th></th></tr></thead>
+    <tbody>
+    {% for a in roster %}
+    <tr>
+      <td class="text-nowrap">{{ a.employee.employee_no }}</td>
+      <td class="fw-medium">{{ a.employee.full_name }}</td>
+      <td>{{ a.employee.labor_profile.trade.name }}</td>
+      <td class="text-nowrap">{{ a.effective_from|date:"d M Y" }}</td>
+      <td>
+        {% if a.also_on %}<span class="badge bg-body-secondary text-body-secondary">also on {{ a.also_on|join:", " }}</span>
+        {% if a.is_main %}<span class="badge bg-primary-subtle text-primary-emphasis">Main</span>{% endif %}{% endif %}
+      </td>
+      <td class="text-end text-nowrap">
+        {% if can_change %}
+          {% if a.also_on and not a.is_main %}
+          <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="q" value="{{ q }}">
+            <input type="hidden" name="action" value="main"><input type="hidden" name="allocation" value="{{ a.pk }}">
+            <button class="btn btn-sm btn-outline-secondary">Make main</button></form>
+          {% endif %}
+          <details class="d-inline-block align-top">
+            <summary class="btn btn-sm btn-outline-danger">Remove</summary>
+            <form method="post" class="d-flex gap-2 align-items-center mt-2">{% csrf_token %}<input type="hidden" name="q" value="{{ q }}">
+              <input type="hidden" name="action" value="remove"><input type="hidden" name="allocation" value="{{ a.pk }}">
+              <label class="small text-body-secondary mb-0" for="last-{{ a.pk }}">Last day</label>
+              <input type="date" id="last-{{ a.pk }}" name="last_day" value="{{ today|date:'Y-m-d' }}" min="{{ a.effective_from|date:'Y-m-d' }}" class="form-control form-control-sm w-auto">
+              <button class="btn btn-sm btn-danger">Remove</button>
+            </form>
+          </details>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" class="text-body-secondary py-3">Nobody is on this project yet. Use the search below to add people.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+
+{% if can_add and project.location %}
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-header bg-white fw-medium">Add workers</div>
+  <div class="card-body">
+    <form method="get" class="row g-2 mb-3">
+      <div class="col-md-6"><input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search by name, number or trade" aria-label="Search workers"></div>
+      <div class="col-auto"><button class="btn btn-outline-primary">Search</button></div>
+      {% if q %}<div class="col-auto"><a class="btn btn-link" href="{% url 'web:labor_team' project.pk %}">Clear</a></div>{% endif %}
+    </form>
+    <form method="post">
+      {% csrf_token %}<input type="hidden" name="q" value="{{ q }}">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <label class="small text-body-secondary mb-0" for="starts-on">Starts on</label>
+        <input type="date" id="starts-on" name="effective_from" value="{{ today|date:'Y-m-d' }}" class="form-control form-control-sm w-auto">
+        <button class="btn btn-primary btn-sm" name="action" value="add">Add ticked workers</button>
+        <span class="small text-body-secondary">The date can be in the past.</span>
+      </div>
+      <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+        <thead class="table-light"><tr>
+          <th style="width:2rem"><input type="checkbox" class="form-check-input" aria-label="Tick all" onclick="document.querySelectorAll('input[name=profiles]').forEach(function (c) { c.checked = this.checked }, this)"></th>
+          <th>No.</th><th>Worker</th><th>Trade</th><th>Now</th><th></th></tr></thead>
+        <tbody>
+        {% for c in candidates %}
+        <tr>
+          <td><input type="checkbox" class="form-check-input" name="profiles" value="{{ c.pk }}" aria-label="Add {{ c.employee.full_name }}"></td>
+          <td class="text-nowrap">{{ c.employee.employee_no }}</td>
+          <td class="fw-medium">{{ c.employee.full_name }}</td>
+          <td>{{ c.trade.name }}</td>
+          <td>{% if c.on_projects %}<span class="badge bg-body-secondary text-body-secondary">on {{ c.on_projects|join:", " }}</span>{% else %}<span class="badge bg-success-subtle text-success-emphasis">not on any project</span>{% endif %}</td>
+          <td class="text-end">{% if can_share %}<button class="btn btn-sm btn-link" name="share" value="{{ c.pk }}">Make shared</button>{% endif %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-body-secondary py-3">{% if q %}Nobody matches that search.{% else %}Everyone is already on this project.{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% if too_many %}<div class="small text-body-secondary mt-2">Showing the first {{ limit }}. Search to narrow the list.</div>{% endif %}
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -140,7 +140,7 @@ class AllocatePageTests(SitePageCase):
         r = self.client.post(self.url("labor_release", self.p.pk), {"last_day": "2026-03-20"})
         self.assertRedirects(r, self.url("labor_detail", self.p.pk))
         self.assertIsNone(deployment.open_allocation(self.p.employee))
-        self.assertContains(self.client.get(self.url("labor_detail", self.p.pk)), "Not on any site")
+        self.assertContains(self.client.get(self.url("labor_detail", self.p.pk)), "Not on any project")
         again = self.client.get(self.url("labor_release", self.p.pk), follow=True)
         self.assertContains(again, "not allocated anywhere")
         bad = self.client.post(self.url("labor_release", self.p.pk), {"last_day": "2026-03-01"}, follow=True)
@@ -173,7 +173,7 @@ class ListAndSitePageTests(SitePageCase):
     def test_list_shows_tick_boxes_and_the_move_button_to_people_who_can_allocate(self):
         page = self.client.get(self.url("labor_list")).content.decode()
         self.assertIn(f'name="profiles" value="{self.p.pk}"', page)
-        self.assertIn("Allocate / move ticked workers", page)
+        self.assertIn("Add ticked workers to a project", page)
 
     def test_site_overview_and_detail(self):
         b = self.worker("Imran", engagement="contracted", contractor=self.contractor)

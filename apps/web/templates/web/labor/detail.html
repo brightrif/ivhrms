@@ -52,20 +52,14 @@
 {% if perms.labor.view_laborallocation %}
 <div class="card shadow-sm border-0 mt-3">
   <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
-    <span class="fw-semibold">Site</span>
+    <span class="fw-semibold">Projects</span>
     {% if emp.status != 'separated' %}
     <span class="d-flex gap-2">
-      {% if perms.labor.add_laborallocation %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:labor_allocate' profile.pk %}">{% if current_allocation %}Move{% else %}Allocate{% endif %}</a>{% endif %}
-      {% if current_allocation and perms.labor.change_laborallocation %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:labor_release' profile.pk %}">Release</a>{% endif %}
+      {% if perms.labor.add_laborallocation and not profile.serves_all_projects %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:labor_project_add' profile.pk %}">Add to project</a>{% endif %}
     </span>
     {% endif %}
   </div>
-  <div class="card-body py-2">
-    {% if current_allocation %}
-      <div class="fw-medium">{{ current_allocation.project.code }} {{ current_allocation.project.name }}</div>
-      <div class="small text-body-secondary">{{ current_allocation.location.name }}{% if current_allocation.work_order %} &middot; work order {{ current_allocation.work_order.code }}{% endif %} &middot; since {{ current_allocation.effective_from|date:"d M Y" }}</div>
-    {% else %}<div class="text-body-secondary">Not on any site.</div>{% endif %}
-  </div>
+  <div class="card-body py-2">{% include "web/labor/_projects_now.html" %}</div>
   {% if allocations|length > 1 or not current_allocation and allocations %}
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
