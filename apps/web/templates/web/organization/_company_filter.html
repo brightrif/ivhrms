@@ -1,0 +1,8 @@
+{% if multi_company %}
+<form method="get" class="row g-2 mb-3">
+  <div class="col-6 col-md-3"><select name="company" class="form-select" aria-label="Company" onchange="this.form.submit()">
+    <option value="">All companies</option>
+    {% for c in companies %}<option value="{{ c.pk }}"{% if selected and c.pk == selected.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+  </select></div>
+</form>
+{% endif %}

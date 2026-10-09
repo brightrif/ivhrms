@@ -2,12 +2,13 @@
 {% block title %}Companies{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-  <h1 class="mb-0">Companies</h1>
+  <h1 class="mb-0">Organization</h1>
+  
   {% if perms.organization.add_company %}
   <a class="btn btn-primary" href="{% url 'web:company_create' %}"><i class="bi bi-plus-lg me-1"></i>Add company</a>
   {% endif %}
 </div>
-
+{% include "web/organization/_tabs.html" with tab="companies" %}
 <div class="card shadow-sm border-0">
   <div class="card-body p-0">
     <div class="table-responsive">

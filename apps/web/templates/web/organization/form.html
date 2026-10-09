@@ -1,0 +1,134 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<form method="post" class="form-compact">
+  {% csrf_token %}
+  <h1>{{ title }}</h1>
+  {{ form.non_field_errors }}
+  <div class="row g-3">
+    {% for section in sections %}
+    <div class="col-lg-{{ section.width }}">
+      <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+        <h2>{{ section.title }}</h2>
+        {% for row in section.rows %}
+        <div class="row">
+          {% for bf in row %}
+            {% if bf.is_hidden %}{{ bf }}
+            {% elif bf.field.widget.input_type == "checkbox" %}
+            <div class="col-12"><div class="form-check form-switch mb-3">
+              {{ bf|bs }}
+              <label class="form-check-label fw-medium" for="{{ bf.id_for_label }}">{{ bf.label }}</label>
+              {% if bf.help_text %}<div class="form-text">{{ bf.help_text }}</div>{% endif %}
+              {{ bf.errors }}
+            </div></div>
+            {% else %}
+            <div class="col-md-{% widthratio 12 row|length 1 %}">{{ bf.as_field_group }}</div>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div></div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="form-actions">
+    <button class="btn btn-primary">{{ submit }}</button>
+    <a class="btn btn-outline-secondary" href="{{ back_url }}">Cancel</a>
+  </div>
+</form>
+
+<script>
+  // A code box with data-autofill-from is filled from the server while the name (and site) change.
+  // Typing in the code box stops the auto-fill; emptying the box turns it back on.
+  (function () {
+    document.querySelectorAll("[data-autofill-from]").forEach(function (box) {
+      var sources = box.dataset.autofillFrom.split(",")
+        .map(function (id) { return document.getElementById(id); }).filter(Boolean);
+      if (!sources.length) return;
+      var main = sources[0], timer, touched = box.value !== "";
+      function fill() {
+        var name = main.value.trim();
+        if (!name) { box.value = ""; return; }
+        var query = sources.map(function (el) {
+          return encodeURIComponent(el.name) + "=" + encodeURIComponent(el.value.trim());
+        }).join("&");
+        fetch(box.dataset.autofillUrl + "?" + query)
+          .then(function (r) { return r.ok ? r.text() : ""; })
+          .then(function (code) { if (!touched && main.value.trim() === name) box.value = code; });
+      }
+      function later() { if (touched) return; clearTimeout(timer); timer = setTimeout(fill, 300); }
+      sources.forEach(function (el) { el.addEventListener("input", later); el.addEventListener("change", later); });
+      box.addEventListener("input", function () { touched = box.value !== ""; if (!touched) fill(); });
+      if (!touched && main.value.trim()) fill();
+    });
+  })();
+</script>
+
+<script>
+  // A search-as-you-type box: lists matches after the first letter; the choice goes in a hidden input.
+  (function () {
+    document.querySelectorAll("[data-typeahead]").forEach(function (box) {
+      var text = box.querySelector("[data-typeahead-text]"),
+          value = box.querySelector("[data-typeahead-value]"),
+          list = box.querySelector("[data-typeahead-list]"),
+          timer, items = [], active = -1;
+
+      function changed() { value.dispatchEvent(new Event("change", { bubbles: true })); }
+      function close() {
+        list.hidden = true; list.innerHTML = ""; items = []; active = -1;
+        text.setAttribute("aria-expanded", "false");
+      }
+      function choose(item) {
+        text.value = item.name; value.value = item.id;
+        text.classList.remove("is-invalid"); close(); changed();
+      }
+      function mark() {
+        Array.prototype.forEach.call(list.children, function (el, i) { el.classList.toggle("active", i === active); });
+      }
+      function show(results) {
+        list.innerHTML = ""; items = results; active = -1;
+        if (!results.length) {
+          var none = document.createElement("div");
+          none.className = "list-group-item small text-body-secondary";
+          none.textContent = "No site matches";
+          list.appendChild(none);
+        }
+        results.forEach(function (item) {
+          var row = document.createElement("button");
+          row.type = "button"; row.className = "list-group-item list-group-item-action py-1";
+          row.textContent = item.name;
+          var code = document.createElement("small");
+          code.className = "text-body-secondary ms-2"; code.textContent = item.code;
+          row.appendChild(code);
+          row.addEventListener("mousedown", function (e) { e.preventDefault(); choose(item); });
+          list.appendChild(row);
+        });
+        list.hidden = false; text.setAttribute("aria-expanded", "true");
+      }
+      function search() {
+        var q = text.value.trim();
+        if (!q) { close(); return; }
+        fetch(box.dataset.typeaheadUrl + "?q=" + encodeURIComponent(q))
+          .then(function (r) { return r.ok ? r.json() : { results: [] }; })
+          .then(function (data) { if (text.value.trim() === q) show(data.results); });
+      }
+      text.addEventListener("input", function () {
+        if (value.value) { value.value = ""; changed(); }     // typing again: the earlier choice no longer stands
+        clearTimeout(timer); timer = setTimeout(search, 150);
+      });
+      text.addEventListener("keydown", function (e) {
+        if (list.hidden) return;
+        if (e.key === "ArrowDown") { e.preventDefault(); active = Math.min(active + 1, items.length - 1); mark(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); active = Math.max(active - 1, 0); mark(); }
+        else if (e.key === "Enter" && items.length) { e.preventDefault(); choose(items[active >= 0 ? active : 0]); }
+        else if (e.key === "Escape") { close(); }
+      });
+      text.addEventListener("blur", function () {
+        close();
+        text.classList.toggle("is-invalid", text.value.trim() !== "" && !value.value);
+      });
+    });
+  })();
+</script>
+{% endblock %}

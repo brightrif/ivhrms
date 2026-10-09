@@ -1,0 +1,7 @@
+<ul class="nav nav-tabs mb-3">
+  {% if perms.organization.view_company %}<li class="nav-item"><a class="nav-link{% if tab == 'companies' %} active{% endif %}" href="{% url 'web:company_list' %}">Companies</a></li>{% endif %}
+  {% if perms.organization.view_department %}<li class="nav-item"><a class="nav-link{% if tab == 'departments' %} active{% endif %}" href="{% url 'web:department_list' %}">Departments</a></li>{% endif %}
+  {% if perms.organization.view_designation %}<li class="nav-item"><a class="nav-link{% if tab == 'designations' %} active{% endif %}" href="{% url 'web:designation_list' %}">Designations &amp; Grades</a></li>{% endif %}
+  {% if perms.organization.view_project %}<li class="nav-item"><a class="nav-link{% if tab == 'projects' %} active{% endif %}" href="{% url 'web:project_list' %}">Projects</a></li>{% endif %}
+  {% if perms.organization.view_location %}<li class="nav-item"><a class="nav-link{% if tab == 'sites' %} active{% endif %}" href="{% url 'web:site_list' %}">Sites</a></li>{% endif %}
+</ul>

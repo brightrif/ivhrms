@@ -13,6 +13,7 @@ class Company(BaseModel):
     address = models.TextField(blank=True)
     currency = models.CharField(max_length=3, default="BHD")
     is_active = models.BooleanField(default=True)
+    runs_projects = models.BooleanField(default=False, help_text="Offered when adding a project.")
 
     class Meta:
         verbose_name_plural = "companies"

@@ -1,0 +1,36 @@
+{% extends "web/base.html" %}
+{% block title %}Projects{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Organization</h1>
+  {% if perms.organization.add_project %}<a class="btn btn-primary" href="{% url 'web:project_create' %}"><i class="bi bi-plus-lg me-1"></i>Add project</a>{% endif %}
+</div>
+{% include "web/organization/_tabs.html" with tab="projects" %}
+{% include "web/organization/_company_filter.html" %}
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Project</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Site</th><th>Dates</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for p in projects %}
+      <tr{% if p.status == 'closed' %} class="table-light text-body-secondary"{% endif %}>
+        <td class="fw-medium">{{ p.code }}<div class="small text-body-secondary">{{ p.name }}</div></td>
+        {% if multi_company %}<td>{{ p.company.code }}</td>{% endif %}
+        <td>{{ p.location.name|default:"-" }}</td>
+        <td class="text-nowrap">{% if p.start_date %}{{ p.start_date|date:"d M Y" }}{% else %}-{% endif %}{% if p.end_date %} to {{ p.end_date|date:"d M Y" }}{% endif %}</td>
+        <td>{% if p.status == 'active' %}<span class="badge text-bg-success">Active</span>{% elif p.status == 'on_hold' %}<span class="badge text-bg-warning">On hold</span>{% else %}<span class="badge text-bg-secondary">Closed</span>{% endif %}</td>
+        <td class="text-end text-nowrap">
+          {% if perms.organization.change_project %}
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'web:project_edit' p.pk %}">Edit</a>
+          <form method="post" action="{% url 'web:project_toggle' p.pk %}" class="d-inline">{% csrf_token %}
+            <button class="btn btn-sm btn-outline-secondary">{% if p.status == 'closed' %}Reopen{% else %}Close{% endif %}</button></form>
+          {% endif %}
+          {% if perms.organization.delete_project %}<a class="btn btn-sm btn-outline-danger" href="{% url 'web:project_delete' p.pk %}">Delete</a>{% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="text-center text-body-secondary py-4">No projects yet. Add a site first if the project has its own camp or location.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

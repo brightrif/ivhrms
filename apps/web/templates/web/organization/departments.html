@@ -1,12 +1,15 @@
 {% extends "web/base.html" %}
-{% block title %}Departments{% endblock %}
+{% block title %}Organization{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-  <h1 class="mb-0">Departments</h1>
+  <h1 class="mb-0">Organization</h1>
+  
   {% if perms.organization.add_department %}
   <a class="btn btn-primary" href="{% url 'web:department_create' %}"><i class="bi bi-plus-lg me-1"></i>Add department</a>
   {% endif %}
 </div>
+{% include "web/organization/_tabs.html" with tab="departments" %}
+{% include "web/organization/_company_filter.html" %}
 <div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive">
   <table class="table table-hover align-middle mb-0">
     <thead class="table-light">

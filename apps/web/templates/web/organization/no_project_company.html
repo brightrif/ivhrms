@@ -1,0 +1,14 @@
+{% extends "web/base.html" %}
+{% block title %}Add project{% endblock %}
+{% block content %}
+<h1>Add project</h1>
+<div class="card shadow-sm border-0" style="max-width:720px"><div class="card-body">
+  <div class="alert alert-warning">No company is set to run projects, so there is nothing to add a project to.</div>
+  {% if perms.configuration.view_settings_organization %}
+  <a class="btn btn-primary" href="{% url 'web:settings_module' 'organization' %}">Choose companies in Settings</a>
+  {% else %}
+  <p>Ask an administrator to switch this on under Settings &rarr; Organization.</p>
+  {% endif %}
+  <a class="btn btn-outline-secondary" href="{% url 'web:project_list' %}">Back</a>
+</div></div>
+{% endblock %}

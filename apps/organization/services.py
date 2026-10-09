@@ -3,8 +3,22 @@ import re
 from django.db import models, transaction
 from django.db.models import ProtectedError, RestrictedError
 
-from .models import Company, CompanyAccess, Department
+from .models import Company, CompanyAccess, Department, Project
 
+
+
+
+def project_companies(user):
+    """Companies the user may work in that run projects (switched on under Settings > Organization)."""
+    return companies_for(user).filter(runs_projects=True)
+
+
+def suggest_project_code(company, name, site=None):
+    """'Hamad Tower' at site CAMP -> HAT-CAMP; a number is added if the company already has it."""
+    base = site_letters(name)
+    if site is not None:
+        base = f"{base}-{site.code}"
+    return _unique(Project.objects.filter(company=company) if company else Project.objects.none(), base)
 
 class CompanyError(Exception):
     pass
@@ -105,3 +119,40 @@ def descendant_ids(department):
         found.update(children)
         frontier = children
     return found
+
+def _initials(text, fallback=""):
+    words = re.findall(r"[A-Za-z0-9]+", text)
+    if len(words) > 1:
+        return "".join(w[0] for w in words[:4]).upper()
+    return words[0][:4].upper() if words else fallback
+
+
+def _unique(queryset, base):
+    code, n = base, 1
+    while queryset.filter(code=code).exists():
+        n += 1
+        code = f"{base}{n}"
+    return code
+
+
+def suggest_code(queryset, name, fallback="X"):
+    """'Senior Engineer' -> SE; a number is added if the code is taken."""
+    return _unique(queryset, _initials(name, fallback))
+
+
+def site_letters(name):
+    """Three letters from a site name: Riffa -> RIF, Hamad Camp -> HAC, Al Hamad Camp -> AHC."""
+    words = re.findall(r"[A-Za-z0-9]+", name)
+    if len(words) >= 3:
+        letters = "".join(w[0] for w in words[:3])
+    elif len(words) == 2:
+        letters = words[0][:2] + words[1][0]
+    elif words:
+        letters = words[0][:3]
+    else:
+        letters = ""
+    return (letters or "LOC").upper()
+
+
+def suggest_site_code(queryset, name):
+    return _unique(queryset, site_letters(name))

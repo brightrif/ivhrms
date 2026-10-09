@@ -53,18 +53,12 @@
           <a class="nav-link {% if u|slice:':9' == 'employee_' %}active{% endif %}" href="{% url 'web:employee_list' %}">
             <i class="bi bi-people"></i> Staff</a>
           {% endif %}
-          {% if perms.organization.view_department %}
-          <a class="nav-link {% if u|slice:':11' == 'department_' %}active{% endif %}" href="{% url 'web:department_list' %}">
-            <i class="bi bi-diagram-3"></i> Departments</a>
+          {% if perms.organization.view_company or perms.organization.view_department or perms.organization.view_designation or perms.organization.view_project or perms.organization.view_location %}
+          <a class="nav-link {% if u == 'organization_home' or u|slice:':8' == 'company_' or u|slice:':11' == 'department_' or u|slice:':12' == 'designation_' or u|slice:':8' == 'project_' or u|slice:':5' == 'site_' or u|slice:':6' == 'grade_' %}active{% endif %}" href="{% url 'web:organization_home' %}">
+            <i class="bi bi-diagram-3"></i> Organization</a>
           {% endif %}
-          {% if perms.organization.view_designation %}
-          <a class="nav-link {% if u|slice:':12' == 'designation_' %}active{% endif %}" href="{% url 'web:designation_list' %}">
-            <i class="bi bi-person-badge"></i> Designations</a>
-          {% endif %}
-          {% if perms.organization.view_company %}
-          <a class="nav-link {% if u|slice:':8' == 'company_' %}active{% endif %}" href="{% url 'web:company_list' %}">
-            <i class="bi bi-building"></i> Companies</a>
-          {% endif %}
+          
+          
           {% if perms.compliance.view_document %}
           <a class="nav-link {% if u|slice:':11' == 'compliance_' %}active{% endif %}" href="{% url 'web:compliance_dashboard' %}">
             <i class="bi bi-shield-check"></i> Compliance
