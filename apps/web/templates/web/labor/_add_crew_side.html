@@ -1,0 +1,32 @@
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card shadow-sm border-0"><div class="card-body">
+      <h2>Selected projects <span class="badge text-bg-success">{{ selected|length }}</span></h2>
+      <ul class="list-unstyled mb-0">
+      {% for s in selected %}
+        <li class="d-flex justify-content-between align-items-center py-1{% if not forloop.first %} border-top{% endif %}">
+          <span><span class="fw-medium">{{ s.project.code }}</span>
+            <span class="small text-body-secondary">{{ s.project.name }}</span></span>
+          <span class="badge text-bg-light">{% if s.count == crew_size %}all{% else %}{{ s.count }} of {{ crew_size }}{% endif %}</span>
+        </li>
+      {% empty %}
+        <li class="text-body-secondary">None yet</li>
+      {% endfor %}
+      </ul>
+    </div></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm border-0"><div class="card-body">
+      <h2>Not selected <span class="badge text-bg-secondary">{{ not_selected|length }}</span></h2>
+      <ul class="list-unstyled mb-0">
+      {% for p in not_selected %}
+        <li class="py-1{% if not forloop.first %} border-top{% endif %}">
+          <span class="fw-medium">{{ p.code }}</span> <span class="small text-body-secondary">{{ p.name }}</span>
+        </li>
+      {% empty %}
+        <li class="text-body-secondary">All projects selected</li>
+      {% endfor %}
+      </ul>
+    </div></div>
+  </div>
+</div>

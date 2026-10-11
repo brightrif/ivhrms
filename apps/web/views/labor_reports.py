@@ -6,6 +6,10 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
 
+from django.utils.text import slugify
+from apps.labor.timesheet import TimeEntry
+from apps.organization.models import Project
+
 from apps.labor import reporting, sitesheet
 from apps.labor.models import Contractor, LaborProfile
 from apps.organization.services import companies_for
@@ -19,6 +23,7 @@ REPORTS = [
     ("labor_report_manpower", "Manpower by day", "labor.view_laborallocation"),
     ("labor_report_cost", "Cost", "labor.view_laborrate"),
     ("labor_report_contractor", "Contractor statement", "labor.view_laborrate"),
+    ("labor_report_timesheet", "Timesheet", "labor.view_timeentry"),
 ]
 
 
@@ -81,6 +86,26 @@ def report_manpower(request):
         "period": period, "periods": sitesheet.PERIODS.items(), "anchor": anchor, "first": first, "last": last,
         "today": today, "prev_query": nav(-1), "next_query": nav(1),
         "next_is_future": sitesheet.shift_anchor(period, first, 1) > today})
+
+@hr_perm("labor.view_timeentry")
+def report_timesheet(request):
+    today = timezone.localdate()
+    period = request.GET.get("period") if request.GET.get("period") in sitesheet.PERIODS else "month"
+    anchor = min(_date(request.GET.get("date"), today), today)
+    first, last = sitesheet.period_bounds(period, anchor)
+    projects = list(Project.objects.filter(
+        pk__in=TimeEntry.objects.for_user(request.user).filter(date__range=(first, last)).values("project")).order_by("code"))
+    project = next((p for p in projects if str(p.pk) == request.GET.get("project")), None)
+    report = reporting.timesheet_report(request.user, first, last, project=project)
+    here = {"period": period, **({"project": project.pk} if project else {})}
+    nav = lambda step: urlencode({**here, "date": sitesheet.shift_anchor(period, first, step).isoformat()})
+    stamp = f"{first:%Y-%m-%d}_{last:%Y-%m-%d}"
+    name = f"labor-timesheet-{slugify(project.code)}-{stamp}" if project else f"labor-timesheet-{stamp}"
+    return _respond(request, report, "labor_report_timesheet", name, {
+        "period": period, "periods": sitesheet.PERIODS.items(), "anchor": anchor, "first": first, "last": last,
+        "today": today, "prev_query": nav(-1), "next_query": nav(1),
+        "next_is_future": sitesheet.shift_anchor(period, first, 1) > today,
+        "projects": projects, "project": project})
 
 
 @hr_perm("labor.view_laborrate")

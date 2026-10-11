@@ -2,26 +2,78 @@
 {% load bs %}
 {% block title %}Timesheets{% endblock %}
 {% block content %}
+<style>
+  /* a short day: fewer hours than the day expects. Move this rule next to the other .ts-* rules in your css file. */
+  .ts-short{border:1.5px solid #b02a37;background:var(--bs-danger-bg-subtle)}
+</style>
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="mb-0">Labor</h1>
 </div>
 {% include "web/labor/_tabs.html" with tab="timesheets" %}
 
-<form method="get" class="row g-2 mb-3 align-items-center">
-  <div class="col-6 col-md-2"><select name="period" class="form-select">
-    {% for value, label in periods %}<option value="{{ value }}"{% if value == period %} selected{% endif %}>{{ label }}</option>{% endfor %}
-  </select></div>
-  <div class="col-6 col-md-2"><input type="date" name="date" value="{{ anchor|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" class="form-control"></div>
-  <div class="col-md-4"><select name="site" class="form-select">
-    {% for project, location in sites %}<option value="{{ project.pk }}:{{ location.pk }}"{% if chosen and chosen.0.pk == project.pk and chosen.1.pk == location.pk %} selected{% endif %}>{{ project.code }} &middot; {{ location.name }}</option>{% empty %}<option value="">No site had workers in this period</option>{% endfor %}
-  </select></div>
-  <div class="col-auto"><button class="btn btn-outline-primary">Show</button></div>
-  <div class="col-auto ms-md-auto d-flex align-items-center gap-2">
-    <a class="btn btn-outline-secondary btn-sm" href="?{{ prev_query }}" aria-label="Previous period"><i class="bi bi-chevron-left"></i></a>
-    <span class="fw-medium">{{ first|date:"d M" }}{% if first != last %} &ndash; {{ last|date:"d M Y" }}{% else %} {{ first|date:"Y" }}{% endif %}</span>
-    {% if not next_is_future %}<a class="btn btn-outline-secondary btn-sm" href="?{{ next_query }}" aria-label="Next period"><i class="bi bi-chevron-right"></i></a>{% endif %}
+<form id="filter-form" method="get"></form>
+{% if sheet %}
+<form method="post" id="sheet-form">
+  {% csrf_token %}
+  <input type="hidden" name="period" value="{{ period }}">
+  <input type="hidden" name="date" value="{{ anchor|date:'Y-m-d' }}">
+  <input type="hidden" name="site" value="{{ chosen.0.pk }}:{{ chosen.1.pk }}">
+{% endif %}
+
+<div class="card shadow-sm border-0 mb-2"><div class="card-body py-2">
+
+  {# row 1: filters (they belong to the empty GET form above through form="filter-form") #}
+  <div class="row g-2 align-items-center">
+    <div class="col-6 col-md-2"><select name="period" form="filter-form" class="form-select form-select-sm" aria-label="Period">
+      {% for value, label in periods %}<option value="{{ value }}"{% if value == period %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></div>
+    <div class="col-6 col-md-2"><input type="date" name="date" form="filter-form" value="{{ anchor|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" class="form-control form-control-sm" aria-label="Date"></div>
+    <div class="col-md-4"><select name="site" form="filter-form" class="form-select form-select-sm" aria-label="Project and site">
+      {% for project, location in sites %}<option value="{{ project.pk }}:{{ location.pk }}"{% if chosen and chosen.0.pk == project.pk and chosen.1.pk == location.pk %} selected{% endif %}>{{ project.code }} &middot; {{ location.name }}</option>{% empty %}<option value="">No site had workers in this period</option>{% endfor %}
+    </select></div>
+    <div class="col-auto"><button type="submit" form="filter-form" class="btn btn-outline-primary btn-sm">Show</button></div>
+    <div class="col-auto ms-md-auto d-flex align-items-center gap-2">
+      <a class="btn btn-outline-secondary btn-sm" href="?{{ prev_query }}" aria-label="Previous period"><i class="bi bi-chevron-left"></i></a>
+      <span class="fw-medium">{{ first|date:"d M" }}{% if first != last %} &ndash; {{ last|date:"d M Y" }}{% else %} {{ first|date:"Y" }}{% endif %}</span>
+      {% if not next_is_future %}<a class="btn btn-outline-secondary btn-sm" href="?{{ next_query }}" aria-label="Next period"><i class="bi bi-chevron-right"></i></a>{% endif %}
+    </div>
   </div>
-</form>
+
+  {% if sheet %}
+  {# row 2: summary chips and actions #}
+  <div class="d-flex flex-wrap align-items-center gap-2 mt-2 pt-2 border-top">
+    <span class="rounded-pill bg-body-secondary px-3 py-1 small">Hours <strong class="fs-6 ms-1">{{ sheet.hours|floatformat:"-2" }}</strong></span>
+    {% if sheet.overtime_mode != 'none' %}
+    <span class="rounded-pill px-3 py-1 small {% if sheet.overtime %}bg-warning-subtle text-warning-emphasis{% else %}bg-body-secondary{% endif %}">Overtime <strong class="fs-6 ms-1">{{ sheet.overtime|floatformat:"-2" }}</strong></span>
+    {% endif %}
+    <span class="rounded-pill px-3 py-1 small {% if sheet.missing %}bg-warning-subtle text-warning-emphasis{% else %}bg-body-secondary{% endif %}" title="Worked days without hours">Missing <strong class="fs-6 ms-1">{{ sheet.missing }}</strong></span>
+    <span class="rounded-pill bg-body-secondary px-3 py-1 small" title="Working days with no attendance and no hours. Check them against the paper. If the worker was away, mark Absent or Leave in Attendance.">Not entered <strong class="fs-6 ms-1">{{ sheet.unentered }}</strong></span>
+    <span class="rounded-pill px-3 py-1 small {% if sheet.short %}bg-danger-subtle text-danger-emphasis{% else %}bg-body-secondary{% endif %}" title="Days with fewer hours than the day expects, across all projects">Short days <strong class="fs-6 ms-1">{{ sheet.short }}</strong></span>
+    <span class="rounded-pill bg-body-secondary px-3 py-1 small">Status
+      <strong class="ms-1">{% if sheet.confirmed and not sheet.drafts %}Confirmed (locked){% elif sheet.confirmed %}{{ sheet.confirmed }} confirmed, {{ sheet.drafts }} draft{% elif sheet.drafts %}Draft{% else %}Nothing entered{% endif %}</strong></span>
+
+    <div class="d-flex flex-wrap align-items-center gap-2 ms-lg-auto">
+      {% if can_save %}
+      <label class="small text-body-secondary mb-0" for="fill">Empty worked days:</label>
+      <select name="fill" id="fill" class="form-select form-select-sm w-auto" title="Only days already marked present are filled. Days with no attendance are never filled.">
+        <option value="">leave as they are</option>
+        <option value="standard"{% if fill_default %} selected{% endif %}>fill the day's standard hours</option>
+      </select>
+      <button class="btn btn-primary btn-sm" name="action" value="save">Save hours</button>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:labor_split' %}?first={{ first|date:'Y-m-d' }}&amp;last={{ last|date:'Y-m-d' }}">Split a worker's hours</a>
+      {% endif %}
+      {% if can_confirm and sheet.drafts %}
+      <button class="btn btn-outline-success btn-sm" name="action" value="confirm"
+              onclick="return confirm('Confirm and lock these hours for this site and period?')">Confirm period</button>
+      {% endif %}
+      {% if can_reopen and sheet.confirmed %}
+      <button class="btn btn-outline-secondary btn-sm" name="action" value="reopen"
+              onclick="return confirm('Reopen the confirmed hours for this site and period?')">Reopen</button>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div></div>
 
 {% if sheet %}
 {% if sheet.overtime_mode == 'none' %}
@@ -30,89 +82,217 @@
 <div class="alert alert-warning py-2">Nobody has said whether this company pays overtime. Until Management sets it
   {% if perms.labor.view_overtimepolicy %}under <a href="{% url 'web:labor_overtime_rules' %}">Overtime rules</a>{% else %}under Overtime rules{% endif %}, workers marked eligible are shown with overtime.</div>
 {% endif %}
-<div class="row g-2 mb-3">
-  <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2"><div class="small text-body-secondary">Hours</div><div class="fs-5 fw-semibold">{{ sheet.hours|floatformat:"-2" }}</div></div></div></div>
-  {% if sheet.overtime_mode != 'none' %}<div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2"><div class="small text-body-secondary">Overtime hours</div><div class="fs-5 fw-semibold">{{ sheet.overtime|floatformat:"-2" }}</div></div></div></div>{% endif %}
-  <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2"><div class="small text-body-secondary">Worked days without hours</div><div class="fs-5 fw-semibold{% if sheet.missing %} text-warning-emphasis{% endif %}">{{ sheet.missing }}</div></div></div></div>
-  <div class="col-6 col-md-3"><div class="card border-0 shadow-sm"><div class="card-body py-2"><div class="small text-body-secondary">Status</div>
-    <div class="fw-semibold">{% if sheet.confirmed and not sheet.drafts %}Confirmed (locked){% elif sheet.confirmed %}{{ sheet.confirmed }} confirmed, {{ sheet.drafts }} draft{% elif sheet.drafts %}Draft{% else %}Nothing entered{% endif %}</div></div></div></div>
-</div>
 {% if sheet.conflicts %}<div class="alert alert-warning py-2">{{ sheet.conflicts }} entr{{ sheet.conflicts|pluralize:"y,ies" }} marked <strong>!</strong> {{ sheet.conflicts|pluralize:"is,are" }} on a day that attendance does not show as worked. Clear {{ sheet.conflicts|pluralize:"it,them" }} or fix the attendance.</div>{% endif %}
 
-<form method="post">
-  {% csrf_token %}
-  <input type="hidden" name="period" value="{{ period }}">
-  <input type="hidden" name="date" value="{{ anchor|date:'Y-m-d' }}">
-  <input type="hidden" name="site" value="{{ chosen.0.pk }}:{{ chosen.1.pk }}">
-
-  <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-    {% if can_save %}
-    <label class="small text-body-secondary mb-0" for="fill">Empty worked days:</label>
-    <select name="fill" id="fill" class="form-select form-select-sm w-auto">
-      <option value="">leave as they are</option>
-      <option value="standard"{% if fill_default %} selected{% endif %}>fill the day's standard hours</option>
-    </select>
-    <button class="btn btn-primary btn-sm" name="action" value="save">Save hours</button>
-    <a class="btn btn-outline-secondary btn-sm" href="{% url 'web:labor_split' %}?first={{ first|date:'Y-m-d' }}&amp;last={{ last|date:'Y-m-d' }}">Split a worker's hours</a>
-    {% endif %}
-    {% if can_confirm and sheet.drafts %}
-    <button class="btn btn-outline-success btn-sm" name="action" value="confirm"
-            onclick="return confirm('Confirm and lock these hours for this site and period?')">Confirm period</button>
-    {% endif %}
-    {% if can_reopen and sheet.confirmed %}
-    <button class="btn btn-outline-secondary btn-sm" name="action" value="reopen"
-            onclick="return confirm('Reopen the confirmed hours for this site and period?')">Reopen</button>
-    {% endif %}
-  </div>
-
-  <div class="card shadow-sm border-0"><div class="table-responsive">
-    <table class="table table-sm align-middle mb-0 text-center">
-      <thead class="table-light">
-        <tr>
-          <th class="text-start text-nowrap">Worker</th>
-          {% for d in sheet.days %}<th class="px-1">{{ d|date:"j" }}<div class="small fw-normal text-body-secondary">{{ d|date:"D"|slice:":2" }}</div></th>{% endfor %}
-          <th class="text-nowrap">Hours</th>{% if sheet.overtime_mode != 'none' %}<th>OT</th>{% endif %}<th>Missing</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for row in sheet.rows %}
-        <tr>
-          <td class="text-start text-nowrap">{% if row.profile %}<a class="fw-medium text-decoration-none" href="{% url 'web:labor_detail' row.profile.pk %}">{{ row.employee.full_name }}</a>{% else %}<span class="fw-medium">{{ row.employee.full_name }}</span>{% endif %}
-            <div class="small text-body-secondary">{{ row.employee.employee_no }}{% if row.profile %} &middot; {{ row.profile.trade.name }}{% endif %}</div></td>
-          {% for c in row.cells %}
-          <td class="px-1{% if c.kind == 'weekly_off' or c.kind == 'holiday' %} table-secondary{% endif %}">
-            {% if c.is_conflict %}<span class="text-danger fw-bold" title="Hours {{ c.entry.hours|floatformat:'-2' }} on a day that is not marked as worked">!</span>
-            {% elif c.locked %}<span class="fw-medium" title="Confirmed">{{ c.entry.hours|floatformat:"-2" }}</span>
-            {% elif c.can_enter and can_save %}
-              <input type="text" inputmode="decimal" name="{{ c.key }}" autocomplete="off"
-                     value="{% if c.entry %}{{ c.entry.hours|floatformat:'-2' }}{% endif %}" placeholder="{{ c.expected|floatformat:'-2' }}"
-                     class="form-control form-control-sm px-1 text-center{% if c.entry and c.entry.overtime_hours %} border-warning{% endif %}"
-                     style="min-width:3.4rem;max-width:4rem" aria-label="{{ row.employee.full_name }} {{ c.date|date:'j M' }} hours">
-              {% if row.split and sheet.overtime_mode != 'none' %}
-              <input type="text" inputmode="decimal" name="{{ c.ot_key }}" autocomplete="off"
-                     value="{% if c.entry and c.entry.overtime_hours %}{{ c.entry.overtime_hours|floatformat:'-2' }}{% endif %}" placeholder="OT"
-                     class="form-control form-control-sm px-1 text-center mt-1 border-warning-subtle"
-                     style="min-width:3.4rem;max-width:4rem" aria-label="{{ row.employee.full_name }} {{ c.date|date:'j M' }} overtime hours">
-              {% endif %}
-              {% if c.others %}<div class="small text-body-secondary" title="Hours on other projects: {{ c.other_projects }}">+{{ c.other_hours|floatformat:'-2' }}</div>{% endif %}
-            {% elif c.entry %}<span class="fw-medium">{{ c.entry.hours|floatformat:"-2" }}</span>
-            {% elif c.attendance %}<span class="text-body-secondary" title="{{ c.attendance.get_status_display }}">{{ c.letter }}</span>
-            {% else %}<span class="text-body-secondary">{% if c.covered %}&middot;{% else %}&ndash;{% endif %}</span>{% endif %}
-          </td>
+{% comment %} table start here  {% endcomment %}
+ <div class="card shadow-sm border-0"><div class="table-responsive">
+  {% widthratio sheet.days|length 1 34 as days_px %}
+  <table class="table table-sm align-middle mb-0 text-center ts-table" style="min-width:{{ days_px|add:272 }}px">
+    <colgroup>
+      <col style="width:11rem">
+      {% for c in sheet.rows.0.cells %}<col{% if c.kind == 'weekly_off' or c.kind == 'holiday' %} class="ts-off"{% elif period == "month" and c.date > today %} class="ts-future"{% endif %}>{% endfor %}
+      <col style="width:6.5rem">
+    </colgroup>
+    <thead class="table-light">
+      <tr>
+        <th class="ts-first text-start">Worker</th>
+        {% if sheet.rows %}
+          {% for c in sheet.rows.0.cells %}
+          <th class="fw-normal{% if c.kind == 'weekly_off' or c.kind == 'holiday' %} table-secondary{% endif %}"
+              title="{% if c.kind == 'weekly_off' %}Weekly off: hours here count at the special rate{% elif c.kind == 'holiday' %}Holiday: hours here count at the special rate{% endif %}">
+            <div class="fw-semibold">{{ c.date|date:"j" }}</div>
+            <div class="text-body-secondary" style="font-size:.65rem">{{ c.date|date:"D"|slice:":2"|upper }}</div>
+          </th>
           {% endfor %}
-          <td class="text-nowrap fw-medium">{{ row.hours|floatformat:"-2" }}</td>
-          {% if sheet.overtime_mode != 'none' %}<td>{% if row.overtime %}{{ row.overtime|floatformat:"-2" }}{% endif %}</td>{% endif %}
-          <td{% if row.missing %} class="text-warning-emphasis fw-medium"{% endif %}>{{ row.missing|default:"" }}</td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="{{ sheet.days|length|add:4 }}" class="text-center text-body-secondary py-4">Nobody was allocated to this site in this period.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div></div>
-  <div class="small text-body-secondary mt-2">Grey numbers in the boxes are the hours that day expects. Hours above that are overtime (outlined). Hours can only be entered for days attendance shows as worked. A letter means no hours can be entered that day. Confirmed hours are locked.</div>
+        {% else %}
+          {% for d in sheet.days %}<th class="fw-normal">{{ d|date:"j" }}</th>{% endfor %}
+        {% endif %}
+        <th class="ts-last">{% if period == "month" %}Month{% elif period == "week" %}Week{% else %}Day{% endif %}</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in sheet.rows %}
+      <tr>
+        <td class="ts-first text-nowrap">
+          {% if row.profile %}<a class="fw-semibold text-decoration-none" href="{% url 'web:labor_detail' row.profile.pk %}">{{ row.employee.full_name }}</a>{% else %}<span class="fw-semibold">{{ row.employee.full_name }}</span>{% endif %}
+          <div class="text-body-secondary" style="font-size:.7rem">{{ row.employee.employee_no }}{% if row.profile %} &middot; {{ row.profile.trade.name }}{% endif %}</div>
+        </td>
+        {% for c in row.cells %}
+        <td class="{% if c.kind == 'weekly_off' or c.kind == 'holiday' %}table-secondary{% endif %}">
+          {% if c.is_conflict %}<span class="text-danger fw-bold" title="Hours {{ c.entry.hours|floatformat:'-2' }} on a day that is not marked as worked">!</span>
+          {% elif c.locked %}<span class="fw-semibold{% if c.is_short %} text-danger{% endif %}" title="Confirmed{% if c.is_short %}. Short day: fewer than {{ c.expected|floatformat:'-2' }} h in total{% endif %}">{% if c.entry.overtime_hours %}<span class="text-warning-emphasis">{{ c.entry.regular_hours|floatformat:"-2" }}+{{ c.entry.overtime_hours|floatformat:"-2" }}</span>{% else %}{{ c.entry.hours|floatformat:"-2" }}{% endif %}</span>
+          {% elif c.can_enter and can_save %}
+            <input type="text" inputmode="decimal" name="{{ c.key }}" autocomplete="off"
+                   class="ts-box{% if c.entry and c.entry.overtime_hours %} ts-ot{% elif c.worked and not c.entry %} ts-missing{% endif %}{% if c.is_short %} ts-short{% endif %}"
+                   {% if row.split and c.kind != 'weekly_off' and c.kind != 'holiday' %}data-ot="{{ c.ot_key }}"{% endif %}
+                   data-expected="{{ c.expected|stringformat:'s' }}" data-other="{{ c.other_hours|stringformat:'s' }}"
+                   data-worked="{% if c.worked %}1{% endif %}" data-off="{% if c.kind == 'weekly_off' or c.kind == 'holiday' %}1{% endif %}"
+                   value="{% if c.entry %}{% if row.split and c.entry.overtime_hours %}{{ c.entry.regular_hours|floatformat:'-2' }}+{{ c.entry.overtime_hours|floatformat:'-2' }}{% else %}{{ c.entry.hours|floatformat:'-2' }}{% endif %}{% endif %}"
+                   placeholder="{{ c.expected|floatformat:'-2' }}"
+                   title="{% if c.is_short %}Short day: fewer than {{ c.expected|floatformat:'-2' }} h in total. Check the paper. {% endif %}{% if c.pending_attendance %}No attendance yet: saving hours marks this day present. {% endif %}{% if c.others %}Other projects that day: {{ c.other_projects }} ({{ c.other_hours|floatformat:'-2' }} h).{% endif %}"
+                   aria-label="{{ row.employee.full_name }} {{ c.date|date:'j M' }} hours">
+            {% if c.others %}<div class="text-body-secondary" style="font-size:.65rem">+{{ c.other_hours|floatformat:'-2' }}</div>{% endif %}
+          {% elif c.entry %}<span class="fw-semibold{% if c.is_short %} text-danger{% endif %}"{% if c.is_short %} title="Short day: fewer than {{ c.expected|floatformat:'-2' }} h in total"{% endif %}>{{ c.entry.hours|floatformat:"-2" }}</span>
+          {% elif c.attendance %}<span class="text-body-secondary" title="{{ c.attendance.get_status_display }}">{{ c.letter }}</span>
+          {% else %}<span class="text-body-secondary" title="{% if c.covered %}Not open for hours: a future day, or no pay terms for this day.{% else %}Not allocated to this site that day.{% endif %}">{% if c.covered %}&middot;{% else %}&ndash;{% endif %}</span>{% endif %}
+        </td>
+        {% endfor %}
+        <td class="ts-last text-nowrap">
+          <div class="fw-bold">{{ row.hours|floatformat:"-2" }} h</div>
+          <div style="font-size:.7rem">
+            {% if sheet.overtime_mode != 'none' and row.overtime %}<span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">OT {{ row.overtime|floatformat:"-2" }}</span>{% endif %}
+            {% if row.missing %}<span class="badge rounded-pill bg-warning-subtle text-warning-emphasis">{{ row.missing }} missing</span>{% endif %}
+            {% if row.short %}<span class="badge rounded-pill bg-danger-subtle text-danger-emphasis">{{ row.short }} short</span>{% endif %}
+          </div>
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="{{ sheet.days|length|add:2 }}" class="text-center text-body-secondary py-4">Nobody was allocated to this site in this period.</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot class="table-light">
+  <tr>
+    <td class="ts-first small fw-semibold">Hours per day</td>
+    {% for t in sheet.day_totals %}<td class="small fw-semibold">{% if t %}{{ t|floatformat:"-2" }}{% endif %}</td>{% endfor %}
+    <td class="ts-last fw-bold">{{ sheet.hours|floatformat:"-2" }} h</td>
+  </tr>
+</tfoot>
+  </table>
+</div></div>
+
+{% comment %} table ends here  {% endcomment %}
+<div id="ts-hint" class="small text-body-secondary mt-2" role="status" aria-live="polite"></div>
+  <details class="small text-body-secondary mt-2">
+    <summary class="text-primary">How to read this sheet</summary>
+    <div class="mt-1">Type <strong>8</strong> for normal hours. For a worker on several projects, type <strong>8+2</strong> for normal plus overtime. To fill many boxes at once, drag across them (or Shift+click the last one), then type the hours: every selected box gets them. Press Enter to finish, Esc to cancel. Every working day the worker is on this site is open: saving hours on a day with no attendance marks it present. A day marked Absent or Leave stays closed. The grey number in an empty box is the hours that day expects, a dashed box is a present day with no hours yet, and a red box is a short day (fewer hours than expected, across all projects): check it against the paper. The Not entered chip counts working days with neither attendance nor hours. Grey columns are weekly offs and holidays: type the hours only. A dash means no attendance, and a letter means that day cannot take hours. Confirmed hours are locked.</div>
+  </details>
 </form>
 {% else %}
 <div class="card shadow-sm border-0"><div class="card-body text-center text-body-secondary py-4">No workers were allocated to any site in this period.</div></div>
 {% endif %}
+
+<script>
+(function () {
+  var form = document.getElementById('sheet-form');
+  if (!form) return;
+  var table = form.querySelector('.ts-table');
+  var hint = document.getElementById('ts-hint');
+  var withOt = /^\d{0,2}(\.\d{0,2})?(\+\d{0,2}(\.\d{0,2})?)?$/, plain = /^\d{0,2}(\.\d{0,2})?$/;
+  var boxes = Array.prototype.slice.call(table.querySelectorAll('.ts-box'));
+  var anchor = null, down = false, dragging = false, sel = [], buffer = '', saved = null;
+
+  function say(text) { if (hint) hint.textContent = text; }
+  function ruleFor(box) { return box.dataset.ot ? withOt : plain; }
+
+  function paint(box) {                       // keep the amber, dashed and red look in step with what is typed
+    var v = box.value.trim(), parts = v.split('+'), main = parseFloat(parts[0]) || 0;
+    var extra = box.dataset.ot ? (parseFloat(parts[1]) || 0) : 0, total = main + extra;
+    var ot = box.dataset.ot ? extra : Math.max(0, main - (parseFloat(box.placeholder) || 0));
+    var exp = parseFloat(box.dataset.expected) || 0, other = parseFloat(box.dataset.other) || 0;
+    box.classList.toggle('ts-ot', v !== '' && ot > 0);
+    box.classList.toggle('ts-missing', v === '' && box.dataset.worked === '1');
+    box.classList.toggle('ts-short', v !== '' && !box.dataset.off && exp > 0 && total + other < exp);
+  }
+
+  boxes.forEach(function (b) {
+    b._r = b.closest('tr').rowIndex;
+    b._c = b.closest('td').cellIndex;
+    b.dataset.last = b.value;
+    b.addEventListener('input', function () {
+      if (ruleFor(b).test(b.value)) { b.dataset.last = b.value; paint(b); } else { b.value = b.dataset.last; }
+    });
+    b.addEventListener('focus', function () { anchor = b; });
+  });
+
+  function rect(a, b) {
+    var r1 = Math.min(a._r, b._r), r2 = Math.max(a._r, b._r), c1 = Math.min(a._c, b._c), c2 = Math.max(a._c, b._c);
+    return boxes.filter(function (x) { return x._r >= r1 && x._r <= r2 && x._c >= c1 && x._c <= c2; });
+  }
+
+  function select(list) {
+    sel.forEach(function (b) { b.classList.remove('ts-sel'); });
+    sel = list;
+    sel.forEach(function (b) { b.classList.add('ts-sel'); });
+    buffer = ''; saved = null;
+    say(sel.length > 1 ? sel.length + ' cells selected. Type the hours. Enter to finish, Esc to cancel.' : '');
+  }
+
+  function apply(text) {
+    var skipped = 0;
+    sel.forEach(function (b) {
+      if (ruleFor(b).test(text)) { b.value = text; b.dataset.last = text; paint(b); } else { skipped++; }
+    });
+    say(sel.length + ' cells: ' + (text === '' ? 'cleared' : text)
+        + (skipped ? '. ' + skipped + ' cannot take overtime and kept their value' : '') + '. Enter to finish, Esc to cancel.');
+  }
+
+  // select with the mouse
+  table.addEventListener('mousedown', function (e) {
+    if (e.button !== 0) return;
+    var box = e.target.closest ? e.target.closest('.ts-box') : null;
+    if (!box) { select([]); return; }
+    if (e.shiftKey && anchor && anchor !== box) {
+      e.preventDefault();
+      if (document.activeElement) document.activeElement.blur();
+      select(rect(anchor, box));
+      return;
+    }
+    select([]);
+    anchor = box; down = true; dragging = false;
+  });
+  table.addEventListener('mousemove', function (e) {
+    if (!down) return;
+    var td = e.target.closest ? e.target.closest('td') : null;
+    var box = td ? td.querySelector('.ts-box') : null;
+    if (!box || (box === anchor && !dragging)) return;
+    if (!dragging) {
+      dragging = true;
+      table.classList.add('ts-dragging');
+      if (document.activeElement) document.activeElement.blur();
+      window.getSelection().removeAllRanges();
+    }
+    e.preventDefault();
+    select(rect(anchor, box));
+  });
+  document.addEventListener('mouseup', function () { down = false; dragging = false; table.classList.remove('ts-dragging'); });
+  document.addEventListener('mousedown', function (e) { if (!table.contains(e.target)) select([]); });
+
+  // type once, fill all
+  document.addEventListener('keydown', function (e) {
+    if (sel.length < 2 || e.ctrlKey || e.metaKey || e.altKey) return;
+    var t = document.activeElement;
+    if (t && t !== document.body && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+    var snap = function () { if (!saved) saved = sel.map(function (b) { return b.value; }); };
+    if (e.key === 'Escape') {
+      if (saved) sel.forEach(function (b, i) { b.value = saved[i]; b.dataset.last = saved[i]; paint(b); });
+      select([]);
+    } else if (e.key === 'Enter') {
+      var n = sel.length, changed = !!saved;
+      select([]);
+      say(changed ? 'Filled ' + n + ' cells. Press Save hours to keep them.' : '');
+    } else if (e.key === 'Delete' || (e.key === 'Backspace' && buffer === '')) {
+      snap(); buffer = ''; apply('');
+    } else if (e.key === 'Backspace') {
+      snap(); buffer = buffer.slice(0, -1); apply(buffer);
+    } else if (/^[0-9.+]$/.test(e.key)) {
+      snap(); buffer += e.key; apply(buffer);
+    } else {
+      return;
+    }
+    e.preventDefault();
+  });
+
+  // before saving, turn "8+2" into hours 10 and overtime 2 for the fields the server already reads
+  form.addEventListener('submit', function () {
+    form.querySelectorAll('.ts-box[data-ot]').forEach(function (box) {
+      var parts = box.value.split('+'), ot = parts.length > 1 ? (parseFloat(parts[1]) || 0) : 0;
+      var total = (parseFloat(parts[0]) || 0) + ot;
+      var hid = document.createElement('input');
+      hid.type = 'hidden'; hid.name = box.dataset.ot; hid.value = ot ? String(+ot.toFixed(2)) : '';
+      box.value = box.value.trim() === '' ? '' : String(+total.toFixed(2));
+      form.appendChild(hid);
+    });
+  });
+})();
+</script>
 {% endblock %}

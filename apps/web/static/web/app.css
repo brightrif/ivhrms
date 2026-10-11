@@ -299,3 +299,77 @@ fieldset:disabled {
   display: flex;
   gap: 0.5rem;
 }
+
+/* ---- Styles for timesheet tables ---- */
+.ts-table {
+  table-layout: fixed;
+  width: 100%;
+}
+.ts-table th,
+.ts-table td {
+  padding: 0.25rem 0;
+  font-size: 0.8rem;
+}
+.ts-first,
+.ts-last {
+  position: sticky;
+  z-index: 2;
+  background: var(--bs-body-bg);
+}
+.ts-first {
+  left: 0;
+  width: 11rem;
+  padding-left: 0.75rem !important;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ts-last {
+  right: 0;
+  width: 6.5rem;
+  padding-right: 0.75rem !important;
+  text-align: right;
+}
+.ts-table thead .ts-first,
+.ts-table thead .ts-last {
+  background: var(--bs-light-bg-subtle);
+}
+.ts-off {
+  width: 1.9rem;
+}
+.ts-future {
+  width: 1.1rem;
+}
+.ts-box {
+  width: 100%;
+  max-width: 3.6rem;
+  min-width: 0;
+  height: 2rem;
+  padding: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.3rem;
+  background: var(--bs-body-bg);
+}
+.ts-ot {
+  border: 1.5px solid #d39e00;
+  background: var(--bs-warning-bg-subtle);
+  font-weight: 700;
+}
+.ts-missing {
+  border: 1.5px dashed #a07400;
+}
+
+.ts-sel {
+  outline: 2px solid #1f4f86;
+  outline-offset: -1px;
+  background: #e3edf7 !important;
+}
+.ts-dragging,
+.ts-dragging * {
+  user-select: none;
+  cursor: cell;
+}
+
+/* ---- Styles for timesheet tables ---- */

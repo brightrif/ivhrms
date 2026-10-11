@@ -14,6 +14,10 @@ from apps.labor.allocation import LaborAllocation
 from apps.labor.models import LaborProfile
 from apps.labor.services import LaborError
 
+from collections import Counter
+from apps.organization.models import Project
+from apps.organization.services import companies_for
+
 from apps.web.access import hr_perm
 from apps.web.forms.labor_projects import AddCrewForm, AddProjectForm
 
@@ -23,10 +27,10 @@ LAYOUTS = {
 }
 
 
-def _form_page(request, form, title, back_url, layout, intro="", submit_label="Save"):
+def _form_page(request, form, title, back_url, layout, intro="", submit_label="Save", extra=None):
     return render(request, "web/form_layout.html", {
         "form": form, "title": title, "back_url": back_url, "layout": LAYOUTS[layout], "intro": intro,
-        "submit_label": submit_label})
+        "submit_label": submit_label, **(extra or {})})
 
 
 def _profile(request, pk):
@@ -96,16 +100,26 @@ def labor_project_remove(request, pk):
 def labor_projects_add_many(request):
     """Several workers, one more project each. The list page and the site page send the ticked workers here."""
     if request.method == "POST":
-        form = AddCrewForm(request.POST, user=request.user)
         ids = request.POST.getlist("profiles")
     else:
         ids = [i for i in request.GET.getlist("profiles") if i.isdigit()]
         if not ids:
             messages.error(request, "Tick at least one worker first.")
             return redirect("web:labor_list")
-        form = AddCrewForm(user=request.user, initial={"profiles": ids})
     people = list(LaborProfile.objects.for_user(request.user).filter(pk__in=[i for i in ids if str(i).isdigit()])
                   .select_related("employee").order_by("employee__employee_no"))
+
+    # how many of the ticked workers are on each project right now
+    on_count = Counter(LaborAllocation.objects
+                       .filter(employee_id__in=[p.employee_id for p in people], effective_to__isnull=True)
+                       .values_list("project_id", flat=True))
+    everyone_on = {pid for pid, n in on_count.items() if n >= len(people)}
+
+    if request.method == "POST":
+        form = AddCrewForm(request.POST, user=request.user, exclude_projects=everyone_on)
+    else:
+        form = AddCrewForm(user=request.user, initial={"profiles": ids}, exclude_projects=everyone_on)
+
     if request.method == "POST" and form.is_valid():
         cd = form.cleaned_data
         try:
@@ -117,10 +131,19 @@ def labor_projects_add_many(request):
             note = f" {already} {'was' if already == 1 else 'were'} already on it." if already else ""
             messages.success(request, f"{added} worker{'s' if added != 1 else ''} added to {cd['project'].code}.{note}")
             return redirect("web:labor_team", project_pk=cd["project"].pk)
+
+    # the cards on the right
+    projects = list(Project.objects.filter(company__in=companies_for(request.user), status=Project.Status.ACTIVE,
+                                           location__isnull=False).order_by("code"))
+    selected = [{"project": p, "count": on_count[p.pk]} for p in projects if on_count[p.pk]]
+    not_selected = [p for p in projects if not on_count[p.pk]]
+
     names = ", ".join(p.employee.full_name for p in people[:8]) + (f" and {len(people) - 8} more" if len(people) > 8 else "")
     return _form_page(request, form, "Add workers to a project", reverse("web:labor_list"), "add_crew",
                       intro=f"{len(people)} worker{'s' if len(people) != 1 else ''}: {names}. Their other projects stay as they are.",
-                      submit_label="Add to project")
+                      submit_label="Add to project",
+                      extra={"side_template": "web/labor/_add_crew_side.html", "selected": selected,
+                             "not_selected": not_selected, "crew_size": len(people)})
 
 
 @hr_perm("labor.add_laborprofile")

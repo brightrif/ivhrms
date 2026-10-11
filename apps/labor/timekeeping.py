@@ -21,6 +21,7 @@ from .models import LaborRate
 from .overtime import OvertimePolicy
 from .services import LaborError
 from .timesheet import TimeEntry
+from apps.attendance import services as attendance_services
 
 ZERO, MIN_HOURS, MAX_HOURS = Decimal("0"), Decimal("0.25"), Decimal("24")
 
@@ -36,6 +37,7 @@ class TCell:
     eligible: bool = True
     work_order_id: int = None
     can_enter: bool = False
+    pending_attendance: bool = False    # nothing recorded for the day yet: saving hours will mark it present
     key: str = ""
     ot_key: str = ""                    # the overtime box, shown for workers on several projects
     main: bool = True                   # this project is the worker's main one that day
@@ -76,6 +78,17 @@ class TCell:
         """Hours exist for a day that was not worked (the attendance was changed afterwards)."""
         return self.entry is not None and not self.worked
 
+    @property
+    def is_short(self):
+        """Fewer hours than the day expects, counting the worker's other projects that day. HR should check the paper."""
+        return (self.entry is not None and self.expected is not None and self.kind not in sitesheet.OFF_DAYS
+                and self.entry.hours + self.other_hours < self.expected)
+
+    @property
+    def is_unentered(self):
+        """A working day with no attendance and no hours: absent, on leave, or just not typed yet."""
+        return self.pending_attendance and self.entry is None and self.kind not in sitesheet.OFF_DAYS
+
 
 @dataclass
 class TRow:
@@ -92,6 +105,8 @@ class TRow:
     overtime = property(lambda self: self._sum("overtime_hours"))
     missing = property(lambda self: sum(1 for c in self.cells if c.is_missing))
     conflicts = property(lambda self: sum(1 for c in self.cells if c.is_conflict))
+    short = property(lambda self: sum(1 for c in self.cells if c.is_short))
+    unentered = property(lambda self: sum(1 for c in self.cells if c.is_unentered))
 
 
 @dataclass
@@ -112,10 +127,23 @@ class TSheet:
     def confirmed(self):
         return sum(1 for r in self.rows for c in r.cells if c.locked)
 
+# Hours per day footer
+    @property
+    def day_totals(self):
+        totals = [ZERO] * len(self.days)
+        for r in self.rows:
+            for i, c in enumerate(r.cells):
+                if c.entry:
+                    totals[i] += c.entry.hours
+        return totals
+
+
     missing = property(lambda self: sum(r.missing for r in self.rows))
     conflicts = property(lambda self: sum(r.conflicts for r in self.rows))
     hours = property(lambda self: sum((r.hours for r in self.rows), ZERO))
     overtime = property(lambda self: sum((r.overtime for r in self.rows), ZERO))
+    short = property(lambda self: sum(r.short for r in self.rows))
+    unentered = property(lambda self: sum(r.unentered for r in self.rows))
 
 
 def parse_hours(text):
@@ -185,12 +213,13 @@ def build_timesheet(user, project, location, first, last, today=None):
                          main=(span is not None and span.is_main) if row.split else True,
                          others=elsewhere.get((employee.pk, c.date), []))
             rate = rate_on(employee.pk, c.date)
-            if cell.worked and rate is not None:
-                cell.expected = (rate.standard_hours * Decimal(str(Attendance.DAY_FRACTION[c.record.status]))
-                                 ).quantize(Decimal("0.01"))
+            cell.pending_attendance = c.editable           # nothing recorded yet: saving hours will mark the day present
+            if rate is not None and (cell.worked or cell.pending_attendance):
+                fraction = Decimal(str(Attendance.DAY_FRACTION[c.record.status])) if c.record else Decimal("1")
+                cell.expected = (rate.standard_hours * fraction).quantize(Decimal("0.01"))
                 cell.eligible = rate.overtime_eligible and pays_overtime(c.date)
-            cell.can_enter = (cell.covered and cell.worked and cell.expected is not None and not cell.locked
-                              and c.date <= today)
+            cell.can_enter = (cell.covered and (cell.worked or cell.pending_attendance)
+                              and cell.expected is not None and not cell.locked and c.date <= today)
             row.cells.append(cell)
         rows.append(row)
     return TSheet(project=project, location=location, first=first, last=last, days=base.days, rows=rows,
@@ -238,6 +267,8 @@ def save_hours(user, project, location, first, last, posted, fill=""):
                         continue
                     text = (raw or "").strip()
                     if not text and fill == "standard":
+                        if cell.pending_attendance:
+                            continue
                         if row.split and not (cell.main and not cell.others):
                             continue
                         hours = cell.expected
@@ -246,14 +277,23 @@ def save_hours(user, project, location, first, last, posted, fill=""):
                     else:
                         continue
                     regular = _regular_for(cell, hours, raw_ot) if row.split else cell.expected
-                    TimeEntry.objects.create(
-                        employee=row.employee, date=cell.date, project=project, location=location,
-                        work_order_id=cell.work_order_id, hours=hours, expected_hours=regular,
-                        overtime_eligible=cell.eligible)
+                    with transaction.atomic():                       # the day and its hours go in together, or not at all
+                        if cell.pending_attendance:
+                            attendance_services.mark_attendance(
+                                row.employee, cell.date, Attendance.Status.PRESENT.value, project=project,
+                                location=location, remarks=f"From timesheet {project.code} / {location.name}"[:255],
+                                source=Attendance.Source.BULK)
+                        TimeEntry.objects.create(
+                            employee=row.employee, date=cell.date, project=project, location=location,
+                            work_order_id=cell.work_order_id, hours=hours, expected_hours=regular,
+                            overtime_eligible=cell.eligible)
                     done["created"] += 1
-                except (LaborError, IntegrityError) as exc:
+                    if cell.pending_attendance:
+                        done["marked"] += 1
+                except (LaborError, IntegrityError, attendance_services.AttendanceError) as exc:
                     skipped.append(f"{label}: {exc}")
-    return {"created": done["created"], "updated": done["updated"], "cleared": done["cleared"], "skipped": skipped}
+        return {"created": done["created"], "updated": done["updated"], "cleared": done["cleared"],
+            "marked": done["marked"], "skipped": skipped}
 
 
 def _period_entries(user, sheet, status):

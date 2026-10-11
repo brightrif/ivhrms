@@ -8,3 +8,7 @@ print(settings.TEMPLATES[0]['DIRS'])
 print((settings.BASE_DIR / 'templates/django/forms/field.html').exists())
 "
 ls -la templates/django/forms
+
+# grep the files
+
+grep -rn "add-many" apps/ --include=\*.py

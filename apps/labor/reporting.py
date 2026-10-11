@@ -6,6 +6,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
+import re
 
 from django.db.models import Q
 from django.utils import timezone
@@ -66,6 +67,8 @@ def show(kind, value):
         return f"{int(value):,}", True
     if kind == "hours":
         return f"{Decimal(value).quantize(TWO, ROUND_HALF_UP):,}", True
+    if kind == "hrs":                       # compact hours: 8, 10.5
+        return f"{Decimal(value).quantize(TWO, ROUND_HALF_UP).normalize():f}", True
     if kind == "money":
         return f"{Decimal(value).quantize(THREE, ROUND_HALF_UP):,}", True
     if kind == "date":
@@ -80,8 +83,12 @@ def display(table):
     return rows, total
 
 
-_STYLE = {"int": (xlsx.INT, xlsx.INT_BOLD), "hours": (xlsx.HOURS, xlsx.HOURS_BOLD),
-          "money": (xlsx.MONEY, xlsx.MONEY_BOLD), "date": (xlsx.DATE, xlsx.DATE), "text": (xlsx.DEFAULT, xlsx.TEXT_BOLD)}
+_STYLE = {"int": (xlsx.INT, xlsx.INT_BOLD), 
+          "hours": (xlsx.HOURS, xlsx.HOURS_BOLD),
+          "hrs": (xlsx.HOURS, xlsx.HOURS_BOLD),
+          "money": (xlsx.MONEY, xlsx.MONEY_BOLD), 
+          "date": (xlsx.DATE, xlsx.DATE), 
+          "text": (xlsx.DEFAULT, xlsx.TEXT_BOLD)}
 
 
 def to_xlsx(report):
@@ -109,7 +116,7 @@ def to_xlsx(report):
 def _native(kind, value):
     if kind == "money" and value is not None:
         return Decimal(value).quantize(THREE, ROUND_HALF_UP)
-    if kind == "hours" and value is not None:
+    if kind in ("hours", "hrs") and value is not None:
         return Decimal(value).quantize(TWO, ROUND_HALF_UP)
     return value
 
@@ -198,7 +205,111 @@ def manpower_report(user, first, last):
                    "A worker on several projects counts as one person on each project he worked for that day, "
                    "and his man-day is divided between them."])
 
+# ------------------------------------------------------------------ timesheet: each worker's hours across every project
 
+OFF_KINDS = (HOLIDAY, WEEKLY_OFF)
+
+def _sheet_title(code, site, used):
+    """A heading that is also a safe Excel sheet name: at most 31 characters, none of \\ / ? * : [ ], and not used twice."""
+    base = re.sub(r"[\\/*?:\[\]]", "-", f"{code} · {site}").strip()[:31] or "Project"
+    title, n = base, 2
+    while title in used:
+        tail = f" ({n})"
+        title, n = base[:31 - len(tail)] + tail, n + 1
+    used.add(title)
+    return title
+
+def timesheet_report(user, first, last, *, project=None, today=None):
+    """Hours for a period. The first table adds each worker's hours across every project; below it there is one table
+    per project and site, in the same layout, with only the hours on that project. HR checks them, prints them and sends
+    each project's table to its project manager. It has no money."""
+    today = today or timezone.localdate()
+    end = min(last, today)
+    by_emp = {p.employee_id: p for p in
+              LaborProfile.objects.for_user(user).select_related("employee", "trade", "contractor")}
+    days = [first + timedelta(days=i) for i in range((last - first).days + 1)]
+    worked, entries = defaultdict(dict), defaultdict(list)
+    if by_emp and end >= first:
+        ids = list(by_emp)
+        if project is None:              # attendance is per worker, not per project, so only the all-projects view uses it
+            for rec in Attendance.objects.filter(employee_id__in=ids, date__range=(first, end),
+                                                 status__in=Attendance.WORKED):
+                worked[rec.employee_id][rec.date] = Decimal(str(Attendance.DAY_FRACTION[rec.status]))
+        hours = (TimeEntry.objects.filter(employee_id__in=ids, date__range=(first, end))
+                 .select_related("project", "location"))
+        if project is not None:
+            hours = hours.filter(project=project)
+        for e in hours:
+            entries[e.employee_id].append(e)
+
+    show_days = len(days) <= 31
+    columns = ([Column("E.No"), Column("Name")]
+               + ([Column(f"{d.day} {d:%a}"[:6], "hrs") for d in days] if show_days else [])
+               + [Column("Total", "hrs"), Column("W.H", "hrs"), Column("O.T", "hrs")])
+
+    def make_table(title, people):
+        """people: (employee, hours per day, W.H, O.T) for each worker on the table."""
+        rows, day_totals = [], defaultdict(Decimal)
+        for emp, per_day, wh, ot in people:
+            for d, h in per_day.items():
+                day_totals[d] += h
+            rows.append([emp.employee_no, emp.full_name]
+                        + ([per_day.get(d) for d in days] if show_days else []) + [wh + ot, wh, ot])
+        start = len(columns) - 3
+        total = (["Total", ""] + ([day_totals.get(d) for d in days] if show_days else [])
+                 + [sum((r[i] for r in rows), ZERO) for i in range(start, start + 3)]) if rows else None
+        return Table(title, columns, rows, total)
+
+    everyone, per_project = [], defaultdict(dict)
+    missing_total = draft_total = 0
+    for emp_id in sorted(set(worked) | set(entries), key=lambda i: by_emp[i].employee.employee_no):
+        emp = by_emp[emp_id].employee
+        kinds = day_types(emp, first, end)
+        wh = ot_sum = ZERO
+        per_day = defaultdict(Decimal)
+        has_hours, drafts = set(), set()
+        for e in entries[emp_id]:
+            off = kinds.get(e.date) in OFF_KINDS
+            ot = ZERO if off else e.overtime_hours
+            wh_part = ZERO if off else e.hours - ot              # W.H: normal working hours
+            ot_part = e.hours if off else ot                     # O.T: overtime, plus every hour on a weekly off or holiday
+            wh, ot_sum = wh + wh_part, ot_sum + ot_part
+            per_day[e.date] += e.hours
+            has_hours.add(e.date)
+            if e.status == TimeEntry.Status.DRAFT:
+                drafts.add(e.date)
+            line = per_project[(e.project.code, e.location.name)].setdefault(
+                emp_id, [emp, defaultdict(Decimal), ZERO, ZERO])
+            line[1][e.date] += e.hours
+            line[2] += wh_part
+            line[3] += ot_part
+        missing_total += sum(1 for d in worked[emp_id] if d not in has_hours)
+        draft_total += len(drafts)
+        everyone.append((emp, per_day, wh, ot_sum))
+
+    tables = [] if project else [make_table("All projects", everyone)]
+    used = set() if project else {"All projects"}
+    for code, site in sorted(per_project):
+        tables.append(make_table(_sheet_title(code, site, used), list(per_project[(code, site)].values())))
+
+    notes = [(f"Only the hours on {project.code} are shown." if project else
+              "The first table adds each worker's hours across every project. Each project and site table below it shows only "
+              "the hours on that project, for the project manager to check."),
+             "W.H is normal working hours. O.T is overtime plus all hours worked on a weekly off or a holiday. "
+             "Total = W.H + O.T.",
+             "Hours come from the timesheets (draft and confirmed). Overtime is the hours above the day's expected hours, "
+             "for workers eligible for overtime. Approved overtime and its cost are in the cost report."]
+    if missing_total:
+        notes.append(f"{missing_total} worked day{'s' if missing_total != 1 else ''} "
+                     f"{'have' if missing_total != 1 else 'has'} no hours yet.")
+    if draft_total:
+        notes.append(f"{draft_total} day{'s' if draft_total != 1 else ''} of hours "
+                     f"{'are' if draft_total != 1 else 'is'} still draft (not confirmed).")
+    notes.append("Workers with nothing recorded in the period are left out.")
+    if last > today:
+        notes.append("Days after today are not counted.")
+    subtitle = f"{first:%d %b %Y} to {last:%d %b %Y}"
+    return Report("Labor timesheet", f"{project.code} · {subtitle}" if project else subtitle, tables, notes)
 # ------------------------------------------------------------------ cost: what the labor on each site costs
 
 @dataclass

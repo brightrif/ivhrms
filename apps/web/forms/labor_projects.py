@@ -50,10 +50,11 @@ class AddCrewForm(forms.Form):
     effective_from = forms.DateField(widget=date_input(), label="Starts on")
     profiles = forms.ModelMultipleChoiceField(queryset=LaborProfile.objects.none(), widget=forms.MultipleHiddenInput)
 
-    def __init__(self, *args, user, **kwargs):
+    def __init__(self, *args, user, exclude_projects=(), **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["project"].queryset = (Project.objects.filter(company__in=companies_for(user), status=Project.Status.ACTIVE,
-                                                                  location__isnull=False)
-                                           .select_related("company", "location").order_by("code"))
+                                                                location__isnull=False)
+                                        .exclude(pk__in=exclude_projects)
+                                        .select_related("company", "location").order_by("code"))
         self.fields["profiles"].queryset = LaborProfile.objects.for_user(user).select_related("employee", "company")
         self.initial.setdefault("effective_from", timezone.localdate())

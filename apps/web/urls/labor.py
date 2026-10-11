@@ -32,6 +32,7 @@ urlpatterns = [
     path("labor/reports/manpower/", labor_reports.report_manpower, name="labor_report_manpower"),
     path("labor/reports/cost/", labor_reports.report_cost, name="labor_report_cost"),
     path("labor/reports/contractor/", labor_reports.report_contractor, name="labor_report_contractor"),
+    path("labor/reports/timesheet/", labor_reports.report_timesheet, name="labor_report_timesheet"),
     path("labor/work-orders/", labor_sites.work_order_list, name="labor_work_order_list"),
     path("labor/work-orders/new/", labor_sites.work_order_create, name="labor_work_order_create"),
     path("labor/work-orders/<int:pk>/edit/", labor_sites.work_order_edit, name="labor_work_order_edit"),

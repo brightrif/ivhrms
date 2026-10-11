@@ -297,3 +297,11 @@ class ExcelTests(ReportCase):
     def test_one_sheet_per_table(self):
         names = openpyxl.load_workbook(io.BytesIO(reporting.to_xlsx(reporting.deployment_report(self.user, date(2026, 3, 3))))).sheetnames
         self.assertEqual(names, ["By site", "By trade", "By contractor"])
+
+class TimesheetReportTests(ReportCase):
+    def test_hours_are_split_into_working_and_overtime_and_missing_days_are_noted(self):
+        self.approve_ravi_overtime()                                  # Monday 10 h and Tuesday 11 h against an 8 h day
+        rep = reporting.timesheet_report(self.user, SUN, SAT)
+        row = next(r for r in rep.tables[0].rows if self.emp.employee_no in r)
+        self.assertEqual(row[-3:], [D("21"), D("16"), D("5")])           # total, W.H, O.T
+        self.assertTrue(any("4 worked days have no hours" in n for n in rep.notes))
