@@ -16,6 +16,7 @@ urlpatterns = [
     path("labor/<int:pk>/projects/add/", labor_projects.labor_project_add, name="labor_project_add"),
     path("labor/allocations/<int:pk>/remove/", labor_projects.labor_project_remove, name="labor_project_remove"),
     path("labor/projects/add-many/", labor_projects.labor_projects_add_many, name="labor_projects_add_many"),
+    path("labor/pay/bulk/", labor.labor_pay_bulk, name="labor_pay_bulk"),
     path("labor/<int:pk>/shared/", labor_projects.labor_shared_set, name="labor_shared_set"),
     path("labor/<int:pk>/release/", labor_sites.labor_release, name="labor_release"),
     path("labor/transfer/", labor_sites.labor_transfer, name="labor_transfer"),

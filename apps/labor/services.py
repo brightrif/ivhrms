@@ -18,13 +18,13 @@ class LaborError(Exception):
 
 def _check_terms(*, wage_basis, rate, standard_hours, engagement):
     if wage_basis not in WageBasis.values:
-        raise LaborError("Choose a daily wage or a monthly salary.")
+        raise LaborError("Choose hourly, daily or monthly pay.")
     if rate is None or Decimal(rate) <= 0:
         raise LaborError("The rate must be more than zero.")
     if standard_hours is None or not Decimal("1") <= Decimal(standard_hours) <= Decimal("24"):
         raise LaborError("Standard hours per day must be between 1 and 24.")
-    if engagement == Engagement.CONTRACTED and wage_basis != WageBasis.DAILY:
-        raise LaborError("Contracted workers are paid a daily rate.")
+    if engagement == Engagement.CONTRACTED and wage_basis == WageBasis.MONTHLY:
+        raise LaborError("Contracted workers are paid a daily rate or an hourly rate, not a monthly salary.")
 
 
 def _check_engagement(employee, engagement, contractor):
@@ -43,21 +43,31 @@ def _check_engagement(employee, engagement, contractor):
             raise LaborError(f"{contractor.name} is inactive. Choose another contractor or reactivate it first.")
 
 
+def _switches(overtime_eligible, weekend_premium, paid_holidays):
+    # Callers that do not pass the new switches keep the old behaviour: premium follows overtime, holidays unpaid.
+    return (overtime_eligible,
+            overtime_eligible if weekend_premium is None else weekend_premium,
+            False if paid_holidays is None else paid_holidays)
+
+
 def _open_profile(employee, *, engagement, contractor, trade, notes, wage_basis, rate, standard_hours,
-                  overtime_eligible, effective_from):
+                  overtime_eligible, effective_from, weekend_premium=None, paid_holidays=None):
     """Create the profile and its first rate for an employee that is already saved."""
     _check_engagement(employee, engagement, contractor)
     _check_terms(wage_basis=wage_basis, rate=rate, standard_hours=standard_hours, engagement=engagement)
     profile = LaborProfile.objects.create(employee=employee, engagement=engagement, contractor=contractor,
                                           trade=trade, notes=notes or "")
+    overtime_eligible, weekend_premium, paid_holidays = _switches(overtime_eligible, weekend_premium, paid_holidays)
     LaborRate.objects.create(profile=profile, wage_basis=wage_basis, rate=rate, standard_hours=standard_hours,
-                             overtime_eligible=overtime_eligible, effective_from=effective_from)
+                             overtime_eligible=overtime_eligible, weekend_premium=weekend_premium,
+                             paid_holidays=paid_holidays, effective_from=effective_from)
     return profile
 
 
 @transaction.atomic
 def create_labor_worker(employee, *, engagement, contractor=None, trade, notes="", wage_basis, rate,
-                        standard_hours=Decimal("8"), overtime_eligible=True):
+                        standard_hours=Decimal("8"), overtime_eligible=True, weekend_premium=None,
+                        paid_holidays=None):
     """Add a brand-new worker: the Employee record (numbered IV-L...) and the labor profile together.
     `employee` is a new, unsaved Employee. Any failure rolls both back, so no number is used up."""
     employee.worker_type = Employee.WorkerType.LABOR
@@ -69,18 +79,21 @@ def create_labor_worker(employee, *, engagement, contractor=None, trade, notes="
         raise LaborError(str(exc)) from exc
     return _open_profile(employee, engagement=engagement, contractor=contractor, trade=trade, notes=notes,
                          wage_basis=wage_basis, rate=rate, standard_hours=standard_hours,
-                         overtime_eligible=overtime_eligible, effective_from=employee.joining_date)
+                         overtime_eligible=overtime_eligible, effective_from=employee.joining_date,
+                         weekend_premium=weekend_premium, paid_holidays=paid_holidays)
 
 
 @transaction.atomic
 def setup_profile(employee, *, engagement, contractor=None, trade, notes="", wage_basis, rate,
-                  standard_hours=Decimal("8"), overtime_eligible=True, effective_from=None):
+                  standard_hours=Decimal("8"), overtime_eligible=True, effective_from=None,
+                  weekend_premium=None, paid_holidays=None):
     """Give an existing labor employee a profile (for workers added before this module existed)."""
     if LaborProfile.objects.filter(employee=employee).exists():
         raise LaborError("This worker already has a labor profile.")
     return _open_profile(employee, engagement=engagement, contractor=contractor, trade=trade, notes=notes,
                          wage_basis=wage_basis, rate=rate, standard_hours=standard_hours,
-                         overtime_eligible=overtime_eligible, effective_from=effective_from or employee.joining_date)
+                         overtime_eligible=overtime_eligible, effective_from=effective_from or employee.joining_date,
+                         weekend_premium=weekend_premium, paid_holidays=paid_holidays)
 
 
 @transaction.atomic
@@ -89,7 +102,7 @@ def update_profile(profile, *, engagement, contractor, trade, notes=""):
     profile = LaborProfile.objects.select_for_update().select_related("employee").get(pk=profile.pk)
     _check_engagement(profile.employee, engagement, contractor)
     current = profile.current_rate
-    if engagement == Engagement.CONTRACTED and current and current.wage_basis != WageBasis.DAILY:
+    if engagement == Engagement.CONTRACTED and current and current.wage_basis == WageBasis.MONTHLY:
         raise LaborError("Contracted workers are paid a daily rate. Change the pay to a daily rate first.")
     profile.engagement, profile.contractor, profile.trade, profile.notes = engagement, contractor, trade, notes or ""
     profile.save()
@@ -97,7 +110,8 @@ def update_profile(profile, *, engagement, contractor, trade, notes=""):
 
 
 @transaction.atomic
-def change_rate(profile, *, effective_from, wage_basis, rate, standard_hours, overtime_eligible):
+def change_rate(profile, *, effective_from, wage_basis, rate, standard_hours, overtime_eligible,
+                weekend_premium=None, paid_holidays=None):
     """Start new pay terms on a date. The old terms end the day before, so history is never rewritten."""
     profile = LaborProfile.objects.select_for_update().select_related("employee").get(pk=profile.pk)
     if profile.employee.status == Employee.Status.SEPARATED:
@@ -110,8 +124,45 @@ def change_rate(profile, *, effective_from, wage_basis, rate, standard_hours, ov
     if current:
         current.effective_to = effective_from - timedelta(days=1)
         current.save()
+    overtime_eligible, weekend_premium, paid_holidays = _switches(overtime_eligible, weekend_premium, paid_holidays)
     return LaborRate.objects.create(profile=profile, wage_basis=wage_basis, rate=rate, standard_hours=standard_hours,
-                                    overtime_eligible=overtime_eligible, effective_from=effective_from)
+                                    overtime_eligible=overtime_eligible, weekend_premium=weekend_premium,
+                                    paid_holidays=paid_holidays, effective_from=effective_from)
+
+
+@transaction.atomic
+def change_switches(profiles, *, effective_from, overtime_eligible=None, weekend_premium=None, paid_holidays=None):
+    """Change the pay switches of several workers from a date. A switch given as None stays as it is, and pay basis,
+    rate and standard hours are copied, so only the chosen switches change. Workers whose terms would not change are
+    left alone. All or nothing. Returns (changed, unchanged)."""
+    if overtime_eligible is None and weekend_premium is None and paid_holidays is None:
+        raise LaborError("Choose Yes or No for at least one switch.")
+    changed = unchanged = 0
+    problems = []
+    for profile in profiles:
+        number = profile.employee.employee_no
+        current = profile.rates.filter(effective_to__isnull=True).first()
+        if current is None:
+            problems.append(f"{number} has no pay terms yet")
+            continue
+        wanted = (current.overtime_eligible if overtime_eligible is None else overtime_eligible,
+                  current.weekend_premium if weekend_premium is None else weekend_premium,
+                  current.paid_holidays if paid_holidays is None else paid_holidays)
+        if wanted == (current.overtime_eligible, current.weekend_premium, current.paid_holidays):
+            unchanged += 1
+            continue
+        try:
+            change_rate(profile, effective_from=effective_from, wage_basis=current.wage_basis, rate=current.rate,
+                        standard_hours=current.standard_hours, overtime_eligible=wanted[0],
+                        weekend_premium=wanted[1], paid_holidays=wanted[2])
+        except LaborError as exc:
+            problems.append(f"{number}: {exc}")
+        else:
+            changed += 1
+    if problems:
+        more = f" (and {len(problems) - 3} more)" if len(problems) > 3 else ""
+        raise LaborError("Nobody was changed. " + " | ".join(problems[:3]) + more)
+    return changed, unchanged
 
 
 def rate_on(profile, on_date):

@@ -44,6 +44,13 @@ class Contractor(BaseModel):
     address = models.TextField(blank=True)
     notes = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    # Pre-fill for the workers this contractor supplies. Empty means HR must choose for every worker.
+    default_overtime = models.BooleanField(
+        "Overtime by default", null=True, blank=True,
+        help_text="What the worker form starts with for this contractor's workers. Leave empty to choose each time.")
+    default_weekend_premium = models.BooleanField(
+        "Friday and holiday premium by default", null=True, blank=True,
+        help_text="What the worker form starts with for this contractor's workers. Leave empty to choose each time.")
 
     objects = CompanyQuerySet.as_manager()
 
@@ -112,17 +119,25 @@ class LaborRate(BaseModel):
     class WageBasis(models.TextChoices):
         DAILY = "daily", "Daily wage"
         MONTHLY = "monthly", "Monthly salary"
+        HOURLY = "hourly", "Hourly"
 
     company = models.ForeignKey("organization.Company", on_delete=models.PROTECT, related_name="+", editable=False)
     profile = models.ForeignKey(LaborProfile, on_delete=models.CASCADE, related_name="rates")
     wage_basis = models.CharField(max_length=8, choices=WageBasis.choices, default=WageBasis.DAILY)
     rate = models.DecimalField("Rate (BHD)", max_digits=10, decimal_places=3,
                                validators=[MinValueValidator(Decimal("0.001"))],
-                               help_text="Per day for a daily wage, per month for a monthly salary.")
+                               help_text="Per hour, per day or per month, depending on the pay basis.")
     standard_hours = models.DecimalField("Standard hours per day", max_digits=4, decimal_places=2, default=Decimal("8"),
                                          validators=[MinValueValidator(Decimal("1")), MaxValueValidator(Decimal("24"))],
                                          help_text="Hours beyond this count as overtime.")
-    overtime_eligible = models.BooleanField(default=True)
+    overtime_eligible = models.BooleanField("Overtime", default=True)
+    weekend_premium = models.BooleanField(
+        "Friday and holiday premium", default=False,
+        help_text="Yes: Fridays (the weekly off) and public holidays are paid at the company's premium multiplier. "
+                  "No: those hours are paid like any other day.")
+    paid_holidays = models.BooleanField(
+        "Paid for holidays and paid leave", default=False,
+        help_text="Yes: public holidays and paid leave are paid at the standard hours even if not worked.")
     effective_from = models.DateField()
     effective_to = models.DateField(null=True, blank=True)
 

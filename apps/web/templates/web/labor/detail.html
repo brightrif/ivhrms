@@ -84,16 +84,18 @@
   <div class="card-header bg-white py-2"><span class="fw-semibold">Pay history</span></div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
-      <thead class="table-light"><tr><th>From</th><th>To</th><th>Basis</th><th class="text-end">Rate (BHD)</th><th class="text-end">Standard hours</th><th>Overtime</th></tr></thead>
+      <thead class="table-light"><tr><th>From</th><th>To</th><th>Basis</th><th class="text-end">Rate (BHD)</th><th class="text-end">Standard hours</th><th>Overtime</th><th>Friday / holiday premium</th><th>Paid holidays and leave</th></tr></thead>
       <tbody>
       {% for r in rates %}
         <tr>
           <td class="text-nowrap">{{ r.effective_from|date:"d M Y" }}</td>
           <td class="text-nowrap">{% if r.effective_to %}{{ r.effective_to|date:"d M Y" }}{% else %}<span class="badge text-bg-light border">Current</span>{% endif %}</td>
           <td>{{ r.get_wage_basis_display }}</td>
-          <td class="text-end">{{ r.rate|floatformat:3 }}</td>
+          <td class="text-end text-nowrap">{{ r.rate|floatformat:3 }} <small class="text-body-secondary">{% if r.wage_basis == "hourly" %}per hour{% elif r.wage_basis == "daily" %}per day{% else %}per month{% endif %}</small></td>
           <td class="text-end">{{ r.standard_hours|floatformat:"-2" }}</td>
           <td>{% if r.overtime_eligible %}Yes{% else %}No{% endif %}</td>
+          <td>{% if r.weekend_premium %}Yes{% else %}No{% endif %}</td>
+          <td>{% if r.paid_holidays %}Yes{% else %}No{% endif %}</td>
         </tr>
       {% endfor %}
       </tbody>

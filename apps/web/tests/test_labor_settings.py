@@ -27,11 +27,11 @@ class LaborScreensFollowSettings(SitePageCase):
 
     def test_the_add_worker_form_starts_with_the_chosen_defaults(self):
         form = self.client.get(self.url("labor_create")).context["form"]
-        self.assertEqual((form.initial["standard_hours"], form.initial["overtime_eligible"]), (D("8"), True))
+        self.assertEqual(form.initial["standard_hours"], D("8"))
+        self.assertNotIn("overtime_eligible", form.initial)        # HR must choose: nothing is pre-selected
         svc.set_value("labor.default_standard_hours", "9")
-        svc.set_value("labor.new_worker_overtime_eligible", "")
         form = self.client.get(self.url("labor_create")).context["form"]
-        self.assertEqual((form.initial["standard_hours"], form.initial["overtime_eligible"]), (D("9"), False))
+        self.assertEqual(form.initial["standard_hours"], D("9"))
         self.assertContains(self.client.get(self.url("labor_create")), 'value="9"')
 
     def test_an_explicit_choice_on_the_form_still_wins(self):

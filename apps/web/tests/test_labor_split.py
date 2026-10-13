@@ -20,12 +20,12 @@ class SplitPageCase(TimesheetPageCase):
 
 class TimesheetBoxTests(SplitPageCase):
     def test_no_overtime_box_for_a_worker_on_one_project(self):
-        self.assertNotContains(self.page(), f'name="o_{self.p.employee_id}_')
+        self.assertNotContains(self.page(), f'data-ot="o_{self.p.employee_id}_')
 
     def test_a_worker_on_two_projects_gets_the_box_and_the_split_link(self):
         self.join_second_project()
         page = self.page()
-        self.assertContains(page, f'name="o_{self.p.employee_id}_20260302"')
+        self.assertContains(page, f'data-ot="o_{self.p.employee_id}_20260302"')
         self.assertContains(page, self.url("labor_split"))
 
     def test_hours_with_overtime_are_saved_through_the_page(self):

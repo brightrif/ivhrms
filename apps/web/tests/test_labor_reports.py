@@ -148,7 +148,7 @@ class ScreenTests(ReportPageCase):
 
     def test_each_report_offers_the_excel_download_with_the_same_choices(self):
         page = self.cost(group="trade")
-        self.assertContains(page, "Export to Excel")
+        self.assertContains(page, "Excel")
         self.assertIn("group=trade", page.context["export_query"])
         self.assertIn("format=xlsx", page.context["export_query"])
 

@@ -48,7 +48,8 @@
 
 <form method="get" action="{% url 'web:labor_projects_add_many' %}">
 {% if can_allocate %}
-<div class="mb-2"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-geo-alt me-1"></i>Add ticked workers to a project</button></div>
+<div class="mb-2 d-flex flex-wrap gap-2"><button class="btn btn-outline-primary btn-sm"><i class="bi bi-geo-alt me-1"></i>Add ticked workers to a project</button>
+{% if perms.labor.add_laborrate %}<button class="btn btn-outline-primary btn-sm" formaction="{% url 'web:labor_pay_bulk' %}"><i class="bi bi-sliders me-1"></i>Change pay switches</button>{% endif %}</div>
 {% endif %}
 <div class="card shadow-sm border-0"><div class="table-responsive">
   <table class="table table-hover align-middle mb-0">

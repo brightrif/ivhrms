@@ -33,8 +33,6 @@ register(Module(
             Setting("labor.default_standard_hours", "Standard hours per day for new workers", "decimal", Decimal("8"),
                     help="What the form starts with when you add a worker. Hours beyond this count as overtime.",
                     minimum=Decimal("1"), maximum=Decimal("24")),
-            Setting("labor.new_worker_overtime_eligible", "New workers eligible for overtime by default", "bool", True,
-                    help="Only counts if the company pays overtime. It can be changed for each worker."),
         ]),
         Section(title="Timesheets", settings=[
             Setting("labor.timesheet_fill_standard", "Start with \"fill the day's standard hours\" chosen", "bool", False,

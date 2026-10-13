@@ -49,7 +49,7 @@ class LaborPageCase(TestCase):
     def new_worker_post(self, **over):
         data = {"company": self.co.pk, "first_name": "Sunil", "last_name": "K", "nationality": "Indian",
                 "phone": "3999", "joining_date": "2026-03-01", "engagement": "direct", "trade": self.mason.pk,
-                "wage_basis": "daily", "rate": "4.500", "standard_hours": "8", "overtime_eligible": "on"}
+                "wage_basis": "daily", "rate": "4.500", "standard_hours": "8", "overtime_eligible": "1", "weekend_premium": "1", "paid_holidays": "0"}
         data.update(over)
         return self.client.post(self.url("labor_create"), data)
 
@@ -123,7 +123,7 @@ class WorkerPageTests(LaborPageCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "no contractor")
         r = self.new_worker_post(engagement="contracted", wage_basis="monthly")
-        self.assertContains(r, "paid a daily rate")
+        self.assertContains(r, "paid hourly or by the day")
         r = self.new_worker_post(engagement="contracted", contractor=self.contractor.pk)      # this one is fine
         self.assertEqual(r.status_code, 302)
         self.assertEqual(Employee.objects.count(), 1)
@@ -161,7 +161,7 @@ class WorkerPageTests(LaborPageCase):
         self.assertEqual(form.status_code, 200)
         r = self.client.post(self.url("labor_setup", e.pk), {
             "engagement": "direct", "trade": self.mason.pk, "wage_basis": "monthly", "rate": "250.000",
-            "standard_hours": "8", "effective_from": "2025-05-01", "overtime_eligible": "on"})
+            "standard_hours": "8", "effective_from": "2025-05-01", "overtime_eligible": "1", "weekend_premium": "1", "paid_holidays": "0"})
         p = LaborProfile.objects.get(employee=e)
         self.assertRedirects(r, self.url("labor_detail", p.pk))
         self.assertNotContains(self.client.get(self.url("labor_list")), "without a labor profile")
@@ -196,21 +196,21 @@ class WorkerPageTests(LaborPageCase):
         p = self.worker(rate="5")
         r = self.client.post(self.url("labor_rate_change", p.pk), {
             "effective_from": "2026-07-01", "wage_basis": "daily", "rate": "6.000", "standard_hours": "9",
-            "overtime_eligible": "on"})
+            "overtime_eligible": "1", "weekend_premium": "1", "paid_holidays": "0"})
         self.assertRedirects(r, self.url("labor_detail", p.pk))
         detail = self.client.get(self.url("labor_detail", p.pk))
         self.assertContains(detail, "6.000")
         self.assertContains(detail, "5.000")                           # the old terms are still listed
         self.assertContains(detail, "30 Jun 2026")                      # and end the day before the new ones
         bad = self.client.post(self.url("labor_rate_change", p.pk), {
-            "effective_from": "2026-02-01", "wage_basis": "daily", "rate": "9.000", "standard_hours": "8"})
+            "effective_from": "2026-02-01", "wage_basis": "daily", "rate": "9.000", "standard_hours": "8", "overtime_eligible": "1", "weekend_premium": "1", "paid_holidays": "0"})
         self.assertContains(bad, "must start after")
         self.assertEqual(p.rates.count(), 2)
 
     def test_contracted_worker_is_offered_only_a_daily_rate(self):
         p = self.worker(engagement="contracted")
         form = self.client.get(self.url("labor_rate_change", p.pk)).context["form"]
-        self.assertEqual([c[0] for c in form.fields["wage_basis"].choices], ["daily"])
+        self.assertEqual([c[0] for c in form.fields["wage_basis"].choices], ["daily", "hourly"])
 
     def test_pages_for_a_worker_who_left_hide_the_change_buttons(self):
         p = self.worker()
@@ -218,7 +218,7 @@ class WorkerPageTests(LaborPageCase):
         page = self.client.get(self.url("labor_detail", p.pk))
         self.assertNotContains(page, self.url("labor_rate_change", p.pk))
         r = self.client.post(self.url("labor_rate_change", p.pk), {
-            "effective_from": "2026-07-01", "wage_basis": "daily", "rate": "6.000", "standard_hours": "8"})
+            "effective_from": "2026-07-01", "wage_basis": "daily", "rate": "6.000", "standard_hours": "8", "overtime_eligible": "1", "weekend_premium": "1", "paid_holidays": "0"})
         self.assertContains(r, "has left")
 
 

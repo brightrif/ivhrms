@@ -326,6 +326,18 @@ class Fact:
     ot_pending: Decimal = ZERO
 
 
+def _hourly_wage(entry, rate, kind, policy):
+    """What an hourly worker earns for the hours on one timesheet line, apart from overtime and premium: every hour at
+    the hourly rate except the hours that approved claims pay (those are counted as overtime, not as wages)."""
+    from .overtime import OvertimeClaim
+    from .overtime_services import KINDS, claim_terms
+
+    through_claims = ZERO
+    if policy is not None and policy.overtime_applies:
+        through_claims = claim_terms(entry, KINDS.get(kind, OvertimeClaim.DayKind.WORKING), policy, rate)[0]
+    return rate.rate * (entry.hours - through_claims)
+
+
 def collect_facts(user, first, last, *, company="", engagement="", contractor="", today=None):
     """Everything the cost reports add up, one Fact per worker, project, site and work order."""
     today = today or timezone.localdate()
@@ -399,7 +411,8 @@ def collect_facts(user, first, last, *, company="", engagement="", contractor=""
                     kinds[emp_id] = day_types(emp, first, end)
                 policy = policy_on(emp.company_id, d)
                 paid_as_overtime = (kinds[emp_id][d] in (HOLIDAY, WEEKLY_OFF) and policy is not None
-                                    and policy.overtime_applies and policy.all_hours_on_days_off)
+                                    and policy.overtime_applies and policy.all_hours_on_days_off
+                                    and rate.weekend_premium)
                 if not paid_as_overtime:
                     f.wages += rate.rate * fraction * share
 
@@ -425,9 +438,42 @@ def collect_facts(user, first, last, *, company="", engagement="", contractor=""
                         fact(emp, project, location, order).wages += wage * share
             d += timedelta(days=1)
 
+    # paid holidays and paid leave: a worker whose terms say so is paid the standard day for a public holiday or a day
+    # of paid leave that was not worked. A monthly salary already covers every calendar day, so it is left alone.
+    for emp_id in ids:
+        emp = by_emp[emp_id].employee
+        mine, shared = spans.get(emp_id, []), by_emp[emp_id].serves_all_projects
+        if not mine and not shared:
+            continue
+        d = max(first, emp.joining_date)
+        while d <= end:
+            rate = rate_on(emp_id, d)
+            if rate and rate.paid_holidays and rate.wage_basis != LaborRate.WageBasis.MONTHLY:
+                rec = attendance.get((emp_id, d))
+                if emp_id not in kinds:
+                    kinds[emp_id] = day_types(emp, first, end)
+                on_leave = rec is not None and rec.status == "paid_leave"
+                on_holiday = kinds[emp_id].get(d) == HOLIDAY and not (rec and rec.status in Attendance.WORKED)
+                covering = [a for a in mine if a.effective_from <= d and (a.effective_to is None or d <= a.effective_to)]
+                if (on_leave or on_holiday) and (covering or shared):
+                    wage = rate.rate if rate.wage_basis == LaborRate.WageBasis.DAILY else rate.rate * rate.standard_hours
+                    parts = attribution.parts(emp_id, d)
+                    if parts is None and covering:
+                        parts = [(covering[0].project, covering[0].location, covering[0].work_order, Decimal("1"))]
+                    for project, location, order, share in parts or ():
+                        fact(emp, project, location, order).wages += wage * share
+            d += timedelta(days=1)
+
     for entry in (TimeEntry.objects.filter(employee_id__in=ids, date__range=(first, end))
                   .select_related("project", "location", "work_order")):
-        fact(by_emp[entry.employee_id].employee, entry.project, entry.location, entry.work_order).hours += entry.hours
+        f = fact(by_emp[entry.employee_id].employee, entry.project, entry.location, entry.work_order)
+        f.hours += entry.hours
+        rate = rate_on(entry.employee_id, entry.date)
+        if rate and rate.wage_basis == LaborRate.WageBasis.HOURLY:          # an hourly worker costs hours x rate
+            if entry.employee_id not in kinds:
+                kinds[entry.employee_id] = day_types(by_emp[entry.employee_id].employee, first, end)
+            f.wages += _hourly_wage(entry, rate, kinds[entry.employee_id].get(entry.date),
+                                    policy_on(by_emp[entry.employee_id].employee.company_id, entry.date))
 
     for claim in (OvertimeClaim.objects.filter(employee_id__in=ids, date__range=(first, end))
                   .select_related("project", "location", "work_order")):
@@ -475,6 +521,15 @@ BASIS.append(
     "on each project's timesheet line. While no hours are entered the day is divided equally between the projects he is on "
     "(for a worker shared with every project, between the company's active projects): an estimate that firms up as hours "
     "are entered. Overtime is charged only to the project that asked for it.")
+BASIS.extend([
+    "Hourly workers: the hours on each project's own timesheet x the hourly rate, so the cost on a project is not an "
+    "estimate. Hours that approved overtime or Friday and holiday premium pays are counted as overtime, not as wages. "
+    "A worker with no overtime is paid every hour at the normal rate.",
+    "A worker without the Friday and holiday premium is paid a Friday or holiday like any other day. "
+    "A worker with it is paid those hours through overtime at the company's premium multiplier.",
+    "Workers with paid holidays and paid leave are paid the standard day for a public holiday or a day of paid leave "
+    "that was not worked (a monthly salary already covers every day).",
+])
 
 
 def _money(v):

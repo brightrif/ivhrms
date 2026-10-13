@@ -83,18 +83,41 @@ def realign_drafts(company, from_date):
     return changed
 
 
-def overtime_hours(entry, kind, policy):
+def _could_claim(entry, kind, rate):
+    """Quick check, before any rules are looked up: can this entry possibly produce a claim?
+    A worker's Friday and holiday premium counts even when the worker has no overtime."""
+    premium = entry.overtime_eligible if rate is None else rate.weekend_premium
+    if kind == Claim.DayKind.WORKING:
+        return entry.overtime_eligible and entry.hours > entry.expected_hours
+    return entry.overtime_eligible or premium
+
+
+def claim_terms(entry, kind, policy, rate=None):
+    """(hours, multiplier) to claim for one entry. The worker's own switches decide whether they are on the
+    company's multipliers at all; the multipliers themselves stay in the company's overtime rules.
+    With no rate given, the premium follows the overtime flag (the old behaviour)."""
+    overtime = entry.overtime_eligible
+    premium = overtime if rate is None else rate.weekend_premium
+    beyond = max(entry.hours - entry.expected_hours, ZERO)
+    if kind == Claim.DayKind.WORKING:
+        return (beyond if overtime else ZERO), policy.working_day_multiplier
+    if premium:                                       # Friday or holiday at the premium multiplier
+        return (entry.hours if policy.all_hours_on_days_off else beyond), policy.multiplier_for(kind)
+    if overtime:                                      # overtime but no premium: beyond the day, at the normal multiplier
+        return beyond, policy.working_day_multiplier
+    return ZERO, policy.working_day_multiplier
+
+
+def overtime_hours(entry, kind, policy, rate=None):
     """The hours of this entry that are paid as overtime."""
-    if not entry.overtime_eligible:
-        return ZERO
-    if kind != Claim.DayKind.WORKING and policy.all_hours_on_days_off:
-        return entry.hours
-    return max(entry.hours - entry.expected_hours, ZERO)
+    return claim_terms(entry, kind, policy, rate)[0]
 
 
 def hourly_rate(rate, policy):
     """The worker's pay for one hour. A daily wage is spread over the standard hours; a monthly salary over the
     days in a month first."""
+    if rate.wage_basis == LaborRate.WageBasis.HOURLY:         # an hourly rate already is the hour
+        return rate.rate.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
     per_day = rate.rate if rate.wage_basis == LaborRate.WageBasis.DAILY else rate.rate / policy.monthly_divisor
     return (per_day / rate.standard_hours).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
 
@@ -119,7 +142,8 @@ def prepare_claims(user, project, location, first, last):
             kinds[e.employee_id] = day_types(e.employee, first, last)
             rates[e.employee_id] = list(e.employee.labor_profile.rates.all())
         kind = KINDS.get(kinds[e.employee_id][e.date], Claim.DayKind.WORKING)
-        if not e.overtime_eligible or (kind == Claim.DayKind.WORKING and e.hours <= e.expected_hours):
+        rate = _rate_on(rates[e.employee_id], e.date)
+        if not _could_claim(e, kind, rate):
             continue                                  # no overtime is possible here, whatever the rules say
         policy = policy_on(e.employee.company, e.date)
         if policy is None:
@@ -127,14 +151,13 @@ def prepare_claims(user, project, location, first, last):
                              "Set it under Overtime > Rules first.")
         if not policy.overtime_applies:
             continue                                  # the company has decided it pays no overtime
-        hours = overtime_hours(e, kind, policy)
+        hours, multiplier = claim_terms(e, kind, policy, rate)
         if hours <= 0:
             continue
-        rate = _rate_on(rates[e.employee_id], e.date)
         if rate is None:
             skipped.append(f"{label}: no pay terms on that date")
             continue
-        hourly, multiplier = hourly_rate(rate, policy), policy.multiplier_for(kind)
+        hourly = hourly_rate(rate, policy)
         Claim.objects.create(
             entry=e, employee=e.employee, date=e.date, project=e.project, location=e.location, work_order=e.work_order,
             day_kind=kind, hours=hours, hourly_rate=hourly, multiplier=multiplier, policy=policy,

@@ -98,7 +98,7 @@ class AccessTests(SettingsPageCase):
         self.assertEqual(self.client.get(self.url("settings_module", "nonsense")).status_code, 404)
 
     def test_home_goes_to_the_first_tab_or_access(self):
-        self.assertRedirects(self.client.get(self.url("settings_home")), self.url("settings_module", "labor"),
+        self.assertRedirects(self.client.get(self.url("settings_home")), self.url("settings_module", "dependants"),            # the first tab
                              fetch_redirect_response=False)
 
 
@@ -122,9 +122,10 @@ class ModulePageTests(SettingsPageCase):
         self.assertContains(self.client.get(r.url), "Nothing changed")
 
     def test_a_switch_that_is_left_out_is_turned_off(self):
-        data = {"s__labor.default_standard_hours": "8", "s__labor.sheet_period": "week"}          # eligible box absent
+        svc.set_value("labor.timesheet_fill_standard", "on")
+        data = {"s__labor.default_standard_hours": "8", "s__labor.sheet_period": "week"}          # fill box absent
         self.client.post(self.url("settings_module", "labor"), data)
-        self.assertFalse(svc.get("labor.new_worker_overtime_eligible"))
+        self.assertFalse(svc.get("labor.timesheet_fill_standard"))
 
     def test_bad_values_save_nothing_and_are_shown_where_they_are(self):
         r = self.save_labor(**{"s__labor.default_standard_hours": "30", "s__labor.sheet_period": "year"})

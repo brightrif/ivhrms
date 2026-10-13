@@ -51,7 +51,7 @@ class AccessTests(TimesheetPageCase):
             page = self.page()
             self.assertEqual(page.status_code, 200, user.username)
             self.assertNotContains(page, 'name="h_')
-            self.assertNotContains(page, "Save hours")
+            self.assertNotContains(page, 'name="action" value="save"')
             self.assertNotContains(page, "Confirm period")
             for action in ("save", "confirm", "reopen"):
                 self.assertEqual(self.post(action=action, fill="standard").status_code, 403, (user.username, action))
@@ -84,7 +84,7 @@ class SheetTests(TimesheetPageCase):
     def test_grid_offers_boxes_only_on_worked_days_with_the_expected_hours_as_a_hint(self):
         page = self.page()
         self.assertContains(page, f'name="{self.key(MON)}"')
-        self.assertNotContains(page, f'name="{self.key(date(2026, 3, 6))}"')          # the Friday off
+        self.assertContains(page, f'name="{self.key(date(2026, 3, 6))}"')          # the Friday off is open too
         self.assertContains(page, 'placeholder="8"')
         self.assertContains(page, "Save hours")
 
@@ -97,7 +97,7 @@ class SheetTests(TimesheetPageCase):
         self.assertEqual((e.hours, e.overtime_hours, e.project, e.location), (D("10.5"), D("2.5"), self.p1, self.site1))
         self.assertEqual(TimeEntry.objects.filter(employee=self.p.employee).count(), 6)
         page = self.page()
-        self.assertContains(page, "border-warning")                                    # the overtime day is outlined
+        self.assertContains(page, "ts-ot")                                             # the overtime day is outlined
         self.assertEqual(page.context["sheet"].overtime, D("2.5"))
         self.assertEqual(page.context["sheet"].hours, D("10.5") + 5 * 8)
 
@@ -140,7 +140,7 @@ class SheetTests(TimesheetPageCase):
 
     def test_a_forged_action_or_cell_does_nothing(self):
         self.assertEqual(self.post(action="delete_everything").status_code, 403)
-        self.post(**{f"h_999999_20260302": "8", self.key(date(2026, 3, 6)): "8"})
+        self.post(**{f"h_999999_20260302": "8", self.key(date(2026, 3, 9)): "8"})
         self.assertEqual(TimeEntry.objects.count(), 0)
 
     def test_period_controls_and_defaults(self):

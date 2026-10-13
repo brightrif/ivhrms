@@ -1,3 +1,4 @@
+import json
 from decimal import Decimal
 
 from django import forms
@@ -17,12 +18,22 @@ DAILY = LaborRate.WageBasis.DAILY
 
 def _worker_defaults():
     """What the add-worker forms start with, from Settings."""
-    return {"standard_hours": settings_service.get("labor.default_standard_hours"),
-            "overtime_eligible": settings_service.get("labor.new_worker_overtime_eligible")}
+    return {"standard_hours": settings_service.get("labor.default_standard_hours")}
 
 
 def _contractor_label(c):
     return f"{c.name} ({c.company.code})"
+
+
+def _yes_no(label, help_text=""):
+    # Radio buttons with nothing pre-selected, so HR has to choose and nobody gets the wrong terms by accident.
+    return forms.TypedChoiceField(choices=[("1", "Yes"), ("0", "No")], coerce=lambda v: v == "1",
+                                  widget=forms.RadioSelect, label=label, help_text=help_text,
+                                  error_messages={"required": "Choose Yes or No."})
+
+
+def _yn(value):
+    return "1" if value else "0"
 
 
 class _EngagementForm(forms.Form):
@@ -40,7 +51,11 @@ class _EngagementForm(forms.Form):
         self.fields["contractor"].label_from_instance = _contractor_label
 
     def _set_choices(self, contractors, current_trade=None):
-        self.fields["contractor"].queryset = contractors.filter(is_active=True).select_related("company")
+        qs = contractors.filter(is_active=True).select_related("company")
+        self.fields["contractor"].queryset = qs
+        # read by the script in form_layout.html to pre-fill the switches when a contractor is chosen
+        self.fields["contractor"].widget.attrs["data-defaults"] = json.dumps({
+            str(c.pk): {"overtime": c.default_overtime, "premium": c.default_weekend_premium} for c in qs})
         trades = Trade.objects.filter(Q(is_active=True) | Q(pk=current_trade.pk if current_trade else None))
         self.fields["trade"].queryset = trades.order_by("name")
 
@@ -49,8 +64,8 @@ class _EngagementForm(forms.Form):
         engagement, contractor = cd.get("engagement"), cd.get("contractor")
         if engagement == "direct" and contractor:
             self.add_error("contractor", "A direct employee has no contractor. Choose 'Contracted' or clear this.")
-        if engagement == "contracted" and cd.get("wage_basis") not in (None, DAILY):
-            self.add_error("wage_basis", "Contracted workers are paid a daily rate.")
+        if engagement == "contracted" and cd.get("wage_basis") == "monthly":
+            self.add_error("wage_basis", "Contracted workers are paid hourly or by the day.")
         return cd
 
 
@@ -58,11 +73,16 @@ class _TermsForm(forms.Form):
     """What the worker is paid."""
     wage_basis = forms.ChoiceField(choices=LaborRate.WageBasis.choices, initial=DAILY, label="Pay basis")
     rate = forms.DecimalField(min_value=Decimal("0.001"), max_digits=10, decimal_places=3, label="Rate (BHD)",
-                              help_text="Per day for a daily wage, per month for a monthly salary.")
+                              help_text="Per hour, per day or per month, depending on the pay basis.")
     standard_hours = forms.DecimalField(min_value=Decimal("1"), max_value=Decimal("24"), max_digits=4,
                                         decimal_places=2, initial=Decimal("8"), label="Standard hours per day",
                                         help_text="Hours beyond this count as overtime.")
-    overtime_eligible = forms.BooleanField(required=False, initial=True, label="Eligible for overtime")
+    overtime_eligible = _yes_no("Overtime", "Yes: hours beyond the standard day are paid at the overtime multiplier. "
+                                             "No: every hour is paid at the normal hourly rate.")
+    weekend_premium = _yes_no("Friday and holiday premium",
+                              "Yes: Fridays and public holidays are paid at the company premium multiplier.")
+    paid_holidays = _yes_no("Paid for holidays and paid leave",
+                            "Yes: public holidays and paid leave are paid at the standard hours.")
 
 
 class LaborWorkerForm(NationalityMixin, _EngagementForm, _TermsForm):
@@ -124,19 +144,57 @@ class RateForm(_TermsForm):
         current = profile.current_rate
         if current:
             self.initial.update(wage_basis=current.wage_basis, rate=current.rate,
-                                standard_hours=current.standard_hours, overtime_eligible=current.overtime_eligible)
+                                standard_hours=current.standard_hours, overtime_eligible=_yn(current.overtime_eligible),
+                                weekend_premium=_yn(current.weekend_premium),
+                                paid_holidays=_yn(current.paid_holidays))
             self.fields["effective_from"].widget.attrs["data-min"] = (current.effective_from).isoformat()
         self.initial.setdefault("effective_from", timezone.localdate())
         if profile.engagement == "contracted":                 # contracted workers are always paid by the day
-            self.fields["wage_basis"].choices = [(DAILY, "Daily wage")]
-            self.initial["wage_basis"] = DAILY
+            self.fields["wage_basis"].choices = [c for c in LaborRate.WageBasis.choices
+                                                 if c[0] != LaborRate.WageBasis.MONTHLY]
+            if self.initial.get("wage_basis") not in (DAILY, LaborRate.WageBasis.HOURLY):
+                self.initial["wage_basis"] = DAILY
+
+
+_KEEP_YES_NO = [("", "Leave as it is"), ("1", "Yes"), ("0", "No")]
+
+
+def _change_choice(label):
+    return forms.TypedChoiceField(choices=_KEEP_YES_NO, required=False, coerce=lambda v: v == "1",
+                                  empty_value=None, label=label)
+
+
+class BulkSwitchesForm(forms.Form):
+    """The pay switches of several ticked workers, from one date. A switch left as it is stays as it is."""
+    profiles = forms.ModelMultipleChoiceField(queryset=LaborProfile.objects.none(), widget=forms.MultipleHiddenInput)
+    effective_from = forms.DateField(widget=date_input(), label="Starts on")
+    overtime_eligible = _change_choice("Overtime")
+    weekend_premium = _change_choice("Friday and holiday premium")
+    paid_holidays = _change_choice("Paid for holidays and paid leave")
+
+    def __init__(self, *args, user, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["profiles"].queryset = LaborProfile.objects.for_user(user).select_related("employee")
+        self.initial.setdefault("effective_from", timezone.localdate())
+
+    def clean(self):
+        cd = super().clean()
+        if not self.errors and all(cd.get(n) is None for n in ("overtime_eligible", "weekend_premium", "paid_holidays")):
+            raise forms.ValidationError("Choose Yes or No for at least one switch.")
+        return cd
+
+
+_DEFAULT_CHOICES = [("", "No default (HR chooses each time)"), ("True", "Yes"), ("False", "No")]
 
 
 class ContractorForm(forms.ModelForm):
     class Meta:
         model = Contractor
-        fields = ["company", "name", "name_ar", "cr_number", "contact_person", "phone", "email", "address", "notes"]
-        widgets = {"address": forms.Textarea(attrs={"rows": 2}), "notes": forms.Textarea(attrs={"rows": 2})}
+        fields = ["company", "name", "name_ar", "cr_number", "contact_person", "phone", "email", "address", "notes",
+                  "default_overtime", "default_weekend_premium"]
+        widgets = {"address": forms.Textarea(attrs={"rows": 2}), "notes": forms.Textarea(attrs={"rows": 2}),
+                   "default_overtime": forms.Select(choices=_DEFAULT_CHOICES),
+                   "default_weekend_premium": forms.Select(choices=_DEFAULT_CHOICES)}
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)

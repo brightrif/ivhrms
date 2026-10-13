@@ -41,8 +41,8 @@ class BuildTests(TimeCase):
         c = self.cell(MON)
         self.assertTrue(c.can_enter)
         self.assertEqual((c.expected, c.eligible), (D("8.00"), True))
-        self.assertFalse(self.cell(FRI).can_enter)                          # the weekly off: no attendance, nothing worked
-        self.assertIsNone(self.cell(FRI).expected)
+        self.assertTrue(self.cell(FRI).can_enter)                           # the weekly off is open too: saving hours marks it present
+        self.assertEqual(self.cell(FRI).expected, D("8.00"))
 
     def test_half_days_expect_half_the_hours_and_absent_days_take_none(self):
         deployment.allocate(self.b_worker(), project=self.p1, location=self.site1, effective_from=date(2026, 1, 5))
@@ -129,7 +129,7 @@ class SaveHoursTests(TimeCase):
         other = self.make_other("Imran")
         deployment.allocate(other, project=self.p2, location=self.site2, effective_from=date(2026, 1, 5))
         self.hours({self.hkey(other, MON): "8",                         # another site's worker
-                    self.hkey(self.emp, FRI): "8",                      # a day that was not worked
+                    self.hkey(self.emp, date(2026, 3, 9)): "8",       # a day outside the period
                     "h_999999_20260302": "8"})
         self.assertEqual(TimeEntry.objects.count(), 0)
 

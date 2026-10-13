@@ -262,7 +262,7 @@ class NoOvertimeCompanyPageTests(OvertimePageCase):
     def test_the_other_company_is_unaffected(self):
         page = self.timesheet(self.site_key)
         self.assertEqual(page.context["sheet"].overtime_mode, "applies")
-        self.assertContains(page, "Overtime hours")
+        self.assertContains(page, "Overtime <strong")
         self.assertNotContains(page, "does not pay overtime")
         self.assertEqual(page.context["sheet"].overtime, D("5"))                    # 2 hours on Monday, 3 on Tuesday
 

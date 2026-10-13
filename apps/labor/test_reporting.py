@@ -303,5 +303,5 @@ class TimesheetReportTests(ReportCase):
         self.approve_ravi_overtime()                                  # Monday 10 h and Tuesday 11 h against an 8 h day
         rep = reporting.timesheet_report(self.user, SUN, SAT)
         row = next(r for r in rep.tables[0].rows if self.emp.employee_no in r)
-        self.assertEqual(row[-3:], [D("21"), D("16"), D("5")])           # total, W.H, O.T
-        self.assertTrue(any("4 worked days have no hours" in n for n in rep.notes))
+        self.assertEqual(row[-3:], [D("53"), D("48"), D("5")])           # total, W.H, O.T: confirming fills every worked day
+        self.assertFalse(any("have no hours" in n for n in rep.notes))    # none are missing once the period is confirmed

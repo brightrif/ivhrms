@@ -191,8 +191,9 @@ class EmployeeDocumentPageTests(ComplianceCase):
     def test_types_page_shows_both_kinds_and_new_employee_types_work(self):
         page = self.client.get(reverse("web:compliance_types")).content.decode()
         company_part, employee_part = page.split("Employee documents</span>", 1)
+        company_card = company_part.split("Dependant documents</span>", 1)[0]    # the company card only
         self.assertIn("Commercial Registration", company_part)
-        self.assertNotIn("Passport", company_part)                                          # each kind has its own card
+        self.assertNotIn("Passport", company_card)                                          # each kind has its own card
         self.assertIn("Passport", employee_part)
         self.assertIn("Residence Permit", employee_part)
         self.assertEqual(employee_part.count(">Required</span>"), 5)

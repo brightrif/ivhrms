@@ -16,6 +16,7 @@ from apps.organization.services import companies_for
 
 from apps.web.access import hr_perm
 from apps.web.forms.labor import (
+    BulkSwitchesForm,
     ContractorForm,
     LaborWorkerForm,
     ProfileEditForm,
@@ -33,23 +34,27 @@ LAYOUTS = {
          "rows": [["company"], ["first_name", "last_name"], ["nationality", "phone"], ["joining_date"]]},
         _ENGAGEMENT,
         {"title": "Pay", "width": "col-lg-4",
-         "rows": [["wage_basis", "rate"], ["standard_hours"], ["overtime_eligible"]]},
+         "rows": [["wage_basis", "rate"], ["standard_hours"], ["overtime_eligible"], ["weekend_premium"], ["paid_holidays"]]},
     ],
     "setup": [
         _ENGAGEMENT,
         {"title": "Pay", "width": "col-lg-4",
-         "rows": [["effective_from"], ["wage_basis", "rate"], ["standard_hours"], ["overtime_eligible"]]},
+         "rows": [["effective_from"], ["wage_basis", "rate"], ["standard_hours"], ["overtime_eligible"], ["weekend_premium"], ["paid_holidays"]]},
     ],
     "edit": [{"title": "Engagement", "width": "col-lg-5",
               "rows": [["engagement"], ["contractor"], ["trade"], ["notes"]]}],
     "rate": [{"title": "New pay terms", "width": "col-lg-6",
-              "rows": [["effective_from", "wage_basis"], ["rate", "standard_hours"], ["overtime_eligible"]]}],
+              "rows": [["effective_from", "wage_basis"], ["rate", "standard_hours"], ["overtime_eligible"], ["weekend_premium"], ["paid_holidays"]]}],
     "contractor": [
         {"title": "Contractor", "width": "col-lg-7",
          "rows": [["company", "name"], ["name_ar", "cr_number"], ["contact_person", "phone", "email"]]},
-        {"title": "More", "width": "col-lg-5", "rows": [["address"], ["notes"]]},
+        {"title": "More", "width": "col-lg-5",
+         "rows": [["address"], ["notes"], ["default_overtime", "default_weekend_premium"]]},
     ],
     "trade": [{"title": "Trade", "width": "col-lg-7", "rows": [["code", "name", "name_ar"]]}],
+    "pay_bulk": [{"title": "New pay switches", "width": "col-lg-5",
+                  "rows": [["effective_from"], ["overtime_eligible"], ["weekend_premium"], ["paid_holidays"],
+                           ["profiles"]]}],
 }
 
 
@@ -138,7 +143,7 @@ def labor_create(request):
             profile = services.create_labor_worker(
                 employee, engagement=cd["engagement"], contractor=cd["contractor"], trade=cd["trade"],
                 notes=cd["notes"], wage_basis=cd["wage_basis"], rate=cd["rate"],
-                standard_hours=cd["standard_hours"], overtime_eligible=cd["overtime_eligible"])
+                standard_hours=cd["standard_hours"], overtime_eligible=cd["overtime_eligible"], weekend_premium=cd["weekend_premium"], paid_holidays=cd["paid_holidays"])
         except services.LaborError as exc:
             form.add_error(None, str(exc))
         else:
@@ -161,7 +166,7 @@ def labor_setup(request, employee_pk):
             profile = services.setup_profile(
                 employee, engagement=cd["engagement"], contractor=cd["contractor"], trade=cd["trade"],
                 notes=cd["notes"], wage_basis=cd["wage_basis"], rate=cd["rate"],
-                standard_hours=cd["standard_hours"], overtime_eligible=cd["overtime_eligible"],
+                standard_hours=cd["standard_hours"], overtime_eligible=cd["overtime_eligible"], weekend_premium=cd["weekend_premium"], paid_holidays=cd["paid_holidays"],
                 effective_from=cd["effective_from"])
         except services.LaborError as exc:
             form.add_error(None, str(exc))
@@ -200,7 +205,7 @@ def labor_rate_change(request, pk):
         try:
             services.change_rate(profile, effective_from=cd["effective_from"], wage_basis=cd["wage_basis"],
                                  rate=cd["rate"], standard_hours=cd["standard_hours"],
-                                 overtime_eligible=cd["overtime_eligible"])
+                                 overtime_eligible=cd["overtime_eligible"], weekend_premium=cd["weekend_premium"], paid_holidays=cd["paid_holidays"])
         except services.LaborError as exc:
             form.add_error(None, str(exc))
         else:
@@ -208,6 +213,41 @@ def labor_rate_change(request, pk):
             return redirect(back)
     return _form_page(request, form, f"Change pay: {profile.employee.full_name}", back, "rate",
                       intro="The current terms end the day before the new ones start.")
+
+
+@hr_perm("labor.add_laborrate")
+def labor_pay_bulk(request):
+    """Change the pay switches of several workers at once, from a date. The Workers list sends the ticked workers here."""
+    if request.method == "POST":
+        ids = [i for i in request.POST.getlist("profiles") if i.isdigit()]
+        form = BulkSwitchesForm(request.POST, user=request.user)
+    else:
+        ids = [i for i in request.GET.getlist("profiles") if i.isdigit()]
+        if not ids:
+            messages.error(request, "Tick at least one worker first.")
+            return redirect("web:labor_list")
+        form = BulkSwitchesForm(user=request.user, initial={"profiles": ids})
+    people = list(LaborProfile.objects.for_user(request.user).filter(pk__in=ids)
+                  .select_related("employee").order_by("employee__employee_no"))
+    if request.method == "POST" and form.is_valid():
+        cd = form.cleaned_data
+        try:
+            changed, unchanged = services.change_switches(
+                sorted(cd["profiles"], key=lambda p: p.employee.employee_no), effective_from=cd["effective_from"],
+                overtime_eligible=cd["overtime_eligible"], weekend_premium=cd["weekend_premium"],
+                paid_holidays=cd["paid_holidays"])
+        except services.LaborError as exc:
+            form.add_error(None, str(exc))
+        else:
+            note = f" {unchanged} already had these choices." if unchanged else ""
+            messages.success(request, f"Pay switches changed for {changed} worker{'s' if changed != 1 else ''}, "
+                                      f"from {cd['effective_from']:%d %b %Y}.{note}")
+            return redirect("web:labor_list")
+    names = ", ".join(p.employee.full_name for p in people[:8]) + (
+        f" and {len(people) - 8} more" if len(people) > 8 else "")
+    return _form_page(request, form, "Change pay switches", reverse("web:labor_list"), "pay_bulk",
+                      intro=f"{len(people)} worker{'s' if len(people) != 1 else ''}: {names}. Pay basis, rate and "
+                            "standard hours stay as they are. The current terms end the day before.")
 
 
 # ------------------------------------------------------------------ contractors

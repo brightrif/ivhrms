@@ -39,4 +39,51 @@
     <a class="btn btn-outline-secondary" href="{{ back_url }}">Cancel</a>
   </div>
 </form>
+
+<script>
+  // Labor pay forms only. Does nothing on other forms.
+  (function () {
+    // 1. The rate label and hint follow the pay basis.
+    var basis = document.getElementById("id_wage_basis"), rate = document.getElementById("id_rate");
+    if (basis && rate) {
+      var TEXT = {
+        hourly: ["Rate (BHD per hour)", "Paid for each hour worked."],
+        daily: ["Rate (BHD per day)", "Paid for each day worked. The hourly rate is this divided by the standard hours."],
+        monthly: ["Rate (BHD per month)", "Monthly salary. The hourly rate is this divided by the days in a month and the standard hours."]
+      };
+      var label = document.querySelector('label[for="id_rate"]'), help = document.getElementById("id_rate_helptext");
+      var relabel = function () {
+        var t = TEXT[basis.value];
+        if (!t) return;
+        if (label) label.textContent = t[0] + (/:\s*$/.test(label.textContent) ? ":" : "");
+        if (help) help.textContent = t[1];
+      };
+      basis.addEventListener("change", relabel);
+      relabel();
+    }
+
+    // 2. Choosing a contractor pre-fills the overtime and premium switches from that contractor's defaults.
+    //    A switch that HR has already clicked is never overwritten, and HR can always change it.
+    var contractor = document.getElementById("id_contractor");
+    if (contractor && contractor.dataset.defaults) {
+      var defaults = JSON.parse(contractor.dataset.defaults), touched = {};
+      var radios = function (name) { return document.querySelectorAll('input[name="' + name + '"]'); };
+      ["overtime_eligible", "weekend_premium"].forEach(function (name) {
+        radios(name).forEach(function (r) { r.addEventListener("click", function () { touched[name] = true; }); });
+      });
+      var setSwitch = function (name, value) {
+        if (value === null || value === undefined || touched[name]) return;
+        radios(name).forEach(function (r) { r.checked = (r.value === (value ? "1" : "0")); });
+      };
+      var apply = function () {
+        var d = defaults[contractor.value];
+        if (!d) return;
+        setSwitch("overtime_eligible", d.overtime);
+        setSwitch("weekend_premium", d.premium);
+      };
+      contractor.addEventListener("change", apply);
+      if (!document.querySelector('input[name="overtime_eligible"]:checked')) apply();
+    }
+  })();
+</script>
 {% endblock %}
