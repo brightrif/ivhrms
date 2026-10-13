@@ -10,7 +10,7 @@ from apps.core.models import BaseModel
 from apps.core.scoping import CompanyQuerySet
 
 from .storage import attachment_path
-
+from . import visa  # noqa: E402,F401  (the visa request models)
 
 @audited(module="dependants", company="company_id", subject="employee_id")
 class Dependant(BaseModel):

@@ -1,0 +1,45 @@
+{% extends "web/base.html" %}
+{% block title %}Visa costs{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Staff</h1>
+</div>
+{% include "web/staff/_tabs.html" with tab="family" %}
+{% include "web/family/_sections.html" with section="costs" %}
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-auto">
+    <select name="year" class="form-select" onchange="this.form.submit()">
+      {% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}
+    </select>
+  </div>
+</form>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0"><div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Company</th><th>Request</th><th class="text-end">Payments</th><th class="text-end">Government</th><th class="text-end">Service</th><th class="text-end">Fines</th><th class="text-end">Total (BHD)</th><th class="text-end">Charged to employees</th></tr>
+      </thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td>{{ row.company.name }}</td><td>{{ row.kind }}</td><td class="text-end">{{ row.count }}</td>
+          <td class="text-end">{{ row.government|floatformat:3 }}</td><td class="text-end">{{ row.service|floatformat:3 }}</td>
+          <td class="text-end">{{ row.fine|floatformat:3 }}</td><td class="text-end fw-medium">{{ row.total|floatformat:3 }}</td>
+          <td class="text-end">{{ row.charged|floatformat:3 }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" class="text-center text-body-secondary py-4">No visa costs recorded in {{ year }}.</td></tr>
+      {% endfor %}
+      </tbody>
+      {% if rows %}
+      <tfoot class="table-light">
+        <tr><th colspan="3">All</th><th class="text-end">{{ grand.government|floatformat:3 }}</th><th class="text-end">{{ grand.service|floatformat:3 }}</th>
+            <th class="text-end">{{ grand.fine|floatformat:3 }}</th><th class="text-end">{{ grand.total|floatformat:3 }}</th><th class="text-end">{{ grand.charged|floatformat:3 }}</th></tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div></div>
+</div>
+{% endblock %}

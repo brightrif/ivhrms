@@ -1,0 +1,106 @@
+{% extends "web/base.html" %}
+{% block title %}{{ r.title }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h1 class="mb-0">{{ r.get_kind_display }}: {{ dep.full_name }}
+      <span class="fs-6 align-middle">{% include "web/family/_request_status.html" with s=r.status label=r.get_status_display %}</span></h1>
+    <div class="text-body-secondary">{{ dep.get_relationship_display }} of {{ r.employee.full_name }}
+      <span class="small">({{ r.employee.employee_no }})</span></div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    {% if can_submit %}<a class="btn btn-outline-primary" href="{% url 'web:employee_family_request_submitted' r.pk %}">Mark as submitted</a>{% endif %}
+    {% if can_complete %}<a class="btn btn-primary" href="{% url 'web:employee_family_request_complete' r.pk %}">{% if r.kind == 'cancellation' %}Record the cancellation{% else %}Record the issued visa{% endif %}</a>{% endif %}
+    {% if can_withdraw %}
+    <form method="post" action="{% url 'web:employee_family_request_withdraw' r.pk %}" onsubmit="return confirm('Withdraw this request?');">
+      {% csrf_token %}<button class="btn btn-outline-danger">Withdraw</button>
+    </form>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{% url 'web:employee_family_detail' dep.pk %}">Family member</a>
+  </div>
+</div>
+{% include "web/staff/_tabs.html" with tab="family" %}
+{% include "web/family/_sections.html" with section="requests" %}
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>Request</h2>
+      <dl class="row mb-0">
+        <dt class="col-5">Asked by</dt><dd class="col-7">{{ r.requested_by.get_full_name|default:r.requested_by.get_username }}</dd>
+        <dt class="col-5">Asked on</dt><dd class="col-7">{{ r.created_at|date:"d M Y" }}</dd>
+        <dt class="col-5">Reason</dt><dd class="col-7">{{ r.reason|default:"-"|linebreaksbr }}</dd>
+        {% if r.submitted_on %}<dt class="col-5">Submitted</dt><dd class="col-7">{{ r.submitted_on|date:"d M Y" }}{% if r.reference %} &middot; {{ r.reference }}{% endif %}</dd>{% endif %}
+        {% if r.completed_on %}<dt class="col-5">Completed</dt><dd class="col-7">{{ r.completed_on|date:"d M Y" }}</dd>{% endif %}
+        {% if r.visa_document %}<dt class="col-5">Visa</dt><dd class="col-7"><a href="{% url 'web:compliance_detail' r.visa_document.pk %}">{{ r.visa_document.number|default:"Open the document" }}</a> &middot; expires {{ r.visa_document.expiry_date|date:"d M Y" }}</dd>{% endif %}
+      </dl>
+    </div></div>
+
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>Approval</h2>
+      <ul class="list-unstyled mb-0">
+      {% for row in trail %}
+        <li class="d-flex gap-2 mb-2">
+          {% if row.state == 'approved' %}<i class="bi bi-check-circle-fill text-success"></i>
+          {% elif row.state == 'rejected' %}<i class="bi bi-x-circle-fill text-danger"></i>
+          {% elif row.state == 'waiting' %}<i class="bi bi-hourglass-split text-warning"></i>
+          {% else %}<i class="bi bi-circle text-body-secondary"></i>{% endif %}
+          <div>
+            <div class="fw-medium">{{ row.step.name }}</div>
+            <div class="small text-body-secondary">
+              {% if row.action %}{{ row.state|capfirst }} by {{ row.action.actor.get_full_name|default:row.action.actor.get_username }}, {{ row.action.acted_at|date:"d M Y H:i" }}
+                {% if row.action.comment %}<div>&ldquo;{{ row.action.comment }}&rdquo;</div>{% endif %}
+              {% elif row.state == 'waiting' %}Waiting for this approval
+              {% elif row.state == 'later' %}Next
+              {% else %}Not reached{% endif %}
+            </div>
+          </div>
+        </li>
+      {% empty %}<li class="text-body-secondary">No approval record.</li>{% endfor %}
+      </ul>
+    </div></div>
+  </div>
+
+  <div class="col-lg-7">
+    {% if checklist %}
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>What the application needs</h2>
+      <ul class="list-unstyled mb-0">
+      {% for item in checklist %}
+        <li>{% if item.have %}<i class="bi bi-check-circle-fill text-success me-1"></i>{% else %}<i class="bi bi-exclamation-circle text-warning me-1"></i>{% endif %}{{ item.label }}{% if not item.have %} <span class="small text-body-secondary">not on file</span>{% endif %}</li>
+      {% endfor %}
+      </ul>
+    </div></div>
+    {% endif %}
+
+    {% if can_see_costs %}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h2 class="mb-0">Costs</h2>
+        {% if can_pay %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:employee_family_request_payment' r.pk %}"><i class="bi bi-plus-lg me-1"></i>Record a payment</a>{% endif %}
+      </div>
+      <div class="card-body p-0"><div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light"><tr><th>Paid</th><th>For</th><th class="text-end">Total (BHD)</th><th>Paid by</th></tr></thead>
+          <tbody>
+          {% for p in payments %}
+            <tr>
+              <td class="text-nowrap">{{ p.paid_on|date:"d M Y" }}</td>
+              <td>{{ p.description|default:"-" }}{% if p.reference %}<div class="small text-body-secondary">{{ p.reference }}</div>{% endif %}</td>
+              <td class="text-end">{{ p.total|floatformat:3 }}</td>
+              <td>{% if p.charged_to_employee %}<span class="badge text-bg-warning">Employee</span>{% else %}<span class="badge text-bg-light border">Company</span>{% endif %}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="text-center text-body-secondary py-4">No costs recorded.</td></tr>
+          {% endfor %}
+          </tbody>
+          {% if payments %}
+          <tfoot class="table-light"><tr><th colspan="2">Total</th><th class="text-end">{{ paid_total|floatformat:3 }}</th><td>{% if charged_total %}<span class="small">{{ charged_total|floatformat:3 }} to the employee</span>{% endif %}</td></tr></tfoot>
+          {% endif %}
+        </table>
+      </div></div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

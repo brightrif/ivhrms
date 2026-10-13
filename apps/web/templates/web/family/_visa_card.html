@@ -1,0 +1,25 @@
+{% if can_see_requests %}
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <h2 class="mb-0">Visa requests</h2>
+    {% if can_request %}<a class="btn btn-sm btn-primary" href="{% url 'web:employee_family_request_add' dep.pk %}"><i class="bi bi-plus-lg me-1"></i>New request</a>{% endif %}
+  </div>
+  <div class="card-body p-0"><div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead class="table-light"><tr><th>Request</th><th>Status</th><th>Asked on</th><th></th></tr></thead>
+      <tbody>
+      {% for r in visa_requests %}
+        <tr>
+          <td>{{ r.get_kind_display }}</td>
+          <td>{% include "web/family/_request_status.html" with s=r.status label=r.get_status_display %}</td>
+          <td class="text-nowrap">{{ r.created_at|date:"d M Y" }}</td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{% url 'web:employee_family_request' r.pk %}">Open</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="text-center text-body-secondary py-4">No visa requests yet.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+</div>
+{% endif %}

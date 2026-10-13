@@ -22,6 +22,7 @@ from apps.organization.services import companies_for
 
 from apps.web.access import hr_perm
 from apps.web.forms.dependants import AttachmentForm, DependantForm, FamilyDocumentForm
+from apps.dependants import visa_services
 
 SOON_DAYS = 90
 
@@ -144,7 +145,10 @@ def family_detail(request, pk):
         "can_add_file": user.has_perm("dependants.add_dependantattachment") and dep.is_active,
         "can_edit": user.has_perm("dependants.change_dependant"),
         "can_add_doc": user.has_perm("compliance.add_document") and dep.is_active,
-        "can_renew": user.has_perm("compliance.change_document") and dep.is_active})
+        "can_renew": user.has_perm("compliance.change_document") and dep.is_active,
+        "visa_requests": list(dep.visa_requests.select_related("requested_by")[:5]),
+        "can_see_requests": user.has_perm("dependants.view_familyvisarequest"),
+        "can_request": user.has_perm("dependants.add_familyvisarequest") and bool(visa_services.allowed_kinds(dep)),})
 
 
 @hr_perm("dependants.change_dependant")

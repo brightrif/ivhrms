@@ -74,6 +74,7 @@
 
     {% if can_files %}
     <div class="card shadow-sm border-0 mb-3">
+      {% include "web/family/_visa_card.html" %}
       <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h2 class="mb-0">Papers</h2>
         {% if can_add_file %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:employee_family_paper_add' dep.pk %}"><i class="bi bi-paperclip me-1"></i>Attach a paper</a>{% endif %}

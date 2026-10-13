@@ -8,6 +8,7 @@
   {% endif %}
 </div>
 {% include "web/staff/_tabs.html" with tab="family" %}
+{% include "web/family/_sections.html" with section="members" %}
 
 <form method="get" class="row g-2 mb-3" hx-get="{% url 'web:employee_family' %}" hx-trigger="input delay:300ms, change"
       hx-target="#results" hx-push-url="true">
