@@ -7,6 +7,8 @@ from . import (
     vehicle_files,labor,settings_hub,family_visa,family,airtickets)
 # from ..views import family
 
+from . import payroll  # noqa: E402
+
 app_name = "web"
 
 urlpatterns = [
@@ -28,6 +30,7 @@ urlpatterns = [
     *vehicle_custody.urlpatterns,
     *vehicle_files.urlpatterns,
     *labor.urlpatterns,
+    *payroll.urlpatterns,
     *settings_hub.urlpatterns,
     *family.urlpatterns,
     *family_visa.urlpatterns,

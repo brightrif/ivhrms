@@ -75,6 +75,10 @@
           <a class="nav-link {% if u|slice:':6' == 'labor_' %}active{% endif %}" href="{% url 'web:labor_list' %}">
             <i class="bi bi-people"></i> Labor</a>
           {% endif %}
+          {% if perms.payroll.view_salaryrecord %}
+          <a class="nav-link {% if u|slice:':8' == 'payroll_' %}active{% endif %}" href="{% url 'web:payroll_home' %}">
+            <i class="bi bi-cash-coin"></i> Payroll</a>
+          {% endif %}
           {% if perms.configuration %}
           <a class="nav-link {% if u|slice:':9' == 'settings_' %}active{% endif %}" href="{% url 'web:settings_home' %}">
             <i class="bi bi-gear"></i> Settings</a>

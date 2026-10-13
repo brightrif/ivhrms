@@ -1,0 +1,4 @@
+<ul class="nav nav-tabs mb-3">
+  <li class="nav-item"><a class="nav-link{% if tab == 'people' %} active{% endif %}" href="{% url 'web:payroll_home' %}">People</a></li>
+  {% if perms.payroll.view_allowancetype %}<li class="nav-item"><a class="nav-link{% if tab == 'allowances' %} active{% endif %}" href="{% url 'web:payroll_allowances' %}">Allowance types</a></li>{% endif %}
+</ul>
