@@ -1,0 +1,55 @@
+{% extends "web/base.html" %}
+{% block title %}Air ticket expenses{% endblock %}
+{% block content %}
+{% include "web/airtickets/_report_head.html" with report_title="Air ticket expenses" %}
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-6 col-md-2">
+    <select name="year" class="form-select" onchange="this.form.submit()">
+      <option value="all"{% if not year %} selected{% endif %}>All years</option>
+      {% for y in years %}<option value="{{ y }}"{% if y == year %} selected{% endif %}>{{ y }}</option>{% endfor %}
+      {% if year and year not in years %}<option value="{{ year }}" selected>{{ year }}</option>{% endif %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3">
+    <select name="by" class="form-select" onchange="this.form.submit()">
+      {% for value, label in groupings %}<option value="{{ value }}"{% if value == by %} selected{% endif %}>By {{ label|lower }}</option>{% endfor %}
+    </select>
+  </div>
+  {% if multi_company %}
+  <div class="col-6 col-md-3">
+    <select name="company" class="form-select" onchange="this.form.submit()">
+      <option value="">All companies</option>
+      {% for c in companies %}<option value="{{ c.pk }}"{% if c.pk == company %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+</form>
+
+<p class="text-body-secondary small">What the company paid for tickets taken and allowances paid, by the date they were taken. A ticket recorded
+  without a cost counts as taken but adds nothing, and is shown in the "No cost" column so a gap is easy to see.</p>
+
+<div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive">
+  <table class="table align-middle mb-0">
+    <thead class="table-light"><tr><th>{{ by_label }}</th><th class="text-end">Tickets</th><th class="text-end">Allowances</th><th class="text-end">No cost</th><th class="text-end">Cost (BHD)</th><th class="text-end">Average</th><th style="width:16%"></th></tr></thead>
+    <tbody>
+    {% for r in table %}
+      <tr>
+        <td class="fw-medium">{{ r.label }}</td>
+        <td class="text-end">{{ r.taken }}</td><td class="text-end">{{ r.allowance }}</td>
+        <td class="text-end">{% if r.no_cost %}<span class="badge text-bg-warning">{{ r.no_cost }}</span>{% else %}-{% endif %}</td>
+        <td class="text-end fw-medium">{{ r.cost|floatformat:3 }}</td>
+        <td class="text-end">{% if r.average is not None %}{{ r.average|floatformat:3 }}{% else %}-{% endif %}</td>
+        <td><div class="progress" style="height:.5rem" title="{{ r.share }}%"><div class="progress-bar" style="width:{{ r.share }}%"></div></div></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="text-center text-body-secondary py-4">No tickets were taken in this period.</td></tr>
+    {% endfor %}
+    </tbody>
+    {% if table %}
+    <tfoot class="table-light"><tr><th>All</th><th class="text-end">{{ grand.taken }}</th><th class="text-end">{{ grand.allowance }}</th>
+      <th class="text-end">{{ grand.no_cost|default:"-" }}</th><th class="text-end">{{ grand.cost|floatformat:3 }}</th><th></th><th></th></tr></tfoot>
+    {% endif %}
+  </table>
+</div></div></div>
+{% endblock %}

@@ -147,3 +147,7 @@ class TravelProfile(BaseModel):
 
     def __str__(self):
         return f"{self.employee}: {self.destination_airport or self.home_country or 'not set'}"
+
+
+from . import ticketrequests  # noqa: E402,F401  (the air ticket request models)
+from . import reminderlog  # noqa: E402,F401  (the reminder log)

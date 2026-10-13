@@ -1,0 +1,37 @@
+{% extends "web/base.html" %}
+{% block title %}Air ticket reports{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Staff</h1>
+</div>
+{% include "web/staff/_tabs.html" with tab="tickets" %}
+{% include "web/airtickets/_sections.html" with section="reports" %}
+
+<div class="row g-3">
+  <div class="col-md-6 col-xl-3">
+    <a class="card shadow-sm border-0 h-100 text-decoration-none" href="{% url 'web:employee_tickets_report_eligible' %}">
+      <div class="card-body"><div class="text-body-secondary small">Eligible employees</div>
+        <div class="fs-2 fw-semibold">{{ eligible_count }}</div>
+        <div class="small text-body-secondary">due now or within 90 days</div></div></a>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <a class="card shadow-sm border-0 h-100 text-decoration-none" href="{% url 'web:employee_tickets_report_used' %}">
+      <div class="card-body"><div class="text-body-secondary small">Tickets used</div>
+        <div class="fs-2 fw-semibold">{{ used_count }}</div>
+        <div class="small text-body-secondary">tickets and allowances in {{ year }}</div></div></a>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <a class="card shadow-sm border-0 h-100 text-decoration-none" href="{% url 'web:employee_tickets_report_pending' %}">
+      <div class="card-body"><div class="text-body-secondary small">Pending requests</div>
+        <div class="fs-2 fw-semibold">{{ pending_count }}</div>
+        <div class="small text-body-secondary">requests in progress</div></div></a>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <a class="card shadow-sm border-0 h-100 text-decoration-none" href="{% url 'web:employee_tickets_report_expenses' %}">
+      <div class="card-body"><div class="text-body-secondary small">Yearly expense</div>
+        <div class="fs-2 fw-semibold">{{ spent|floatformat:3 }}</div>
+        <div class="small text-body-secondary">BHD in {{ year }}, by nationality, department or company</div></div></a>
+  </div>
+</div>
+<p class="text-body-secondary small mt-3">Every report can be downloaded as a CSV file that opens in Excel.</p>
+{% endblock %}

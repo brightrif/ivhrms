@@ -1,0 +1,12 @@
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Staff</h1>
+</div>
+{% include "web/staff/_tabs.html" with tab="tickets" %}
+{% include "web/airtickets/_sections.html" with section="reports" %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <a class="small text-decoration-none" href="{% url 'web:employee_tickets_reports' %}"><i class="bi bi-arrow-left me-1"></i>All reports</a>
+    <h2 class="mb-0">{{ report_title }}</h2>
+  </div>
+  <a class="btn btn-outline-success" href="?{% if query %}{{ query }}&amp;{% endif %}csv=1"><i class="bi bi-download me-1"></i>Download for Excel (CSV)</a>
+</div>

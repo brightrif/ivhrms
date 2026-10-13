@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 from apps.airtickets import services
 from apps.airtickets.models import TicketEntitlement, TicketPolicy, TravelProfile
 from apps.airtickets.nationalities import canonical
+from apps.airtickets.ticketrequests import TicketRequest
 from apps.organization.services import companies_for
 
 from apps.web.access import hr_perm
@@ -110,7 +111,12 @@ def tickets_detail(request, pk):
         for p in TicketPolicy.objects.filter(company=emp.company, is_active=True).select_related("min_grade"):
             why.append((p, p.mismatches(emp)))
     state = services.entitlement_state(current) if current else None
+    ticket_requests = list(emp.ticket_requests.select_related("requested_by")[:10])
     return render(request, "web/airtickets/detail.html", {
+        "ticket_requests": ticket_requests,
+        "can_see_requests": request.user.has_perm("airtickets.view_ticketrequest"),
+        "can_request": request.user.has_perm("airtickets.add_ticketrequest") and current is not None
+                       and not any(r.status in TicketRequest.OPEN for r in ticket_requests),
         "emp": emp, "policy": policy, "entitlements": entitlements, "current": current, "state": state,
         "why": why, "recognised": canonical(emp.nationality) is not None,
         "profile": getattr(emp, "travel_profile", None),

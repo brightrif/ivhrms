@@ -1,0 +1,95 @@
+{% extends "web/base.html" %}
+{% block title %}{{ r.title }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h1 class="mb-0">{{ emp.full_name }}
+      <span class="fs-6 align-middle">{% include "web/airtickets/_request_status.html" with s=r.status label=r.get_status_display %}</span></h1>
+    <div class="text-body-secondary">{{ emp.employee_no }} &middot; {{ r.depart_on|date:"d M Y" }}{% if r.return_on %} to {{ r.return_on|date:"d M Y" }}{% else %} (one way){% endif %}{% if r.destination %} &middot; {{ r.destination }}{% endif %}</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    {% if can_issue %}<a class="btn btn-primary" href="{% url 'web:employee_tickets_request_issue' r.pk %}">Issue the tickets</a>{% endif %}
+    {% if can_pay %}<a class="btn btn-primary" href="{% url 'web:employee_tickets_request_paid' r.pk %}">Record the allowance paid</a>{% endif %}
+    {% if can_travelled %}<a class="btn btn-primary" href="{% url 'web:employee_tickets_request_travelled' r.pk %}">Mark as travelled</a>{% endif %}
+    {% if can_cancel %}<a class="btn btn-outline-danger" href="{% url 'web:employee_tickets_request_cancel' r.pk %}">Cancel</a>{% endif %}
+    {% if can_withdraw %}
+    <form method="post" action="{% url 'web:employee_tickets_request_withdraw' r.pk %}" onsubmit="return confirm('Withdraw this request?');">
+      {% csrf_token %}<button class="btn btn-outline-danger">Withdraw</button>
+    </form>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{% url 'web:employee_tickets_detail' emp.pk %}">Employee</a>
+  </div>
+</div>
+{% include "web/staff/_tabs.html" with tab="tickets" %}
+{% include "web/airtickets/_sections.html" with section="requests" %}
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>Request</h2>
+      <dl class="row mb-0">
+        <dt class="col-5">Asked by</dt><dd class="col-7">{{ r.requested_by.get_full_name|default:r.requested_by.get_username }}</dd>
+        <dt class="col-5">Asked on</dt><dd class="col-7">{{ r.created_at|date:"d M Y" }}</dd>
+        <dt class="col-5">How</dt><dd class="col-7">{% if r.mode == 'allowance' %}Allowance{% if r.allowance_total %}: {{ r.allowance_total|floatformat:3 }} BHD{% endif %}{% else %}Company books the tickets{% endif %}</dd>
+        <dt class="col-5">Ticket due from</dt><dd class="col-7">{{ r.entitlement.eligible_from|date:"d M Y" }}</dd>
+        <dt class="col-5">Notes</dt><dd class="col-7">{{ r.notes|default:"-"|linebreaksbr }}</dd>
+        {% if r.issued_on %}<dt class="col-5">Issued</dt><dd class="col-7">{{ r.issued_on|date:"d M Y" }}{% if r.airline %} &middot; {{ r.airline }}{% endif %}{% if r.booking_ref %} &middot; {{ r.booking_ref }}{% endif %}</dd>{% endif %}
+        {% if r.departed_on %}<dt class="col-5">Departed</dt><dd class="col-7">{{ r.departed_on|date:"d M Y" }}{% if r.returned_on %}, back {{ r.returned_on|date:"d M Y" }}{% endif %}</dd>{% endif %}
+        {% if r.paid_on %}<dt class="col-5">Allowance paid</dt><dd class="col-7">{{ r.paid_on|date:"d M Y" }}{% if r.payment_ref %} &middot; {{ r.payment_ref }}{% endif %}</dd>{% endif %}
+        {% if r.cancel_reason %}<dt class="col-5">Cancelled because</dt><dd class="col-7">{{ r.cancel_reason|linebreaksbr }}</dd>{% endif %}
+      </dl>
+    </div></div>
+
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>Approval</h2>
+      <ul class="list-unstyled mb-0">
+      {% for row in trail %}
+        <li class="d-flex gap-2 mb-2">
+          {% if row.state == 'approved' %}<i class="bi bi-check-circle-fill text-success"></i>
+          {% elif row.state == 'rejected' %}<i class="bi bi-x-circle-fill text-danger"></i>
+          {% elif row.state == 'waiting' %}<i class="bi bi-hourglass-split text-warning"></i>
+          {% else %}<i class="bi bi-circle text-body-secondary"></i>{% endif %}
+          <div>
+            <div class="fw-medium">{{ row.step.name }}</div>
+            <div class="small text-body-secondary">
+              {% if row.action %}{{ row.state|capfirst }} by {{ row.action.actor.get_full_name|default:row.action.actor.get_username }}, {{ row.action.acted_at|date:"d M Y H:i" }}
+                {% if row.action.comment %}<div>&ldquo;{{ row.action.comment }}&rdquo;</div>{% endif %}
+              {% elif row.state == 'waiting' %}Waiting for this approval
+              {% elif row.state == 'later' %}Next
+              {% else %}Not reached{% endif %}
+            </div>
+          </div>
+        </li>
+      {% empty %}<li class="text-body-secondary">No approval record.</li>{% endfor %}
+      </ul>
+    </div></div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white"><h2 class="mb-0">Who travels</h2></div>
+      <div class="card-body p-0"><div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light"><tr><th>Traveller</th><th>Ticket number</th><th class="text-end">Fare (BHD)</th></tr></thead>
+          <tbody>
+          {% for t in travellers %}
+            <tr>
+              <td>{{ t.name }} <span class="badge text-bg-light border">{{ t.relationship }}</span></td>
+              <td>{{ t.ticket_no|default:"-" }}</td>
+              <td class="text-end">{% if t.fare is not None %}{{ t.fare|floatformat:3 }}{% else %}-{% endif %}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+          {% if r.issued_on %}
+          <tfoot class="table-light">
+            <tr><th colspan="2">Total fares</th><th class="text-end">{{ r.total_fare|floatformat:3 }}</th></tr>
+            {% if r.employee_share %}<tr><td colspan="2">Paid by the employee</td><td class="text-end">{{ r.employee_share|floatformat:3 }}</td></tr>
+            <tr><th colspan="2">Cost to the company</th><th class="text-end">{{ r.company_cost|floatformat:3 }}</th></tr>{% endif %}
+          </tfoot>
+          {% endif %}
+        </table>
+      </div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

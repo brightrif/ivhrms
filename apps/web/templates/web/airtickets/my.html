@@ -1,0 +1,59 @@
+{% extends "web/base.html" %}
+{% block title %}My air ticket{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">My air ticket</h1>
+  {% if current and not open %}<a class="btn btn-primary" href="{% url 'web:my_ticket_apply' %}"><i class="bi bi-send me-1"></i>Request my ticket</a>{% endif %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>My next ticket</h2>
+      {% if current %}
+        <p class="mb-2"><span class="fs-5 fw-medium">{{ current.eligible_from|date:"d M Y" }}</span>
+          {% if state.0 == 'eligible' %}<span class="badge text-bg-success ms-1">You can request it now</span>
+          {% else %}<span class="badge text-bg-warning ms-1">In {{ state.1 }} day{{ state.1|pluralize }}</span>{% endif %}</p>
+        <p class="small text-body-secondary mb-0">{% if current.mode == 'allowance' %}This is paid as an allowance.{% else %}The company books the ticket.{% endif %}
+          {% if current.spouse_covered or current.max_children %}Family covered:{% if current.spouse_covered %} spouse{% endif %}{% if current.max_children %}{% if current.spouse_covered %},{% endif %} up to {{ current.max_children }} child{{ current.max_children|pluralize:",ren" }}{% endif %}.{% endif %}</p>
+        {% if open %}<div class="alert alert-info mt-3 mb-0">You have a request in progress: {{ open.get_status_display|lower }}.</div>{% endif %}
+      {% else %}
+        <p class="mb-0 text-body-secondary">No air ticket policy applies to you. If you think one should, please ask HR.</p>
+      {% endif %}
+    </div></div>
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>Travel details</h2>
+      {% if profile %}<dl class="row mb-0"><dt class="col-5">Home country</dt><dd class="col-7">{{ profile.home_country|default:"-" }}</dd>
+        <dt class="col-5">Flies to</dt><dd class="col-7">{{ profile.destination_airport|default:"-" }}</dd></dl>
+      {% else %}<span class="text-body-secondary">Not set yet. HR can add them.</span>{% endif %}
+    </div></div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white"><h2 class="mb-0">My requests</h2></div>
+      <div class="card-body p-0"><div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light"><tr><th>Trip</th><th>Travellers</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+          {% for r in requests %}
+            <tr>
+              <td class="text-nowrap">{{ r.depart_on|date:"d M Y" }}{% if r.return_on %} to {{ r.return_on|date:"d M Y" }}{% endif %}
+                {% if r.destination %}<div class="small text-body-secondary">{{ r.destination }}</div>{% endif %}</td>
+              <td>{{ r.travellers.all|length }}</td>
+              <td>{% include "web/airtickets/_request_status.html" with s=r.status label=r.get_status_display %}
+                {% if r.status == 'booked' %}<div class="small text-body-secondary">{{ r.airline }} {{ r.booking_ref }}</div>{% endif %}</td>
+              <td class="text-end">{% if r.status == 'pending' %}
+                <form method="post" action="{% url 'web:my_ticket_withdraw' r.pk %}" onsubmit="return confirm('Withdraw this request?');">{% csrf_token %}
+                  <button class="btn btn-sm btn-outline-danger">Withdraw</button></form>{% endif %}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="text-center text-body-secondary py-4">You have not asked for a ticket yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -2,6 +2,7 @@ from apps.attendance.models import AttendanceCorrection
 from apps.leave.models import LeaveRequest
 from apps.vehicles.custody import CustodyRequest
 from apps.dependants.visa import FamilyVisaRequest
+from apps.airtickets.ticketrequests import TicketRequest
 
 def describe(approval):
     """Turn whatever an approval points at into something an approver can read."""
@@ -16,6 +17,8 @@ def describe(approval):
         return {"kind": "Vehicle", "title": t.title, "detail": t.detail, "reason": t.reason}
     if isinstance(t, FamilyVisaRequest):
         return {"kind": "Family visa", "title": t.title, "detail": t.detail, "reason": t.reason}
+    if isinstance(t, TicketRequest):
+        return {"kind": "Air ticket", "title": t.title, "detail": t.detail, "reason": t.notes}
     return {"kind": approval.flow.name, "title": str(t), "detail": "", "reason": ""}
 
 

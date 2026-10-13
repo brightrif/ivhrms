@@ -38,6 +38,8 @@
             <i class="bi bi-speedometer2"></i> Dashboard</a>
           <a class="nav-link {% if u == 'leave_list' or u == 'leave_apply' %}active{% endif %}" href="{% url 'web:leave_list' %}">
             <i class="bi bi-calendar2-check"></i> My leave</a>
+          <a class="nav-link {% if u == 'my_tickets' or u == 'leave_apply' %}active{% endif %}" href="{% url 'web:my_tickets' %}">
+            <i class="bi bi-airplane"></i> My leave</a>
           <a class="nav-link {% if u == 'attendance' %}active{% endif %}" href="{% url 'web:attendance' %}">
             <i class="bi bi-clock-history"></i> My attendance</a>
           <a class="nav-link {% if u == 'approvals' %}active{% endif %}" href="{% url 'web:approvals' %}">
