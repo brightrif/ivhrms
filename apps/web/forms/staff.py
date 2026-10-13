@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.employees.models import Employee, EmploymentRecord
 from apps.organization.models import Department, Designation, Grade, Location
 from apps.organization.services import companies_for
+from apps.web.forms.nationality import NationalityInput, NationalityMixin
 
 from apps.web.forms.common import date_input
 
@@ -44,7 +45,7 @@ class EmployeeForm(WhatsAppMixin, forms.ModelForm):
         fields = ["company", "worker_type", "employment_type", "joining_date", "designation", "department",
                   "first_name", "last_name", "name_ar", "date_of_birth", "nationality",
                   "phone", "whatsapp_number", "email"]
-        widgets = {"date_of_birth": date_input(), "joining_date": date_input()}
+        widgets = {"date_of_birth": date_input(), "joining_date": date_input(),"nationality": NationalityInput()}
         help_texts = {"email": "Optional.",
                       "whatsapp_number": "Optional. With country code, e.g. 97333123456."}
 
@@ -100,7 +101,7 @@ class EmployeePersonalForm(WhatsAppMixin, forms.ModelForm):
         model = Employee
         fields = ["first_name", "last_name", "name_ar", "date_of_birth", "nationality",
                   "email", "phone", "whatsapp_number"]
-        widgets = {"date_of_birth": date_input()}
+        widgets = {"date_of_birth": date_input(), "nationality": NationalityInput()}
 
 
 class AssignmentForm(forms.Form):

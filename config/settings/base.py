@@ -57,6 +57,7 @@ LOCAL_APPS = [
     "apps.organization",
     "apps.employees",
     "apps.dependants",
+    "apps.airtickets",
     "apps.scheduling",
     "apps.leave",
     "apps.attendance",

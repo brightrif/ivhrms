@@ -6,6 +6,7 @@ from django.utils import timezone
 from apps.dependants.visa import FamilyVisaRequest, VisaPayment
 
 from apps.web.forms.common import date_input
+from apps.web.forms.compliance import SCAN_ATTRS, SCAN_HELP
 
 
 class RequestForm(forms.Form):
@@ -61,13 +62,14 @@ class CompleteForm(forms.Form):
 class PaymentForm(forms.ModelForm):
     class Meta:
         model = VisaPayment
-        fields = ["description", "paid_on", "government_fee", "service_fee", "fine", "reference",
+        fields = ["description", "paid_on", "government_fee", "service_fee", "fine", "reference", "receipt",
                   "charged_to_employee", "remarks"]
-        widgets = {"paid_on": date_input(max="today"), "remarks": forms.Textarea(attrs={"rows": 2})}
+        widgets = {"paid_on": date_input(max="today"), "receipt": forms.FileInput(attrs=SCAN_ATTRS),
+                   "remarks": forms.Textarea(attrs={"rows": 2})}
         labels = {"government_fee": "Government fee (BHD)", "service_fee": "Service / agent fee (BHD)",
                   "fine": "Late fine (BHD)", "reference": "Payment reference",
-                  "charged_to_employee": "Charge this cost to the employee"}
-        help_texts = {"charged_to_employee": "Payroll will deduct it once payroll exists. Tick it only if the "
+                  "charged_to_employee": "Charge this cost to the employee", "receipt": "Receipt (scan)"}
+        help_texts = {"receipt": SCAN_HELP, "charged_to_employee": "Payroll will deduct it once payroll exists. Tick it only if the "
                                              "employee pays."}
 
     def __init__(self, *args, **kwargs):

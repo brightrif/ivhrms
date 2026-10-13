@@ -16,13 +16,12 @@ from django.views.decorators.http import require_POST
 from apps.audit import services as audit
 from apps.compliance import services as compliance
 from apps.compliance.models import Document
-from apps.dependants import coverage, services
+from apps.dependants import coverage, leavers, services, visa_services
 from apps.dependants.models import Dependant, DependantAttachment
 from apps.organization.services import companies_for
 
 from apps.web.access import hr_perm
 from apps.web.forms.dependants import AttachmentForm, DependantForm, FamilyDocumentForm
-from apps.dependants import visa_services
 
 SOON_DAYS = 90
 
@@ -79,6 +78,7 @@ def family_list(request):
     company, relationship = request.GET.get("company", ""), request.GET.get("relationship", "")
     status = request.GET.get("status", "active")
     expiring = request.GET.get("expiring") == "1"
+    leaver = request.GET.get("leaver") == "1"
     if company.isdigit():
         qs = qs.filter(company_id=int(company))
     if relationship in Dependant.Relationship.values:
@@ -89,6 +89,9 @@ def family_list(request):
         qs = qs.filter(is_active=False)
     if expiring:
         qs = qs.filter(is_active=True, next_expiry__lte=today + timedelta(days=SOON_DAYS))
+
+    if leaver:                                              # sponsor on notice or gone, visa still open
+        qs = qs.filter(pk__in=leavers.leaver_cases(request.user).values("pk"))
 
     page = Paginator(qs, 25).get_page(request.GET.get("page"))
     rows = list(page)
@@ -101,7 +104,8 @@ def family_list(request):
     params.pop("page", None)
     ctx = {"page": page, "extra": params.urlencode(), "q": q, "company": company, "relationship": relationship,
            "status": status, "expiring": expiring, "companies": companies, "multi_company": companies.count() > 1,
-           "relationships": Dependant.Relationship.choices, "soon_days": SOON_DAYS}
+           "relationships": Dependant.Relationship.choices, "soon_days": SOON_DAYS,
+           "leaver": leaver, "leaver_count": leavers.leaver_cases(request.user).count()}
     partial = request.headers.get("HX-Request") == "true" and not request.headers.get("HX-History-Restore-Request")
     resp = render(request, "web/family/_table.html" if partial else "web/family/list.html", ctx)
     patch_vary_headers(resp, ["HX-Request"])
@@ -148,7 +152,7 @@ def family_detail(request, pk):
         "can_renew": user.has_perm("compliance.change_document") and dep.is_active,
         "visa_requests": list(dep.visa_requests.select_related("requested_by")[:5]),
         "can_see_requests": user.has_perm("dependants.view_familyvisarequest"),
-        "can_request": user.has_perm("dependants.add_familyvisarequest") and bool(visa_services.allowed_kinds(dep)),})
+        "can_request": user.has_perm("dependants.add_familyvisarequest") and bool(visa_services.allowed_kinds(dep))})
 
 
 @hr_perm("dependants.change_dependant")

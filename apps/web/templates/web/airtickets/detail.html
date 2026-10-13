@@ -1,0 +1,98 @@
+{% extends "web/base.html" %}
+{% block title %}Air tickets: {{ emp.full_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h1 class="mb-0">{{ emp.full_name }}</h1>
+    <div class="text-body-secondary">{{ emp.employee_no }} &middot; {{ emp.company.name }}</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    {% if can_record %}
+    <a class="btn btn-primary" href="{% url 'web:employee_tickets_past' emp.pk %}"><i class="bi bi-airplane me-1"></i>A ticket already taken</a>
+    <form method="post" action="{% url 'web:employee_tickets_sync' %}">{% csrf_token %}
+      <input type="hidden" name="employee" value="{{ emp.pk }}">
+      <button class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat me-1"></i>Refresh</button>
+    </form>
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{% url 'web:employee_tickets' %}">Back to list</a>
+  </div>
+</div>
+{% include "web/staff/_tabs.html" with tab="tickets" %}
+
+<div class="row g-3">
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>The next ticket</h2>
+      {% if current %}
+        <p class="mb-2"><span class="fs-5 fw-medium">{{ current.eligible_from|date:"d M Y" }}</span>
+          {% if state.0 == 'eligible' %}<span class="badge text-bg-success ms-1">Eligible now</span>
+          {% else %}<span class="badge text-bg-warning ms-1">In {{ state.1 }} day{{ state.1|pluralize }}</span>{% endif %}</p>
+        <dl class="row mb-0">
+          <dt class="col-5">Policy</dt><dd class="col-7">{{ current.policy.name|default:"-" }}</dd>
+          <dt class="col-5">Covers</dt><dd class="col-7">{{ policy.covers_text|default:"-"|capfirst }}</dd>
+          <dt class="col-5">How</dt><dd class="col-7">{% if current.mode == 'allowance' %}Allowance {{ current.allowance_amount|floatformat:3 }} BHD per traveller{% else %}Company books the ticket{% endif %}</dd>
+        </dl>
+      {% else %}
+        <p class="mb-2"><span class="badge text-bg-light border">No policy applies</span></p>
+        {% if why %}
+          <p class="small text-body-secondary mb-1">None of this company's policies fit {{ emp.first_name }}:</p>
+          <ul class="small mb-0">{% for p, reasons in why %}<li><strong>{{ p.name }}</strong>: {{ reasons|join:"; " }}</li>{% endfor %}</ul>
+        {% else %}
+          <p class="small text-body-secondary mb-0">This company has no ticket policy switched on yet.</p>
+        {% endif %}
+      {% endif %}
+    </div></div>
+
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>Employee</h2>
+      <dl class="row mb-0">
+        <dt class="col-5">Nationality</dt><dd class="col-7">{{ emp.nationality|default:"-" }}{% if emp.nationality and not recognised %} <span class="badge text-bg-warning">not recognised</span>{% endif %}</dd>
+        <dt class="col-5">Grade</dt><dd class="col-7">{{ emp.grade.name|default:"-" }}</dd>
+        <dt class="col-5">Contract</dt><dd class="col-7">{{ emp.get_employment_type_display }}</dd>
+        <dt class="col-5">Joined</dt><dd class="col-7">{{ emp.joining_date|date:"d M Y" }}</dd>
+      </dl>
+    </div></div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h2 class="mb-0">Travel details</h2>
+        {% if can_profile %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:employee_tickets_profile' emp.pk %}">{% if profile %}Edit{% else %}Add{% endif %}</a>{% endif %}
+      </div>
+      <div class="card-body">
+        {% if profile %}
+        <dl class="row mb-0">
+          <dt class="col-4">Home country</dt><dd class="col-8">{{ profile.home_country|default:"-" }}</dd>
+          <dt class="col-4">Flies to</dt><dd class="col-8">{{ profile.destination_airport|default:"-" }}</dd>
+          {% if profile.notes %}<dt class="col-4">Notes</dt><dd class="col-8">{{ profile.notes|linebreaksbr }}</dd>{% endif %}
+        </dl>
+        {% else %}<span class="text-body-secondary">Not set yet.</span>{% endif %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white"><h2 class="mb-0">History</h2></div>
+      <div class="card-body p-0"><div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-light"><tr><th>#</th><th>Due from</th><th>Status</th><th>Taken</th><th>Flew to</th><th class="text-end">Cost (BHD)</th></tr></thead>
+          <tbody>
+          {% for e in entitlements %}
+            <tr>
+              <td>{{ e.cycle }}</td>
+              <td class="text-nowrap">{{ e.eligible_from|date:"d M Y" }}</td>
+              <td>{% if e.status == 'open' %}<span class="badge text-bg-info">{{ e.get_status_display }}</span>{% elif e.status == 'used' or e.status == 'paid' %}<span class="badge text-bg-success">{{ e.get_status_display }}</span>{% else %}<span class="badge text-bg-secondary">{{ e.get_status_display }}</span>{% endif %}</td>
+              <td class="text-nowrap">{{ e.used_on|date:"d M Y"|default:"-" }}</td>
+              <td>{{ e.destination|default:"-" }}</td>
+              <td class="text-end">{% if e.cost is not None %}{{ e.cost|floatformat:3 }}{% else %}-{% endif %}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-center text-body-secondary py-4">Nothing yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "web/base.html" %}
+{% block title %}Air tickets{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Staff</h1>
+  {% if perms.airtickets.add_ticketentitlement %}
+  <form method="post" action="{% url 'web:employee_tickets_sync' %}">{% csrf_token %}
+    <button class="btn btn-outline-secondary"><i class="bi bi-arrow-repeat me-1"></i>Refresh eligibility</button>
+  </form>
+  {% endif %}
+</div>
+{% include "web/staff/_tabs.html" with tab="tickets" %}
+{% include "web/airtickets/_sections.html" with section="eligibility" %}
+
+{% if blank_nationality or unknown_nationalities %}
+<div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <div><i class="bi bi-exclamation-triangle me-1"></i>
+    {% if blank_nationality %}<strong>{{ blank_nationality }}</strong> staff {{ blank_nationality|pluralize:"has,have" }} no nationality.{% endif %}
+    {% if unknown_nationalities %}These nationalities are not recognised, so ticket rules cannot match them:
+      {% for text, n in unknown_nationalities %}<strong>{{ text }}</strong> ({{ n }}){% if not forloop.last %}, {% endif %}{% endfor %}.{% endif %}
+  </div>
+  {% if show != 'unknown' %}<a class="btn btn-sm btn-warning" href="?show=unknown">Show them</a>{% endif %}
+</div>
+{% endif %}
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-md-4">
+    <div class="input-group">
+      <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+      <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Search name or number">
+    </div>
+  </div>
+  {% if multi_company %}
+  <div class="col-6 col-md-2">
+    <select name="company" class="form-select" onchange="this.form.submit()">
+      <option value="">All companies</option>
+      {% for c in companies %}<option value="{{ c.pk }}"{% if c.pk|stringformat:"s" == company %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  <div class="col-6 col-md-3">
+    <select name="show" class="form-select" onchange="this.form.submit()">
+      {% for value, label in shows %}<option value="{{ value }}"{% if value == show %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-secondary">Search</button></div>
+</form>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Employee</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Nationality</th><th>Grade</th><th>Policy</th><th>Next ticket</th><th>Last ticket</th><th>Flies to</th></tr>
+      </thead>
+      <tbody>
+      {% for e in page %}
+        <tr>
+          <td><a class="fw-medium text-decoration-none" href="{% url 'web:employee_tickets_detail' e.pk %}">{{ e.full_name }}</a>
+              <span class="small text-body-secondary">{{ e.employee_no }}</span></td>
+          {% if multi_company %}<td>{{ e.company.code }}</td>{% endif %}
+          <td>{{ e.nationality|default:"-" }}{% if e.nationality and not e.recognised %} <span class="badge text-bg-warning" title="Not in the list of known nationalities">?</span>{% endif %}</td>
+          <td>{{ e.grade.name|default:"-" }}</td>
+          <td>{% if e.policy_name %}{{ e.policy_name }}{% else %}<span class="badge text-bg-light border">No policy applies</span>{% endif %}</td>
+          <td class="text-nowrap">
+            {% if e.next_due %}{{ e.next_due|date:"d M Y" }}
+              {% if e.days <= 0 %}<span class="badge text-bg-success">Eligible now</span>
+              {% elif e.days <= soon_days %}<span class="badge text-bg-warning">In {{ e.days }} day{{ e.days|pluralize }}</span>{% endif %}
+            {% else %}<span class="text-body-secondary">-</span>{% endif %}
+          </td>
+          <td class="text-nowrap">{% if e.last_travel %}{{ e.last_travel|date:"d M Y" }}{% else %}<span class="text-body-secondary">-</span>{% endif %}</td>
+          <td>{% if e.travel_profile.destination_airport %}{{ e.travel_profile.destination_airport }}{% elif e.travel_profile.home_country %}{{ e.travel_profile.home_country }}{% else %}<span class="text-body-secondary">not set</span>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" class="text-center text-body-secondary py-4">Nobody matches.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% if page.has_other_pages %}
+  <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span class="small text-body-secondary">Page {{ page.number }} of {{ page.paginator.num_pages }} &middot; {{ page.paginator.count }} staff</span>
+    <ul class="pagination pagination-sm mb-0">
+      {% if page.has_previous %}<li class="page-item"><a class="page-link" href="?{{ extra }}&page={{ page.previous_page_number }}">Previous</a></li>
+      {% else %}<li class="page-item disabled"><span class="page-link">Previous</span></li>{% endif %}
+      {% if page.has_next %}<li class="page-item"><a class="page-link" href="?{{ extra }}&page={{ page.next_page_number }}">Next</a></li>
+      {% else %}<li class="page-item disabled"><span class="page-link">Next</span></li>{% endif %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

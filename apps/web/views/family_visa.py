@@ -1,13 +1,18 @@
 """Family visa requests: ask, follow the approval, process, pay, and the cost report (HR and Finance)."""
+from pathlib import Path
+
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
+from apps.audit import services as audit
 from apps.core.models import ApprovalRequest
 from apps.dependants import visa_services as visa
 from apps.dependants.visa import FamilyVisaRequest, VisaPayment
@@ -26,7 +31,7 @@ LAYOUTS = {
     "complete_cancel": [{"title": "Cancellation", "width": "col-lg-5", "rows": [["completed_on"]]}],
     "payment": [{"title": "Payment", "width": "col-lg-7",
                  "rows": [["description", "paid_on"], ["government_fee", "service_fee", "fine"], ["reference"]]},
-                {"title": "Who pays", "width": "col-lg-5", "rows": [["charged_to_employee"], ["remarks"]]}],
+                {"title": "Who pays", "width": "col-lg-5", "rows": [["receipt"], ["charged_to_employee"], ["remarks"]]}],
 }
 
 
@@ -203,7 +208,7 @@ def family_request_complete(request, pk):
 @hr_perm("dependants.add_visapayment")
 def family_request_payment(request, pk):
     req = _visa_request(request, pk)
-    form = PaymentForm(request.POST or None, instance=VisaPayment(request=req))
+    form = PaymentForm(request.POST or None, request.FILES or None, instance=VisaPayment(request=req))
     if request.method == "POST" and form.is_valid():
         try:
             visa.add_payment(req, form.save(commit=False))
@@ -213,3 +218,21 @@ def family_request_payment(request, pk):
             messages.success(request, "Payment recorded.")
             return redirect(_url(req))
     return _form_page(request, form, "Record a payment", _url(req), "payment", intro=req.title)
+
+
+@hr_perm("dependants.view_visapayment")
+def family_receipt(request, pk):
+    """Open (or, with ?download=1, download) a payment receipt. Checked, and written to the audit log."""
+    payment = get_object_or_404(VisaPayment.objects.for_user(request.user).select_related("request__dependant"), pk=pk)
+    if not payment.receipt:
+        raise Http404
+    try:
+        handle = payment.receipt.open("rb")
+    except FileNotFoundError:
+        raise Http404
+    audit.log("download", payment, module="dependants", company_id=payment.company_id)
+    name = slugify(f"receipt-{payment.request.dependant.full_name}-{payment.paid_on:%Y-%m-%d}") or "receipt"
+    response = FileResponse(handle, as_attachment=request.GET.get("download") == "1",
+                            filename=name + Path(payment.receipt.name).suffix.lower())
+    response["X-Content-Type-Options"] = "nosniff"
+    return response

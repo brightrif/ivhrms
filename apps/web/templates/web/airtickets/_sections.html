@@ -1,0 +1,4 @@
+<ul class="nav nav-pills small mb-3">
+  <li class="nav-item"><a class="nav-link{% if section == 'eligibility' %} active{% endif %}" href="{% url 'web:employee_tickets' %}">Eligibility</a></li>
+  {% if perms.airtickets.view_ticketpolicy %}<li class="nav-item"><a class="nav-link{% if section == 'policies' %} active{% endif %}" href="{% url 'web:employee_tickets_policies' %}">Policies</a></li>{% endif %}
+</ul>

@@ -18,5 +18,13 @@ app.conf.beat_schedule = {
     "vehicles-daily-service-scan": {
     "task": "apps.vehicles.tasks.daily_service_scan",
     "schedule": crontab(hour=7, minute=15),
-},
+    },
+    "dependants-daily-scan": {                       # <-- add this block
+            "task": "apps.dependants.tasks.daily_scan",
+            "schedule": crontab(hour=7, minute=30),
+        },
+    "airtickets-daily-sync": {
+        "task": "apps.airtickets.tasks.daily_sync",
+        "schedule": crontab(hour=7, minute=45),
+    },
 }

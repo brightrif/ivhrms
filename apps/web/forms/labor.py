@@ -8,6 +8,7 @@ from apps.configuration import services as settings_service
 from apps.labor.models import Contractor, LaborProfile, LaborRate, Trade
 from apps.organization.models import Company
 from apps.organization.services import companies_for
+from apps.web.forms.nationality import NationalityInput, NationalityMixin
 
 from apps.web.forms.common import date_input
 
@@ -64,12 +65,12 @@ class _TermsForm(forms.Form):
     overtime_eligible = forms.BooleanField(required=False, initial=True, label="Eligible for overtime")
 
 
-class LaborWorkerForm(_EngagementForm, _TermsForm):
+class LaborWorkerForm(NationalityMixin, _EngagementForm, _TermsForm):
     """A brand-new worker: the person and the labor profile in one go."""
     company = forms.ModelChoiceField(queryset=Company.objects.none())
     first_name = forms.CharField(max_length=80)
     last_name = forms.CharField(max_length=80, required=False)
-    nationality = forms.CharField(max_length=60, required=False)
+    nationality = forms.CharField(max_length=60, required=False, widget=NationalityInput())
     phone = forms.CharField(max_length=30, required=False)
     joining_date = forms.DateField(widget=date_input(max="today"))
 

@@ -6,8 +6,12 @@ from django.core.validators import MinValueValidator
 from django.db import models
 
 from apps.audit.registry import audited
+from apps.compliance.storage import private_storage
+from apps.compliance.validators import validate_extension, validate_file_size
 from apps.core.models import BaseModel
 from apps.core.scoping import CompanyQuerySet
+
+from .storage import receipt_path
 
 _MONEY = dict(max_digits=12, decimal_places=3, default=Decimal("0"), validators=[MinValueValidator(Decimal("0"))])
 
@@ -87,6 +91,8 @@ class VisaPayment(BaseModel):
     reference = models.CharField(max_length=60, blank=True)
     charged_to_employee = models.BooleanField(default=False)
     remarks = models.TextField(blank=True)
+    receipt = models.FileField(storage=private_storage, upload_to=receipt_path, max_length=200, blank=True,
+                               validators=[validate_extension, validate_file_size])
 
     objects = CompanyQuerySet.as_manager()
 
@@ -104,3 +110,19 @@ class VisaPayment(BaseModel):
 
     def __str__(self):
         return f"{self.request} - {self.total} BHD"
+
+
+class FamilyLeaverAlert(BaseModel):
+    """Remembers that HR was told about a family member whose sponsor is on notice (or has left), so the daily
+    notice goes out once per state and never again."""
+
+    class State(models.TextChoices):
+        NOTICE = "notice", "Sponsor on notice"
+        LEFT = "left", "Sponsor has left"
+
+    dependant = models.ForeignKey("dependants.Dependant", on_delete=models.CASCADE, related_name="leaver_alerts")
+    state = models.CharField(max_length=6, choices=State.choices)
+    recipients = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["dependant", "state"], name="uniq_family_leaver_alert")]

@@ -81,7 +81,7 @@
       </div>
       <div class="card-body p-0"><div class="table-responsive">
         <table class="table align-middle mb-0">
-          <thead class="table-light"><tr><th>Paid</th><th>For</th><th class="text-end">Total (BHD)</th><th>Paid by</th></tr></thead>
+          <thead class="table-light"><tr><th>Paid</th><th>For</th><th class="text-end">Total (BHD)</th><th>Paid by</th><th></th></tr></thead>
           <tbody>
           {% for p in payments %}
             <tr>
@@ -89,13 +89,14 @@
               <td>{{ p.description|default:"-" }}{% if p.reference %}<div class="small text-body-secondary">{{ p.reference }}</div>{% endif %}</td>
               <td class="text-end">{{ p.total|floatformat:3 }}</td>
               <td>{% if p.charged_to_employee %}<span class="badge text-bg-warning">Employee</span>{% else %}<span class="badge text-bg-light border">Company</span>{% endif %}</td>
+              <td class="text-end">{% if p.receipt %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:employee_family_receipt' p.pk %}" target="_blank" rel="noopener">Receipt</a>{% endif %}</td>
             </tr>
           {% empty %}
-            <tr><td colspan="4" class="text-center text-body-secondary py-4">No costs recorded.</td></tr>
+            <tr><td colspan="5" class="text-center text-body-secondary py-4">No costs recorded.</td></tr>
           {% endfor %}
           </tbody>
           {% if payments %}
-          <tfoot class="table-light"><tr><th colspan="2">Total</th><th class="text-end">{{ paid_total|floatformat:3 }}</th><td>{% if charged_total %}<span class="small">{{ charged_total|floatformat:3 }} to the employee</span>{% endif %}</td></tr></tfoot>
+          <tfoot class="table-light"><tr><th colspan="2">Total</th><th class="text-end">{{ paid_total|floatformat:3 }}</th><td colspan="2">{% if charged_total %}<span class="small">{{ charged_total|floatformat:3 }} to the employee</span>{% endif %}</td></tr></tfoot>
           {% endif %}
         </table>
       </div></div>

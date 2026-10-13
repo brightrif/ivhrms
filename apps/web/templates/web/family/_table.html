@@ -12,7 +12,9 @@
             <span class="badge text-bg-light border ms-1">{{ d.get_relationship_display }}</span>
             {% if not d.is_active %}<span class="badge text-bg-secondary ms-1">No longer sponsored</span>{% endif %}
           </td>
-          <td>{{ d.employee.full_name }} <span class="small text-body-secondary">{{ d.employee.employee_no }}</span></td>
+          <td>{{ d.employee.full_name }} <span class="small text-body-secondary">{{ d.employee.employee_no }}</span>
+            {% if d.employee.status == 'separated' %}<span class="badge text-bg-danger ms-1">Left</span>
+            {% elif d.employee.status == 'on_notice' %}<span class="badge text-bg-warning ms-1">On notice</span>{% endif %}</td>
           {% if multi_company %}<td>{{ d.company.code }}</td>{% endif %}
           <td>{{ d.age|default_if_none:"-" }}</td>
           <td>{{ d.nationality|default:"-" }}</td>

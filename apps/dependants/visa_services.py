@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from apps.compliance import services as compliance
 from apps.compliance.models import Document, DocumentType, RenewalTask
+from apps.configuration import services as settings_service
 from apps.core import approvals
 from apps.core.models import ApprovalRequest
 from apps.employees.models import Employee
@@ -27,6 +28,39 @@ PAPER_FOR = {Dependant.Relationship.SPOUSE: DependantAttachment.Kind.MARRIAGE_CE
 
 class VisaError(Exception):
     pass
+
+
+_PLURAL = {Dependant.Relationship.SPOUSE: "spouses", Dependant.Relationship.CHILD: "children",
+           Dependant.Relationship.PARENT: "parents"}
+_ALLOWED_KEY = {Dependant.Relationship.SPOUSE: "dependants.allow_spouse",
+                Dependant.Relationship.CHILD: "dependants.allow_children",
+                Dependant.Relationship.PARENT: "dependants.allow_parents"}
+
+
+def eligibility_problem(dependant, kind):
+    """Why this family member cannot be put forward, by the company's own rules (Settings, Family Visas), or None.
+    Cancelling is always allowed."""
+    if kind == Kind.CANCELLATION:
+        return None
+    company = dependant.company
+    rel = dependant.relationship
+    if not settings_service.get(_ALLOWED_KEY[rel], company):
+        return (f"{company.name} does not put forward {_PLURAL[rel]} for family visas. "
+                "This is a company setting (Settings, Family Visas).")
+    if rel == Dependant.Relationship.CHILD:
+        limit, age = settings_service.get("dependants.child_age_limit", company), dependant.age
+        if limit and age is not None and age > limit:
+            return (f"{dependant.full_name} is {age}. {company.name} puts children forward up to {limit} "
+                    "(Settings, Family Visas).")
+    return None
+
+
+def _papers_problem(req):
+    """With the 'papers first' setting on, a new or renewed visa cannot go to the authority with papers missing."""
+    if req.kind == Kind.CANCELLATION or not settings_service.get("dependants.require_papers", req.company_id):
+        return None
+    missing = [i["label"] for i in checklist(req.dependant) if not i["have"]]
+    return ("Still missing before this can go to the authority: " + ", ".join(missing) + ".") if missing else None
 
 
 def current_visa(dependant):
@@ -71,6 +105,8 @@ def request_visa(dependant, kind, *, requested_by, reason=""):
         raise VisaError(f"{emp.full_name} has left the company.")
     if kind == Kind.CANCELLATION and not reason:
         raise VisaError("Give the reason for cancelling the visa.")
+    if problem := eligibility_problem(dep, kind):
+        raise VisaError(problem)
 
     req = FamilyVisaRequest.objects.create(company_id=dep.company_id, employee=emp, dependant=dep, kind=kind,
                                            reason=reason, requested_by=requested_by)
@@ -117,6 +153,8 @@ def mark_submitted(request, *, submitted_on, reference=""):
     req = _lock(request)
     if req.status != Status.APPROVED:
         raise VisaError("Only an approved request can be marked as submitted.")
+    if problem := _papers_problem(req):
+        raise VisaError(problem)
     req.status, req.submitted_on, req.reference = Status.SUBMITTED, submitted_on, (reference or "").strip()
     req.save(update_fields=["status", "submitted_on", "reference", "updated_at"])
     return req
@@ -131,6 +169,8 @@ def complete(request, user, *, completed_on, number="", issue_date=None, expiry_
         raise VisaError("Only an approved request can be completed.")
     if completed_on > timezone.localdate():
         raise VisaError("The completion date cannot be in the future.")
+    if req.status == Status.APPROVED and (problem := _papers_problem(req)):      # skipped the "submitted" step
+        raise VisaError(problem)
     dep = req.dependant
     if req.kind == Kind.CANCELLATION:
         _retire(dep, completed_on)
