@@ -14,13 +14,14 @@ from .storage import document_path, private_storage, receipt_path
 from .validators import validate_extension, validate_file_size
 
 
+
 @audited(module="compliance")
 class DocumentType(BaseModel):
     """A kind of certificate or licence the firm must keep valid. Editable data, not code."""
 
     class AppliesTo(models.TextChoices):
         COMPANY = "company", "Company"
-        EMPLOYEE = "employee", "Employee"        # reserved for the employee documents phase
+        EMPLOYEE = "employee", "Employee"        
         DEPENDANT = "dependant", "Dependant"
         VEHICLE = "vehicle", "Vehicle"
 
@@ -68,6 +69,9 @@ class Document(BaseModel):
     employee = models.ForeignKey("employees.Employee", null=True, blank=True, on_delete=models.PROTECT,
                                  related_name="compliance_documents",
                                  help_text="Set for personal documents; empty for company documents.")
+    dependant = models.ForeignKey("dependants.Dependant", null=True, blank=True, on_delete=models.PROTECT,
+                              related_name="documents",
+                              help_text="Set for a family member's document. The employee is then the sponsor.")
     reference_name = models.CharField(max_length=120, blank=True)
     number = models.CharField(max_length=60, blank=True)
     issue_date = models.DateField(null=True, blank=True)
@@ -96,10 +100,14 @@ class Document(BaseModel):
                                         "different reference name."),
             models.UniqueConstraint(
                 fields=["employee", "document_type", "reference_name"],
-                condition=models.Q(is_current=True, employee__isnull=False), name="uniq_current_employee_document",
-                violation_error_message="This employee already has a current document of this type with "
-                                        "the same reference. Renew that one, or give this one a "
-                                        "different reference name."),
+                condition=models.Q(is_current=True, employee__isnull=False, dependant__isnull=True),
+                name="uniq_current_employee_document",
+                violation_error_message="(keep your existing message)"),
+            models.UniqueConstraint(
+                fields=["dependant", "document_type", "reference_name"],
+                condition=models.Q(is_current=True, dependant__isnull=False),
+                name="uniq_current_dependant_document",
+                violation_error_message="This family member already has a current document of this type. Renew that one instead."),
             models.UniqueConstraint(
                 fields=["vehicle", "document_type", "reference_name"],
                 condition=models.Q(is_current=True, vehicle__isnull=False), name="uniq_current_vehicle_document",
@@ -109,10 +117,14 @@ class Document(BaseModel):
                 name="compliance_expiry_after_issue"),
         ]
         indexes = [models.Index(fields=["company", "is_current", "expiry_date"]),
-                   models.Index(fields=["employee", "is_current"])]
+                   models.Index(fields=["employee", "is_current"]),
+                   models.Index(fields=["dependant", "is_current"]),
+                   models.Index(fields=["vehicle", "is_current"]),]
 
     def save(self, *args, **kwargs):
         # The company always follows the owner: the employee's company, or the vehicle's company.
+        if self.dependant_id:
+            self.employee_id = self.dependant.employee_id
         if self.employee_id:
             self.company_id = self.employee.company_id
         elif self.vehicle_id:
@@ -129,23 +141,37 @@ class Document(BaseModel):
         kind = self.document_type.applies_to
         if kind == kinds.EMPLOYEE and not self.employee_id:
             raise ValidationError("A personal document type needs an employee.")
+        if kind == kinds.DEPENDANT and not self.dependant_id:
+            raise ValidationError("A family document type needs a family member.")
         if kind == kinds.VEHICLE and not self.vehicle_id:
             raise ValidationError("A vehicle document type needs a vehicle.")
-        if self.employee_id and kind != kinds.EMPLOYEE:
+        if self.dependant_id and kind != kinds.DEPENDANT:
+            raise ValidationError("Only family document types can be attached to a family member.")
+        if self.dependant_id and self.employee_id and self.dependant.employee_id != self.employee_id:
+            raise ValidationError("The family member does not belong to this employee.")
+        if self.employee_id and kind not in (kinds.EMPLOYEE, kinds.DEPENDANT):
             raise ValidationError("Only personal document types can be attached to an employee.")
         if self.vehicle_id and kind != kinds.VEHICLE:
             raise ValidationError("Only vehicle document types can be attached to a vehicle.")
 
     @property
     def is_employee_document(self):
-        return self.employee_id is not None
+        return self.employee_id is not None and self.dependant_id is None
+
+    @property
+    def is_dependant_document(self):
+        return self.dependant_id is not None
 
     @property
     def subject_label(self):
         """Who or what the document is about: the employee, or else the company."""
+        if self.dependant_id:
+                    d = self.dependant
+                    return f"{d.full_name} ({d.get_relationship_display()} of {d.employee.full_name})"
         if self.employee_id:
             e = self.employee
             return f"{e.full_name} ({e.employee_no})" if e.employee_no else e.full_name
+        
         return self.company.name
 
     @property

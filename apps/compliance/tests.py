@@ -82,7 +82,7 @@ class DefaultsTests(ComplianceCase):
         ensure_system_defaults()
         cr = DocumentType.objects.get(code="cr")
         self.assertEqual((cr.alert_days, cr.name), ([60, 30], "Our CR"))
-        self.assertEqual(DocumentType.objects.count(), 17)
+        self.assertEqual(DocumentType.objects.count(), 20)
 
 
 class ScanTests(ComplianceCase):
@@ -438,3 +438,5 @@ class EmployeeDocumentTests(ComplianceCase):
         with self.assertRaises(services.ComplianceError):
             services.record_payment(company_task, RenewalPayment(paid_on=self.today, government_fee=Decimal("5"),
                                                                  charged_to_employee=True))
+
+

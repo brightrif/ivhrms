@@ -224,7 +224,8 @@ class PaymentForm(forms.ModelForm):
 class DocumentTypeForm(forms.ModelForm):
     applies_to = forms.ChoiceField(
         label="Belongs to", choices=[(DocumentType.AppliesTo.COMPANY.value, "The company (CR, licences...)"),
-                                     (DocumentType.AppliesTo.EMPLOYEE.value, "An employee (passport, permits...)")],
+                                     (DocumentType.AppliesTo.EMPLOYEE.value, "An employee (passport, permits...)"),
+                                     (DocumentType.AppliesTo.DEPENDANT.value, "A family member (passport, CPR, visa...)")],
         help_text="Cannot be changed after the type is created.")
     alert_days = forms.CharField(
         required=False, label="Alert days before expiry",

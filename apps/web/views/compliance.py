@@ -27,7 +27,7 @@ from apps.web.access import hr_perm
 
 Company_types = DocumentType.AppliesTo.COMPANY
 Employee_types = DocumentType.AppliesTo.EMPLOYEE
-Supported_types = [Company_types, Employee_types]          # dependants come later
+Supported_types = [Company_types, Employee_types, DocumentType.AppliesTo.DEPENDANT]          
 
 # Full-page layouts: two columns on a laptop screen so nothing needs scrolling. See form_layout.html.
 LAYOUTS = {

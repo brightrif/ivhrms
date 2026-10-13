@@ -1,0 +1,56 @@
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Family member</th><th>Sponsor</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Age</th><th>Nationality</th><th>Family visa expires</th><th>Documents</th></tr>
+      </thead>
+      <tbody>
+      {% for d in page %}
+        <tr>
+          <td>
+            <a class="fw-medium text-decoration-none" href="{% url 'web:employee_family_detail' d.pk %}">{{ d.full_name }}</a>
+            <span class="badge text-bg-light border ms-1">{{ d.get_relationship_display }}</span>
+            {% if not d.is_active %}<span class="badge text-bg-secondary ms-1">No longer sponsored</span>{% endif %}
+          </td>
+          <td>{{ d.employee.full_name }} <span class="small text-body-secondary">{{ d.employee.employee_no }}</span></td>
+          {% if multi_company %}<td>{{ d.company.code }}</td>{% endif %}
+          <td>{{ d.age|default_if_none:"-" }}</td>
+          <td>{{ d.nationality|default:"-" }}</td>
+          <td class="text-nowrap">
+            {% if d.visa_expiry %}{{ d.visa_expiry|date:"d M Y" }}
+              {% if d.visa_days < 0 %}<span class="badge text-bg-danger">Expired</span>
+              {% elif d.visa_days <= soon_days %}<span class="badge text-bg-warning">{{ d.visa_days }} day{{ d.visa_days|pluralize }}</span>{% endif %}
+            {% else %}<span class="text-body-secondary">-</span>{% endif %}
+          </td>
+          <td>
+            {% if not d.is_active %}<span class="text-body-secondary">-</span>
+            {% elif d.missing %}<span class="badge text-bg-warning" title="{% for t in d.missing %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}">{{ d.missing|length }} missing</span>
+            {% else %}<span class="badge text-bg-success">Complete</span>{% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="text-center text-body-secondary py-4">No family members match.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% if page.has_other_pages %}
+  <div class="card-footer bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span class="small text-body-secondary">Page {{ page.number }} of {{ page.paginator.num_pages }} &middot; {{ page.paginator.count }} family members</span>
+    <ul class="pagination pagination-sm mb-0">
+      {% if page.has_previous %}
+      <li class="page-item"><a class="page-link" href="?{{ extra }}&page={{ page.previous_page_number }}"
+          hx-get="?{{ extra }}&page={{ page.previous_page_number }}" hx-target="#results" hx-push-url="true">Previous</a></li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">Previous</span></li>
+      {% endif %}
+      {% if page.has_next %}
+      <li class="page-item"><a class="page-link" href="?{{ extra }}&page={{ page.next_page_number }}"
+          hx-get="?{{ extra }}&page={{ page.next_page_number }}" hx-target="#results" hx-push-url="true">Next</a></li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">Next</span></li>
+      {% endif %}
+    </ul>
+  </div>
+  {% endif %}
+</div>

@@ -27,6 +27,17 @@ DOCUMENT_TYPES = [
     dict(code="vehicle-inspection", name="Periodic Vehicle Inspection", name_ar="الفحص الفني الدوري",
          authority="Traffic Directorate", default_validity_months=12, applies_to="vehicle"),
 ]
+DEPENDANT_DOCUMENT_TYPES = [
+    dict(code="dependant-passport", is_mandatory=True, name="Dependant Passport", name_ar="جواز سفر المعال",
+         applies_to="dependant", authority="Issuing country", alert_days=[180, 90, 30, 7, 0]),
+    dict(code="dependant-cpr", is_mandatory=True, name="Dependant CPR Card", name_ar="البطاقة الذكية للمعال",
+         applies_to="dependant", authority="Population Registry (CPR)", alert_days=[60, 30, 14, 7, 0]),
+    dict(code="family-visa", is_mandatory=True, name="Family Visa (Residence Permit)", name_ar="إقامة المعال",
+         applies_to="dependant", authority="NPRA (Nationality, Passports and Residence Affairs)",
+         default_validity_months=24, alert_days=[90, 60, 30, 14, 7, 0]),
+]
+
+DOCUMENT_TYPES += DEPENDANT_DOCUMENT_TYPES
 
 # Personal documents. "Required" means most staff are expected to hold one, so it is counted in the coverage list
 # (the missing page lets HR judge exceptions, e.g. a Bahraini needs no residence permit). Validity periods and alert days are placeholders to confirm with the client; they can be

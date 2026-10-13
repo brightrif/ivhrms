@@ -43,15 +43,21 @@ def current_documents(user):
     """Current documents the user may see. Documents of people who have left the company, and of sold
     vehicles, are not chased."""
     return (Document.objects.filter(is_current=True, document_type__is_active=True)
-            .for_user(user).select_related("company", "document_type", "responsible", "employee", "vehicle")
+            .for_user(user).select_related("company", "document_type", "responsible", "employee", "vehicle", "dependant")
             .exclude(employee__status=Employee.Status.SEPARATED)
-            .exclude(vehicle__status="sold"))                # "sold" = Vehicle.Status.SOLD, a literal to avoid an import
+            .exclude(dependant__is_active=False)
+            .exclude(vehicle__status="sold") )             
 
 
 
 
 @transaction.atomic
 def create_document(user, doc):
+    if doc.dependant_id:
+        if not doc.dependant.is_active:
+            raise ComplianceError("This family member is no longer sponsored.")
+        if not doc.employee_id:
+            doc.employee_id = doc.dependant.employee_id     # the sponsor
     try:
         doc.clean()                                   # company type <-> no employee, employee type <-> an employee
     except ValidationError as exc:
@@ -86,13 +92,15 @@ def renew_document(doc, user, *, expiry_date, number="", issue_date=None, file=N
         raise ComplianceError("The expiry date cannot be before the issue date.")
     if old.employee_id and old.employee.status == Employee.Status.SEPARATED:
         raise ComplianceError("This employee has left the company.")
+    if old.dependant_id and not old.dependant.is_active:
+        raise ComplianceError("This family member is no longer sponsored.")
 
     old.is_current = False
     old.save(update_fields=["is_current"])
     new = Document(company_id=old.company_id, employee_id=old.employee_id, document_type_id=old.document_type_id,
                    reference_name=old.reference_name, number=number or old.number, issue_date=issue_date,
                    expiry_date=expiry_date, responsible_id=old.responsible_id, agent_name=old.agent_name,
-                   vehicle_id=old.vehicle_id,
+                   vehicle_id=old.vehicle_id, dependant_id=old.dependant_id,
                    notes=notes, previous=old)
     if file:
         new.file = file
@@ -295,9 +303,10 @@ def run_daily_scan(today=None):
     today = today or timezone.localdate()
     stats = {"checked": 0, "alerts": 0, "emails": 0, "tasks": 0, "errors": 0}
     docs = (Document.objects.filter(is_current=True, document_type__is_active=True, company__is_active=True)
-            .exclude(employee__status=Employee.Status.SEPARATED)
-            .exclude(vehicle__status="sold")                 # a sold vehicle's documents are not chased
-            .select_related("company", "document_type", "responsible", "employee", "vehicle"))
+        .exclude(employee__status=Employee.Status.SEPARATED)
+        .exclude(dependant__is_active=False)
+        .exclude(vehicle__status="sold")                 # a sold vehicle's documents are not chased
+        .select_related("company", "document_type", "responsible", "employee", "vehicle", "dependant"))
     for doc in docs:
         stats["checked"] += 1
         left = (doc.expiry_date - today).days

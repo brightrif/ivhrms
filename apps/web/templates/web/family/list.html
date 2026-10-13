@@ -1,0 +1,50 @@
+{% extends "web/base.html" %}
+{% block title %}Family &amp; Visas{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Staff</h1>
+  {% if perms.dependants.add_dependant %}
+  <a class="btn btn-primary" href="{% url 'web:employee_family_add' %}"><i class="bi bi-plus-lg me-1"></i>Add family member</a>
+  {% endif %}
+</div>
+{% include "web/staff/_tabs.html" with tab="family" %}
+
+<form method="get" class="row g-2 mb-3" hx-get="{% url 'web:employee_family' %}" hx-trigger="input delay:300ms, change"
+      hx-target="#results" hx-push-url="true">
+  <div class="col-md-5 col-lg-4">
+    <div class="input-group">
+      <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+      <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Search family member, employee or number" autofocus>
+    </div>
+  </div>
+  {% if multi_company %}
+  <div class="col-6 col-md-2">
+    <select name="company" class="form-select">
+      <option value="">All companies</option>
+      {% for c in companies %}<option value="{{ c.pk }}"{% if c.pk|stringformat:"s" == company %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  <div class="col-6 col-md-2">
+    <select name="relationship" class="form-select">
+      <option value="">Any relationship</option>
+      {% for value, label in relationships %}<option value="{{ value }}"{% if value == relationship %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-2">
+    <select name="status" class="form-select">
+      <option value="active"{% if status == 'active' %} selected{% endif %}>Sponsored now</option>
+      <option value="inactive"{% if status == 'inactive' %} selected{% endif %}>No longer sponsored</option>
+      <option value="all"{% if status == 'all' %} selected{% endif %}>Everyone</option>
+    </select>
+  </div>
+  <div class="col-6 col-md-auto d-flex align-items-center">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" name="expiring" value="1" id="expiring"{% if expiring %} checked{% endif %}>
+      <label class="form-check-label" for="expiring">Expiring within {{ soon_days }} days</label>
+    </div>
+  </div>
+</form>
+
+<div id="results">{% include "web/family/_table.html" %}</div>
+{% endblock %}
