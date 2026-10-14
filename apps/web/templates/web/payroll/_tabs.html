@@ -1,4 +1,7 @@
 <ul class="nav nav-tabs mb-3">
-  <li class="nav-item"><a class="nav-link{% if tab == 'people' %} active{% endif %}" href="{% url 'web:payroll_home' %}">People</a></li>
+  {% if perms.payroll.view_salaryrecord %}<li class="nav-item"><a class="nav-link{% if tab == 'people' %} active{% endif %}" href="{% url 'web:payroll_home' %}">People</a></li>{% endif %}
+  {% if perms.payroll.view_payrollrun %}<li class="nav-item"><a class="nav-link{% if tab == 'runs' %} active{% endif %}" href="{% url 'web:payroll_runs' %}">Payroll runs</a></li>{% endif %}
+  {% if perms.payroll.view_finalsettlement %}<li class="nav-item"><a class="nav-link{% if tab == 'settlements' %} active{% endif %}" href="{% url 'web:payroll_settlements' %}">Final settlements</a></li>{% endif %}
   {% if perms.payroll.view_allowancetype %}<li class="nav-item"><a class="nav-link{% if tab == 'allowances' %} active{% endif %}" href="{% url 'web:payroll_allowances' %}">Allowance types</a></li>{% endif %}
+  {% if perms.payroll.view_payrollpolicy %}<li class="nav-item"><a class="nav-link{% if tab == 'policy' %} active{% endif %}" href="{% url 'web:payroll_policy' %}">Policy</a></li>{% endif %}
 </ul>

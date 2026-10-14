@@ -117,6 +117,8 @@ def change_rate(profile, *, effective_from, wage_basis, rate, standard_hours, ov
     if profile.employee.status == Employee.Status.SEPARATED:
         raise LaborError("This worker has left the company.")
     _check_terms(wage_basis=wage_basis, rate=rate, standard_hours=standard_hours, engagement=profile.engagement)
+    from . import locks  # payroll lock: change_rate
+    locks.ensure_open([profile.employee_id], effective_from, None, "starting new pay terms then")
     current = profile.rates.filter(effective_to__isnull=True).first()
     if current and effective_from <= current.effective_from:
         raise LaborError(f"The new rate must start after the current one, which began on "

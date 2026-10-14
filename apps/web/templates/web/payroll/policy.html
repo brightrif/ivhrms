@@ -1,0 +1,31 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Payroll policy{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Payroll</h1>
+  {% if perms.payroll.add_payrollpolicy %}<a class="btn btn-primary" href="{% url 'web:payroll_policy_new' %}"><i class="bi bi-plus-lg me-1"></i>New policy</a>{% endif %}
+</div>
+{% include "web/payroll/_tabs.html" with tab="policy" %}
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table align-middle mb-0">
+    <thead class="table-light"><tr>{% if multi_company %}<th>Company</th>{% endif %}<th>From</th><th>To</th><th class="text-end">Days / month</th><th class="text-end">SIO employee</th><th class="text-end">SIO employer</th><th class="text-end">Employer, others</th><th class="text-end">Wage range</th></tr></thead>
+    <tbody>
+    {% for p in policies %}
+      <tr>
+        {% if multi_company %}<td>{{ p.company.code }}</td>{% endif %}
+        <td class="text-nowrap">{{ p.effective_from|date:"d M Y" }}</td>
+        <td class="text-nowrap">{% if p.effective_to %}{{ p.effective_to|date:"d M Y" }}{% else %}<span class="badge text-bg-light border">Current</span>{% endif %}</td>
+        <td class="text-end">{{ p.days_in_month }}</td>
+        <td class="text-end">{% if p.sio_employee_rate is None %}<span class="badge text-bg-warning">Not set</span>{% else %}{{ p.sio_employee_rate|floatformat:"-2" }}%{% endif %}</td>
+        <td class="text-end">{% if p.sio_employer_rate is None %}<span class="badge text-bg-warning">Not set</span>{% else %}{{ p.sio_employer_rate|floatformat:"-2" }}%{% endif %}</td>
+        <td class="text-end">{% if p.sio_employer_rate_other is None %}-{% else %}{{ p.sio_employer_rate_other|floatformat:"-2" }}%{% endif %}</td>
+        <td class="text-end">{% if p.sio_wage_floor is None and p.sio_wage_cap is None %}-{% else %}{{ p.sio_wage_floor|default_if_none:"0"|floatformat:3 }} to {% if p.sio_wage_cap is None %}no limit{% else %}{{ p.sio_wage_cap|floatformat:3 }}{% endif %}{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="8" class="text-center text-body-secondary py-4">No payroll policy yet. Add one before starting a payroll run.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

@@ -236,6 +236,8 @@ def save_hours(user, project, location, first, last, posted, fill=""):
         raise LaborError("Choose what to fill empty days with, or leave it blank.")
     sheet = build_timesheet(user, project, location, first, last)
     done, skipped = Counter(), []
+    from . import locks  # payroll lock: save_hours
+    locks.ensure_open([row.employee.pk for row in sheet.rows], first, last, "changing hours")
     with transaction.atomic():
         for row in sheet.rows:
             for cell in row.cells:
@@ -328,6 +330,8 @@ def reopen_period(user, project, location, first, last):
     entries = list(_period_entries(user, sheet, TimeEntry.Status.CONFIRMED))
     if not entries:
         raise LaborError("Nothing is confirmed in this period.")
+    from . import locks  # payroll lock: reopen_period
+    locks.ensure_open([e.employee_id for e in entries], first, last, "reopening hours")
     from .overtime import OvertimeClaim                  # imported here: overtime builds on timesheets
     claims = OvertimeClaim.objects.filter(entry__in=entries)
     decided = claims.exclude(status=OvertimeClaim.Status.PENDING).count()

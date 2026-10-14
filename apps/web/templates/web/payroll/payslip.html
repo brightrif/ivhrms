@@ -1,0 +1,89 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Payslips {{ run.label }} - {{ run.company.name }}</title>
+  <link rel="stylesheet" href="{% static 'web/vendor/bootstrap/bootstrap.min.css' %}">
+  <style>
+    body { background: #f4f5f7; }
+    .slip { background: #fff; max-width: 780px; margin: 16px auto; padding: 28px 34px; border: 1px solid #dee2e6; border-radius: 6px; }
+    .slip h1 { font-size: 1.3rem; margin: 0; }
+    .slip table { font-size: .92rem; }
+    .money { text-align: right; white-space: nowrap; }
+    .net { font-size: 1.15rem; font-weight: 600; }
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none !important; }
+      .slip { border: 0; margin: 0 auto; padding: 0; max-width: none; border-radius: 0; page-break-after: always; break-after: page; }
+      .slip:last-of-type { page-break-after: auto; break-after: auto; }
+      @page { margin: 14mm; }
+    }
+  </style>
+</head>
+<body>
+<div class="no-print d-flex flex-wrap justify-content-between align-items-center gap-2 container py-3" style="max-width:780px">
+  <a href="{% url 'web:payroll_run' run.pk %}">&larr; Back to the run</a>
+  <span class="small text-body-secondary">{{ slips|length }} payslip{{ slips|length|pluralize }}. In the print window choose &ldquo;Save as PDF&rdquo; to keep a file.</span>
+  <button class="btn btn-primary" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+{% for s in slips %}{% with l=s.line %}
+<section class="slip">
+  <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-3">
+    <div><h1>{{ run.company.name }}</h1><div class="text-body-secondary small">Payslip</div></div>
+    <div class="text-end"><div class="fw-semibold">{{ run.label }}</div>
+      <div class="small text-body-secondary">{{ run.period_start|date:"d M Y" }} to {{ run.period_end|date:"d M Y" }}</div></div>
+  </div>
+
+  <div class="row g-2 mb-3 small">
+    <div class="col-6"><div class="text-body-secondary">Employee</div><div class="fw-semibold">{{ l.employee_name }}</div></div>
+    <div class="col-6"><div class="text-body-secondary">Employee no.</div><div class="fw-semibold">{{ l.employee_no }}</div></div>
+    <div class="col-6"><div class="text-body-secondary">Paid by</div>
+      <div>{{ l.get_payment_label }}{% if l.bank_name %}, {{ l.bank_name }}{% endif %}{% if l.iban %} <span class="text-body-secondary">{{ l.iban_masked }}</span>{% endif %}</div></div>
+    <div class="col-6"><div class="text-body-secondary">{% if l.breakdown.labor %}Days worked / hours{% else %}Days employed{% endif %}</div>
+      <div>{% if l.breakdown.labor %}{{ l.breakdown.days_worked|floatformat:"-2" }} days, {{ l.breakdown.hours|floatformat:"-2" }} hours{% else %}{{ l.days_employed }} of {{ l.breakdown.days_in_period }}{% endif %}</div></div>
+  </div>
+
+  <table class="table table-sm mb-3">
+    <thead class="table-light"><tr><th>Earnings</th><th class="money">BHD</th></tr></thead>
+    <tbody>
+    {% if l.breakdown.labor %}
+      {% for kind, amount in l.breakdown.wages_by_kind.items %}
+        <tr><td>{% if kind == "daily" %}Daily wage{% elif kind == "hourly" %}Hourly wage{% elif kind == "monthly" %}Monthly salary{% else %}Holiday and leave pay{% endif %}</td><td class="money">{{ amount|floatformat:3 }}</td></tr>
+      {% empty %}<tr><td>Wages</td><td class="money">{{ l.breakdown.wages|floatformat:3 }}</td></tr>{% endfor %}
+      {% if l.breakdown.overtime != "0.000" %}<tr><td>Overtime and premium ({{ l.breakdown.overtime_hours|floatformat:"-2" }} hours)</td><td class="money">{{ l.breakdown.overtime|floatformat:3 }}</td></tr>{% endif %}
+    {% else %}
+      {% with seg=l.breakdown.segments %}
+      {% if seg|length == 1 and seg.0.parts and seg.0.days == l.breakdown.days_in_period %}
+        <tr><td>Basic salary</td><td class="money">{{ seg.0.parts.basic|floatformat:3 }}</td></tr>
+        {% for name, amount in seg.0.parts.allowances %}<tr><td>{{ name }}</td><td class="money">{{ amount|floatformat:3 }}</td></tr>{% endfor %}
+      {% else %}
+        {% for x in seg %}<tr><td>Salary {{ x.from }} to {{ x.to }} ({{ x.days }} of {{ l.breakdown.days_in_period }} days)</td><td class="money">{{ x.amount|floatformat:3 }}</td></tr>{% endfor %}
+      {% endif %}
+      {% endwith %}
+    {% endif %}
+    {% for a in s.adjustments %}{% if a.kind == "addition" %}<tr><td>{{ a.label }}</td><td class="money">{{ a.amount|floatformat:3 }}</td></tr>{% endif %}{% endfor %}
+    </tbody>
+    <tfoot><tr class="fw-semibold"><td>Total earnings</td><td class="money">{{ l.total_earnings|floatformat:3 }}</td></tr></tfoot>
+  </table>
+
+  <table class="table table-sm mb-3">
+    <thead class="table-light"><tr><th>Deductions</th><th class="money">BHD</th></tr></thead>
+    <tbody>
+      {% if l.absence_deduction %}<tr><td>Absence and unpaid days ({{ l.unpaid_days|floatformat:"-2" }} day{{ l.unpaid_days|pluralize }})</td><td class="money">{{ l.absence_deduction|floatformat:3 }}</td></tr>{% endif %}
+      {% if l.sio_employee %}<tr><td>Social insurance (SIO)</td><td class="money">{{ l.sio_employee|floatformat:3 }}</td></tr>{% endif %}
+      {% for a in s.adjustments %}{% if a.kind == "deduction" %}<tr><td>{{ a.label }}</td><td class="money">{{ a.amount|floatformat:3 }}</td></tr>{% endif %}{% endfor %}
+      {% if not l.total_deductions %}<tr><td class="text-body-secondary">None</td><td class="money">0.000</td></tr>{% endif %}
+    </tbody>
+    <tfoot><tr class="fw-semibold"><td>Total deductions</td><td class="money">{{ l.total_deductions|floatformat:3 }}</td></tr></tfoot>
+  </table>
+
+  <div class="d-flex justify-content-between align-items-center border-top border-bottom py-2 net">
+    <span>Net pay</span><span>{{ l.net|floatformat:3 }} BHD</span>
+  </div>
+  <div class="small text-body-secondary mt-2">{% if l.paid_on %}Paid on {{ l.paid_on|date:"d M Y" }}. {% endif %}This payslip is computer generated and needs no signature.</div>
+</section>
+{% endwith %}{% endfor %}
+</body>
+</html>

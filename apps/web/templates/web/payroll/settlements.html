@@ -1,0 +1,29 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Final settlements{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Payroll</h1>
+  {% if perms.payroll.add_finalsettlement %}<a class="btn btn-primary" href="{% url 'web:payroll_settlement_create' %}"><i class="bi bi-plus-lg me-1"></i>New settlement</a>{% endif %}
+</div>
+{% include "web/payroll/_tabs.html" with tab="settlements" %}
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-hover align-middle mb-0">
+    <thead class="table-light"><tr><th>Employee</th><th>Why</th><th>Last working day</th><th>Status</th><th class="text-end">Net amount (BHD)</th></tr></thead>
+    <tbody>
+    {% for c in cases %}
+      <tr>
+        <td><a class="fw-medium text-decoration-none" href="{% url 'web:payroll_settlement' c.pk %}">{{ c.employee.full_name }}</a> <span class="small text-body-secondary">{{ c.employee.employee_no }}</span></td>
+        <td>{{ c.get_reason_display }}</td>
+        <td class="text-nowrap">{{ c.last_working_day|date:"d M Y" }}</td>
+        <td><span class="badge {% if c.status == 'paid' %}text-bg-success{% elif c.status == 'approved' %}text-bg-primary{% elif c.status == 'submitted' %}text-bg-warning{% elif c.status == 'cancelled' %}text-bg-secondary{% else %}text-bg-light border{% endif %}">{{ c.get_status_display }}</span>
+          {% if c.blocking and c.status == 'draft' %}<span class="badge text-bg-danger">{{ c.blocking|length }} to fix</span>{% endif %}</td>
+        <td class="text-end">{{ c.total|floatformat:3 }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-center text-body-secondary py-4">No final settlements yet.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+{% endblock %}

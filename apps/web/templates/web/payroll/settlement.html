@@ -1,0 +1,90 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Settlement: {{ case.employee.full_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h1 class="mb-0">{{ case.employee.full_name }}</h1>
+    <div class="text-body-secondary">{{ case.employee.employee_no }} &middot; {{ case.company.name }} &middot; {{ case.get_reason_display }} &middot; last working day {{ case.last_working_day|date:"d M Y" }}
+      <span class="badge {% if case.status == 'paid' %}text-bg-success{% elif case.status == 'approved' %}text-bg-primary{% elif case.status == 'submitted' %}text-bg-warning{% elif case.status == 'cancelled' %}text-bg-secondary{% else %}text-bg-light border{% endif %}">{{ case.get_status_display }}</span></div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <a class="btn btn-outline-secondary" href="{% url 'web:payroll_settlements' %}">All settlements</a>
+    <a class="btn btn-outline-secondary" target="_blank" href="{% url 'web:payroll_settlement_statement' case.pk %}"><i class="bi bi-printer me-1"></i>Statement</a>
+    {% if case.status == 'approved' or case.status == 'paid' %}<a class="btn btn-outline-secondary" target="_blank" href="{% url 'web:payroll_settlement_certificate' case.pk %}"><i class="bi bi-award me-1"></i>Certificate</a>{% endif %}
+    {% if case.status == 'draft' %}
+      {% if perms.payroll.add_finalsettlement %}
+      <a class="btn btn-outline-primary" href="{% url 'web:payroll_settlement_edit' case.pk %}">Change</a>
+      <form method="post" action="{% url 'web:payroll_settlement_recalculate' case.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-primary">Recalculate</button></form>
+      {% endif %}
+      {% if perms.payroll.submit_finalsettlement %}
+      <form method="post" action="{% url 'web:payroll_settlement_submit' case.pk %}" class="d-inline" onsubmit="return confirm('Send this settlement to Management for approval? On approval the person is marked as Separated.')">{% csrf_token %}<button class="btn btn-primary">Send for approval</button></form>
+      {% endif %}
+    {% elif case.status == 'submitted' and perms.payroll.submit_finalsettlement %}
+      <form method="post" action="{% url 'web:payroll_settlement_withdraw' case.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-secondary">Take back</button></form>
+    {% elif case.status == 'approved' and perms.payroll.pay_finalsettlement %}
+      <a class="btn btn-primary" href="{% url 'web:payroll_settlement_pay' case.pk %}">Record payment</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if case.note %}<div class="alert alert-warning py-2">{{ case.note }}</div>{% endif %}
+{% if case.status == 'submitted' %}<div class="alert alert-info py-2">Waiting for Management to approve. Nothing can change while it waits.</div>{% endif %}
+{% for i in case.issues %}
+  <div class="alert {% if i.level == 'block' %}alert-danger{% elif i.level == 'warn' %}alert-warning{% else %}alert-info{% endif %} py-2">{{ i.text }}</div>
+{% endfor %}
+
+<div class="row g-3">
+  <div class="col-lg-7"><div class="card shadow-sm border-0 h-100">
+    <div class="card-header bg-white py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span class="fw-semibold">Statement</span>
+      {% if case.status == 'draft' and perms.payroll.add_finalsettlement %}
+      <span class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-primary" href="{% url 'web:payroll_settlement_item_add' case.pk %}">Add a line</a>
+        <form method="post" action="{% url 'web:payroll_settlement_charges' case.pk %}" class="d-inline">{% csrf_token %}
+          <button class="btn btn-sm btn-outline-primary">Pick up charges{% if candidates %} ({{ candidates }}){% endif %}</button></form>
+      </span>{% endif %}
+    </div>
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+      <tbody>
+      {% for i in items %}
+        <tr><td>{{ i.label }}{% if not i.is_system %} <span class="badge text-bg-light border">added</span>{% endif %}</td>
+          <td class="text-end text-nowrap {% if i.amount < 0 %}text-danger{% endif %}">{{ i.amount|floatformat:3 }}</td>
+          <td class="text-end">{% if not i.is_system and case.status == 'draft' and perms.payroll.add_finalsettlement %}
+            <form method="post" action="{% url 'web:payroll_settlement_item_remove' case.pk i.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">Remove</button></form>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="3" class="text-center text-body-secondary py-3">Nothing yet.</td></tr>{% endfor %}
+      </tbody>
+      <tfoot class="table-light"><tr class="fw-semibold"><td>Net amount payable to the employee</td><td class="text-end">{{ case.total|floatformat:3 }} BHD</td><td></td></tr></tfoot>
+    </table></div>
+    <div class="card-footer bg-white small text-body-secondary">Paid by {% if case.payment_method == 'bank' %}bank transfer, {{ case.bank_name }} {{ case.iban_masked }}{% elif case.payment_method == 'cash' %}cash{% else %}(no payment details){% endif %}{% if case.paid_on %}. Paid on {{ case.paid_on|date:"d M Y" }}.{% endif %}</div>
+  </div></div>
+
+  <div class="col-lg-5"><div class="card shadow-sm border-0 h-100"><div class="card-body small">
+    <h2>How it was worked out</h2>
+    {% if details.basis %}<div class="mb-2"><strong>Last wage</strong>: basic {{ details.basis.basic|floatformat:3 }}, monthly total {{ details.basis.monthly_total|floatformat:3 }} BHD. One day = {{ details.daily_rate }} BHD (monthly total &divide; {{ details.policy_days }}).</div>{% endif %}
+    {% if details.basis_note %}<div class="mb-2 text-body-secondary">{{ details.basis_note }}</div>{% endif %}
+    {% if details.leave %}<div class="mb-2"><strong>Annual leave</strong> ({{ details.leave.type }}): balance {{ details.leave.balance }} days, less this year's grant {{ details.leave.granted_this_year }}, plus the {{ details.leave.earned_this_year }} days earned by the last day{% if details.leave.booked_after != "0.0" and details.leave.booked_after != "0" %}, plus {{ details.leave.booked_after }} booked after{% endif %} = <strong>{{ details.leave.payable }} days</strong>.</div>{% endif %}
+    {% if details.notice %}<div class="mb-2"><strong>Notice</strong>: {{ details.notice.required }} days required, {{ details.notice.served }} served, {{ details.notice.short }} short.</div>{% endif %}
+    {% if details.gratuity %}
+      <div class="mb-2"><strong>Gratuity</strong>:
+      {% if details.gratuity.applies == False and details.gratuity.why %}{{ details.gratuity.why }}
+      {% elif details.gratuity.applies == False %}decided not payable{% if case.gratuity_note %} ({{ case.gratuity_note }}){% endif %}.
+      {% else %}wage {{ details.gratuity.wage|floatformat:3 }} (basic plus social allowance). Service {{ details.gratuity.service_years|floatformat:2 }} years, of which {{ details.gratuity.years_before_scheme|floatformat:2 }} before 1 March 2024. The employer pays {{ details.gratuity.employer_months|floatformat:2 }} months of wage for that part. The SIO pays the employee about {{ details.gratuity.sio_estimate|floatformat:3 }} BHD for the {{ details.gratuity.years_since_scheme|floatformat:2 }} years since.{% endif %}</div>
+    {% endif %}
+    <div class="text-body-secondary">These follow the Bahrain Labour Law for the private sector and the SIO gratuity scheme. Have them confirmed by the company's legal adviser.</div>
+  </div></div></div>
+</div>
+
+<div class="card shadow-sm border-0 mt-3"><div class="card-body small">
+  <h2>Clearance checklist</h2>
+  <div class="row"><div class="col-md-6"><ul class="mb-0">
+    <li>Cancel the work permit with the LMRA and the residence permit.</li>
+    <li>End the SIO registration and check the SIO gratuity contributions are paid up to the last month.</li>
+    <li>Return of company assets, keys, card and vehicle.</li>
+  </ul></div><div class="col-md-6"><ul class="mb-0">
+    <li>Return ticket to the home country, if the contract provides one.</li>
+    <li>Pay within the period the law allows, and give the signed statement.</li>
+    <li>Issue the end-of-service certificate (available once approved).</li>
+  </ul></div></div>
+</div></div>
+{% endblock %}

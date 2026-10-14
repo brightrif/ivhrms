@@ -14,7 +14,10 @@
   {% if gaps.without_payment %}
   <a class="btn btn-sm btn-warning" href="?show=no_payment">{{ gaps.without_payment }} without payment details</a>
   {% endif %}
-  {% if not gaps.staff_without_salary and not gaps.without_payment and gaps.total %}
+  {% if gaps.nationality_unknown %}
+  <a class="btn btn-sm btn-warning" href="?show=nationality">{{ gaps.nationality_unknown }} staff with a nationality payroll cannot read</a>
+  {% endif %}
+  {% if not gaps.staff_without_salary and not gaps.without_payment and not gaps.nationality_unknown and gaps.total %}
   <span class="badge text-bg-success align-self-center"><i class="bi bi-check2-circle me-1"></i>Every person has a salary and payment details</span>
   {% endif %}
 </div>
@@ -36,6 +39,7 @@
     <option value="">Everyone</option>
     <option value="no_salary"{% if show == "no_salary" %} selected{% endif %}>Staff without a salary</option>
     <option value="no_payment"{% if show == "no_payment" %} selected{% endif %}>Without payment details</option>
+    <option value="nationality"{% if show == "nationality" %} selected{% endif %}>Nationality not recognised</option>
   </select></div>
   <div class="col-auto"><button class="btn btn-outline-primary">Show</button></div>
 </form>

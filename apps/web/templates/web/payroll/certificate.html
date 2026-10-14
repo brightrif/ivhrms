@@ -1,0 +1,29 @@
+{% load static %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>End-of-service certificate - {{ case.employee.full_name }}</title>
+<link rel="stylesheet" href="{% static 'web/vendor/bootstrap/bootstrap.min.css' %}">
+<style>
+  body { background: #f4f5f7; } .sheet { background: #fff; max-width: 780px; margin: 16px auto; padding: 48px 56px; border: 1px solid #dee2e6; border-radius: 6px; min-height: 900px; }
+  .sign { border-bottom: 1px solid #333; height: 54px; }
+  @media print { body { background: #fff; } .no-print { display: none !important; } .sheet { border: 0; margin: 0 auto; padding: 0; max-width: none; } @page { margin: 20mm; } }
+</style></head><body>
+<div class="no-print d-flex justify-content-between align-items-center container py-3" style="max-width:780px">
+  <a href="{% url 'web:payroll_settlement' case.pk %}">&larr; Back</a><button class="btn btn-primary" onclick="window.print()">Print / Save as PDF</button>
+</div>
+<div class="sheet">
+  <div class="text-center mb-5"><h1 class="h3">{{ case.company.name }}</h1><div class="h5 mt-4">END OF SERVICE CERTIFICATE</div></div>
+  <p class="mb-4">This is to certify that the person named below was employed by {{ case.company.name }} on the terms stated.</p>
+  <table class="table table-borderless">
+    <tr><td class="text-body-secondary" style="width:38%">Name</td><td class="fw-semibold">{{ case.employee.full_name }}</td></tr>
+    <tr><td class="text-body-secondary">Employee no.</td><td>{{ case.employee.employee_no }}</td></tr>
+    {% if case.employee.nationality %}<tr><td class="text-body-secondary">Nationality</td><td>{{ case.employee.nationality }}</td></tr>{% endif %}
+    {% if case.employee.designation %}<tr><td class="text-body-secondary">Position</td><td>{{ case.employee.designation }}</td></tr>{% endif %}
+    <tr><td class="text-body-secondary">Date of joining</td><td>{{ case.employee.joining_date|date:"d F Y" }}</td></tr>
+    <tr><td class="text-body-secondary">Last working day</td><td>{{ case.last_working_day|date:"d F Y" }}</td></tr>
+    {% if details.basis %}<tr><td class="text-body-secondary">Last monthly wage</td><td>BHD {{ details.basis.monthly_total|floatformat:3 }} (basic salary BHD {{ details.basis.basic|floatformat:3 }})</td></tr>{% endif %}
+    <tr><td class="text-body-secondary">End of employment</td><td>{{ case.get_reason_display }}</td></tr>
+  </table>
+  <p class="mt-4">This certificate is issued at the employee's request, without liability on the company.</p>
+  <p class="text-body-secondary small">Issued on {% now "d F Y" %}.</p>
+  <div class="row mt-5 pt-5"><div class="col-5"><div class="sign"></div>Authorised signatory, name and stamp</div></div>
+</div></body></html>

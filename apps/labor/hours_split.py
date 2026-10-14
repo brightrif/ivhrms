@@ -57,6 +57,8 @@ def split_days(user, employee, lines, first, last, *, even=False, today=None):
     if (last - first).days >= MAX_DAYS:
         raise LaborError(f"Choose {MAX_DAYS} days or fewer at a time.")
 
+    from . import locks  # payroll lock: split_days
+    locks.ensure_open([employee.pk], first, last, "dividing hours")
     cells_by_project = {}
     for line in lines:
         project = line["project"]

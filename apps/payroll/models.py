@@ -28,6 +28,11 @@ class AllowanceType(BaseModel):
                   "it only matters for Bahraini staff.")
     is_active = models.BooleanField(default=True)
 
+    counts_for_gratuity = models.BooleanField(
+        "Social allowance (counts for gratuity)", default=False,
+        help_text="Tick for the social allowance, if the company pays one. Gratuity is worked out on basic salary plus "
+                  "this allowance only.")
+
     objects = CompanyQuerySet.as_manager()
 
     class Meta:
@@ -91,6 +96,12 @@ class SalaryRecord(BaseModel):
         return self.basic + sum((a.amount for a in self.allowances.all() if a.allowance_type.counts_for_sio),
                                 Decimal("0"))
 
+    @property
+    def gratuity_wage(self):
+        """Basic plus the allowances marked as the social allowance: the wage end-of-service gratuity is worked on."""
+        return self.basic + sum((a.amount for a in self.allowances.all() if a.allowance_type.counts_for_gratuity),
+                                Decimal("0"))
+
     def __str__(self):
         return f"{self.employee} from {self.effective_from}"
 
@@ -149,3 +160,7 @@ class PaymentDetail(BaseModel):
 
     def __str__(self):
         return f"{self.employee}: {self.get_method_display()}"
+
+
+from . import payrun  # noqa: E402,F401  (registers the payroll run models)
+from . import finalsettlement  # noqa: E402,F401  (registers the final settlement models)

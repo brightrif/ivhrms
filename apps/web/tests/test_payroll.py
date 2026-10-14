@@ -149,6 +149,16 @@ class PeopleListTests(PayrollPageCase):
         self.assertContains(page, "Sunil")
         self.assertNotContains(page, "Sara")
 
+    def test_staff_whose_nationality_payroll_cannot_read_are_listed(self):
+        Employee.objects.filter(pk=self.emp.pk).update(nationality="Bahrani")        # a typing mistake
+        Employee.objects.filter(pk=self.omar.pk).update(nationality="Bahraini")
+        page = self.client.get(self.url("payroll_home"))
+        self.assertContains(page, "1 staff with a nationality payroll cannot read")
+        shown = self.client.get(self.url("payroll_home"), {"show": "nationality"})
+        self.assertContains(shown, "Sara")
+        self.assertNotContains(shown, "Omar")
+        self.assertNotContains(shown, "Sunil")                       # labor is not part of the SIO question
+
     def test_search_and_type_filters(self):
         self.assertNotContains(self.client.get(self.url("payroll_home"), {"q": "omar"}), "Sunil")
         self.assertContains(self.client.get(self.url("payroll_home"), {"q": "L-2"}), "Sunil")
@@ -157,6 +167,7 @@ class PeopleListTests(PayrollPageCase):
         self.assertNotContains(page, "Sara")
 
     def test_everyone_set_up_is_said_so(self):
+        Employee.objects.update(nationality="Indian")
         self.pay(self.omar)
         services.save_payment_details(self.omar, method="cash")
         services.save_payment_details(self.direct, method="cash")

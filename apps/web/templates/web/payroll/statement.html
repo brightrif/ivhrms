@@ -1,0 +1,40 @@
+{% load static %}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Final settlement - {{ case.employee.full_name }}</title>
+<link rel="stylesheet" href="{% static 'web/vendor/bootstrap/bootstrap.min.css' %}">
+<style>
+  body { background: #f4f5f7; } .sheet { background: #fff; max-width: 780px; margin: 16px auto; padding: 28px 34px; border: 1px solid #dee2e6; border-radius: 6px; }
+  .money { text-align: right; white-space: nowrap; } .sign { border-bottom: 1px solid #333; height: 44px; }
+  @media print { body { background: #fff; } .no-print { display: none !important; } .sheet { border: 0; margin: 0 auto; padding: 0; max-width: none; } @page { margin: 14mm; } }
+</style></head><body>
+<div class="no-print d-flex justify-content-between align-items-center container py-3" style="max-width:780px">
+  <a href="{% url 'web:payroll_settlement' case.pk %}">&larr; Back</a><button class="btn btn-primary" onclick="window.print()">Print / Save as PDF</button>
+</div>
+<div class="sheet">
+  <div class="d-flex justify-content-between border-bottom pb-2 mb-3">
+    <div><h1 class="h4 mb-0">{{ case.company.name }}</h1><div class="small text-body-secondary">Final settlement statement</div></div>
+    <div class="text-end small">{% if not case.frozen %}<span class="badge text-bg-warning">DRAFT, not approved</span><br>{% endif %}{{ case.get_status_display }}</div>
+  </div>
+  <div class="row g-2 small mb-3">
+    <div class="col-6"><div class="text-body-secondary">Employee</div><div class="fw-semibold">{{ case.employee.full_name }}</div></div>
+    <div class="col-6"><div class="text-body-secondary">Employee no.</div><div class="fw-semibold">{{ case.employee.employee_no }}</div></div>
+    <div class="col-6"><div class="text-body-secondary">Joined</div><div>{{ case.employee.joining_date|date:"d M Y" }}</div></div>
+    <div class="col-6"><div class="text-body-secondary">Last working day</div><div>{{ case.last_working_day|date:"d M Y" }}</div></div>
+    <div class="col-6"><div class="text-body-secondary">Why employment ends</div><div>{{ case.get_reason_display }}</div></div>
+    <div class="col-6"><div class="text-body-secondary">Paid by</div><div>{% if case.payment_method == 'bank' %}Bank transfer, {{ case.bank_name }} {{ case.iban_masked }}{% elif case.payment_method == 'cash' %}Cash{% else %}-{% endif %}</div></div>
+  </div>
+  <table class="table table-sm mb-3">
+    <thead class="table-light"><tr><th>Description</th><th class="money">BHD</th></tr></thead>
+    <tbody>{% for i in items %}<tr><td>{{ i.label }}</td><td class="money">{{ i.amount|floatformat:3 }}</td></tr>{% endfor %}</tbody>
+    <tfoot><tr class="fw-semibold"><td>Net amount payable to the employee</td><td class="money">{{ case.total|floatformat:3 }}</td></tr></tfoot>
+  </table>
+  {% if details.gratuity.sio_estimate and details.gratuity.applies %}
+  <p class="small text-body-secondary">In addition, the end-of-service gratuity for service since 1 March 2024 ({{ details.gratuity.years_since_scheme|floatformat:2 }} years) is paid to the employee by the Social Insurance Organisation from the contributions the employer has made. The employee applies to the SIO for it.</p>
+  {% endif %}
+  <p class="small">I acknowledge that I have received the amount above in full settlement of my dues from the company.</p>
+  <div class="row g-4 mt-2 small">
+    <div class="col-4"><div class="sign"></div>Employee: name, signature, date</div>
+    <div class="col-4"><div class="sign"></div>Prepared by (HR)</div>
+    <div class="col-4"><div class="sign"></div>Approved by (Management)</div>
+  </div>
+</div></body></html>

@@ -1,0 +1,67 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}{{ line.employee_name }}, {{ run.label }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div><h1 class="mb-0">{{ line.employee_name }}</h1>
+    <div class="text-body-secondary">{{ line.employee_no }} &middot; {{ run.label }} &middot; {{ run.company.name }}</div></div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:payroll_run' run.pk %}">Back to the run</a>
+    <a class="btn btn-outline-secondary" href="{% url 'web:payroll_employee' line.employee_id %}">Salary and payment</a>
+    {% if run.status == 'approved' or run.status == 'paid' %}<a class="btn btn-outline-primary" target="_blank" href="{% url 'web:payroll_payslip' run.pk line.pk %}"><i class="bi bi-printer me-1"></i>Payslip</a>{% endif %}
+  </div>
+</div>
+{% for i in line.issues %}<div class="alert {% if i.level == 'block' %}alert-danger{% else %}alert-warning{% endif %} py-2">{{ i.text }}</div>{% endfor %}
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>How the pay is worked out</h2>
+    <table class="table table-sm mb-0"><tbody>
+      <tr><td>{% if line.breakdown.labor %}Gross pay (wages and approved overtime){% else %}Gross pay ({{ line.days_employed }} of {{ line.breakdown.days_in_period }} days employed){% endif %}</td><td class="text-end">{{ line.gross|floatformat:3 }}</td></tr>
+      {% if not line.breakdown.labor %}<tr><td>Absence and unpaid days ({{ line.unpaid_days|floatformat:"-2" }} day{{ line.unpaid_days|pluralize }}, at salary &divide; {{ line.breakdown.days_in_month }})</td><td class="text-end">-{{ line.absence_deduction|floatformat:3 }}</td></tr>{% endif %}
+      <tr><td>SIO, employee share{% if line.sio_wage %} (on {{ line.sio_wage|floatformat:3 }}){% endif %}</td><td class="text-end">-{{ line.sio_employee|floatformat:3 }}</td></tr>
+      <tr><td>Additions</td><td class="text-end">+{{ line.additions|floatformat:3 }}</td></tr>
+      <tr><td>Deductions</td><td class="text-end">-{{ line.deductions|floatformat:3 }}</td></tr>
+      <tr class="fw-semibold"><td>Net pay</td><td class="text-end">{{ line.net|floatformat:3 }}</td></tr>
+    </tbody></table>
+    <div class="small text-body-secondary mt-2">Company SIO cost on top: {{ line.sio_employer|floatformat:3 }} BHD.{% if line.breakdown.eosg %} SIO gratuity contribution to pay the SIO: {{ line.breakdown.eosg.amount|floatformat:3 }} BHD ({{ line.breakdown.eosg.rate }}% of {{ line.breakdown.eosg.wage|floatformat:3 }}).{% endif %} Paid by: {{ line.get_payment_label }}{% if line.paid_on %}, paid on {{ line.paid_on|date:"d M Y" }}{% endif %}.</div>
+  </div></div></div>
+  {% if line.breakdown.labor %}
+  <div class="col-lg-6"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>What the labor records say</h2>
+    <table class="table table-sm mb-3"><tbody>
+      <tr><td>Pay basis{{ line.breakdown.basis|length|pluralize }}</td><td class="text-end">{{ line.breakdown.basis|join:", " }}</td></tr>
+      <tr><td>Days worked</td><td class="text-end">{{ line.breakdown.days_worked }}</td></tr>
+      <tr><td>Hours on the timesheet</td><td class="text-end">{{ line.breakdown.hours }}</td></tr>
+      <tr><td>Wages (including premium-free holiday and leave pay, as the pay terms say)</td><td class="text-end">{{ line.breakdown.wages }}</td></tr>
+      <tr><td>Approved overtime and premium ({{ line.breakdown.overtime_hours }} hours)</td><td class="text-end">{{ line.breakdown.overtime }}</td></tr>
+    </tbody></table>
+    {% if line.breakdown.lost_days %}
+    <h2>Days not fully worked</h2>
+    <table class="table table-sm mb-0"><thead class="table-light"><tr><th>Date</th><th>Attendance</th><th class="text-end">Day lost</th></tr></thead><tbody>
+    {% for d in line.breakdown.lost_days %}<tr><td>{{ d.date }}</td><td>{{ d.status }}</td><td class="text-end">{{ d.lost }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% endif %}
+  </div></div></div>
+  {% else %}
+  <div class="col-lg-6"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>Salary in force this month</h2>
+    <table class="table table-sm mb-3"><thead class="table-light"><tr><th>From</th><th>To</th><th class="text-end">Days</th><th class="text-end">Monthly</th><th class="text-end">Earned</th></tr></thead><tbody>
+    {% for s in line.breakdown.segments %}<tr><td>{{ s.from }}</td><td>{{ s.to }}</td><td class="text-end">{{ s.days }}</td><td class="text-end">{{ s.monthly_total }}</td><td class="text-end">{{ s.amount }}</td></tr>
+    {% empty %}<tr><td colspan="5" class="text-body-secondary">No salary on record.</td></tr>{% endfor %}
+    </tbody></table>
+    {% if line.breakdown.lost_days %}
+    <h2>Days that cost pay</h2>
+    <table class="table table-sm mb-3"><thead class="table-light"><tr><th>Date</th><th>Attendance</th><th class="text-end">Day lost</th><th class="text-end">Cost</th></tr></thead><tbody>
+    {% for d in line.breakdown.lost_days %}<tr><td>{{ d.date }}</td><td>{{ d.status }}</td><td class="text-end">{{ d.lost }}</td><td class="text-end">{{ d.amount }}</td></tr>{% endfor %}
+    </tbody></table>
+    {% endif %}
+    {% if line.breakdown.missing_days %}<div class="small text-warning-emphasis">No attendance entry (paid in full): {{ line.breakdown.missing_days|join:", " }}</div>{% endif %}
+  </div></div></div>
+  {% endif %}
+</div>
+{% if adjustments %}
+<div class="card shadow-sm border-0 mt-3"><div class="card-body"><h2>Additions and deductions</h2>
+  <table class="table table-sm mb-0"><tbody>{% for a in adjustments %}<tr><td>{{ a.label }}</td><td>{{ a.get_kind_display }}</td><td class="text-end">{% if a.kind == 'deduction' %}-{% endif %}{{ a.amount|floatformat:3 }}</td></tr>{% endfor %}</tbody></table>
+</div></div>
+{% endif %}
+{% endblock %}

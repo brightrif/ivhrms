@@ -78,6 +78,9 @@
           {% if perms.payroll.view_salaryrecord %}
           <a class="nav-link {% if u|slice:':8' == 'payroll_' %}active{% endif %}" href="{% url 'web:payroll_home' %}">
             <i class="bi bi-cash-coin"></i> Payroll</a>
+          {% elif perms.payroll.view_payrollrun %}
+          <a class="nav-link {% if u|slice:':8' == 'payroll_' %}active{% endif %}" href="{% url 'web:payroll_runs' %}">
+            <i class="bi bi-cash-coin"></i> Payroll</a>
           {% endif %}
           {% if perms.configuration %}
           <a class="nav-link {% if u|slice:':9' == 'settings_' %}active{% endif %}" href="{% url 'web:settings_home' %}">

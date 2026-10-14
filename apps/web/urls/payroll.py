@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.web.views import payroll
+from apps.web.views import payroll, payroll_runs, payroll_settlements
 
 urlpatterns = [
     path("payroll/", payroll.payroll_home, name="payroll_home"),
@@ -12,4 +12,36 @@ urlpatterns = [
     path("payroll/allowances/new/", payroll.allowance_create, name="payroll_allowance_create"),
     path("payroll/allowances/<int:pk>/edit/", payroll.allowance_edit, name="payroll_allowance_edit"),
     path("payroll/allowances/<int:pk>/toggle/", payroll.allowance_toggle, name="payroll_allowance_toggle"),
+    path("payroll/policy/", payroll_runs.policy_list, name="payroll_policy"),
+    path("payroll/policy/new/", payroll_runs.policy_new, name="payroll_policy_new"),
+    path("payroll/runs/", payroll_runs.run_list, name="payroll_runs"),
+    path("payroll/runs/new/", payroll_runs.run_create, name="payroll_run_create"),
+    path("payroll/runs/<int:pk>/", payroll_runs.run_detail, name="payroll_run"),
+    path("payroll/runs/<int:pk>/recalculate/", payroll_runs.run_recalculate, name="payroll_run_recalculate"),
+    path("payroll/runs/<int:pk>/cancel/", payroll_runs.run_cancel, name="payroll_run_cancel"),
+    path("payroll/runs/<int:pk>/submit/", payroll_runs.run_submit, name="payroll_run_submit"),
+    path("payroll/runs/<int:pk>/withdraw/", payroll_runs.run_withdraw, name="payroll_run_withdraw"),
+    path("payroll/runs/<int:pk>/charges/", payroll_runs.run_import_charges, name="payroll_run_charges"),
+    path("payroll/runs/<int:pk>/adjustments/new/", payroll_runs.adjustment_add, name="payroll_adjustment_add"),
+    path("payroll/runs/<int:pk>/adjustments/<int:adjustment_pk>/remove/", payroll_runs.adjustment_remove,
+         name="payroll_adjustment_remove"),
+    path("payroll/runs/<int:pk>/lines/<int:line_pk>/", payroll_runs.line_detail, name="payroll_line"),
+    path("payroll/runs/<int:pk>/pay/<str:method>/", payroll_runs.run_pay, name="payroll_run_pay"),
+    path("payroll/runs/<int:pk>/export/<str:kind>/", payroll_runs.run_export, name="payroll_run_export"),
+    path("payroll/runs/<int:pk>/payslips/", payroll_runs.payslips, name="payroll_payslips"),
+    path("payroll/settlements/", payroll_settlements.settlement_list, name="payroll_settlements"),
+    path("payroll/settlements/new/", payroll_settlements.settlement_create, name="payroll_settlement_create"),
+    path("payroll/settlements/<int:pk>/", payroll_settlements.settlement_detail, name="payroll_settlement"),
+    path("payroll/settlements/<int:pk>/edit/", payroll_settlements.settlement_edit, name="payroll_settlement_edit"),
+    path("payroll/settlements/<int:pk>/recalculate/", payroll_settlements.settlement_recalculate, name="payroll_settlement_recalculate"),
+    path("payroll/settlements/<int:pk>/items/new/", payroll_settlements.item_add, name="payroll_settlement_item_add"),
+    path("payroll/settlements/<int:pk>/items/<int:item_pk>/remove/", payroll_settlements.item_remove, name="payroll_settlement_item_remove"),
+    path("payroll/settlements/<int:pk>/charges/", payroll_settlements.settlement_charges, name="payroll_settlement_charges"),
+    path("payroll/settlements/<int:pk>/submit/", payroll_settlements.settlement_submit, name="payroll_settlement_submit"),
+    path("payroll/settlements/<int:pk>/withdraw/", payroll_settlements.settlement_withdraw, name="payroll_settlement_withdraw"),
+    path("payroll/settlements/<int:pk>/cancel/", payroll_settlements.settlement_cancel, name="payroll_settlement_cancel"),
+    path("payroll/settlements/<int:pk>/pay/", payroll_settlements.settlement_pay, name="payroll_settlement_pay"),
+    path("payroll/settlements/<int:pk>/statement/", payroll_settlements.settlement_statement, name="payroll_settlement_statement"),
+    path("payroll/settlements/<int:pk>/certificate/", payroll_settlements.settlement_certificate, name="payroll_settlement_certificate"),
+    path("payroll/runs/<int:pk>/lines/<int:line_pk>/payslip/", payroll_runs.payslip, name="payroll_payslip"),
 ]

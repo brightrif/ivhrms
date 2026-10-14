@@ -1,0 +1,112 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Payroll {{ run.label }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h1 class="mb-0">Payroll {{ run.label }}</h1>
+    <div class="text-body-secondary">{{ run.company.name }} &middot; {{ run.get_kind_display|lower }}
+      <span class="badge {% if run.status == 'paid' %}text-bg-success{% elif run.status == 'approved' %}text-bg-primary{% elif run.status == 'submitted' %}text-bg-warning{% elif run.status == 'cancelled' %}text-bg-secondary{% else %}text-bg-light border{% endif %}">{{ run.get_status_display }}</span></div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <a class="btn btn-outline-secondary" href="{% url 'web:payroll_runs' %}">All runs</a>
+    <div class="dropdown"><button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-download me-1"></i>Downloads</button>
+      <ul class="dropdown-menu">
+        <li><a class="dropdown-item" href="{% url 'web:payroll_run_export' run.pk 'register' %}">Payroll register</a></li>
+        <li><a class="dropdown-item" href="{% url 'web:payroll_run_export' run.pk 'bank' %}">Bank transfer sheet</a></li>
+        <li><a class="dropdown-item" href="{% url 'web:payroll_run_export' run.pk 'cash' %}">Cash pay list</a></li>
+        {% if run.status == 'approved' or run.status == 'paid' %}<li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" target="_blank" href="{% url 'web:payroll_payslips' run.pk %}"><i class="bi bi-printer me-2"></i>All payslips (print or save as PDF)</a></li>{% endif %}
+      </ul></div>
+    {% if run.status == 'draft' %}
+      {% if perms.payroll.add_payrollrun %}
+      <form method="post" action="{% url 'web:payroll_run_recalculate' run.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-primary">Recalculate</button></form>
+      <a class="btn btn-outline-primary" href="{% url 'web:payroll_adjustment_add' run.pk %}">Add adjustment</a>
+      {% endif %}
+      {% if perms.payroll.submit_payrollrun %}
+      <form method="post" action="{% url 'web:payroll_run_submit' run.pk %}" class="d-inline" onsubmit="return confirm('Send this run to Management for approval? It cannot be changed while it waits.')">{% csrf_token %}<button class="btn btn-primary">Send for approval</button></form>
+      {% endif %}
+    {% elif run.status == 'submitted' and perms.payroll.submit_payrollrun %}
+      <form method="post" action="{% url 'web:payroll_run_withdraw' run.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-secondary">Take back</button></form>
+    {% elif run.status == 'approved' and perms.payroll.pay_payrollrun %}
+      {% if bank_unpaid %}<a class="btn btn-primary" href="{% url 'web:payroll_run_pay' run.pk 'bank' %}">Record bank transfers ({{ bank_unpaid }})</a>{% endif %}
+      {% if cash_unpaid %}<a class="btn btn-primary" href="{% url 'web:payroll_run_pay' run.pk 'cash' %}">Record cash ({{ cash_unpaid }})</a>{% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{% if no_profile %}
+<div class="alert alert-warning py-2">{{ no_profile|length }} labor worker{{ no_profile|length|pluralize }} {% if no_profile|length == 1 %}has{% else %}have{% endif %} no labor profile, so no pay terms, and {% if no_profile|length == 1 %}is{% else %}are{% endif %} not in this run: {% for w in no_profile %}{{ w.employee_no }} {{ w.full_name }}{% if not forloop.last %}, {% endif %}{% endfor %}. Add a profile under Labor.</div>
+{% endif %}
+{% if run.note %}<div class="alert alert-warning py-2">{{ run.note }}</div>{% endif %}
+{% if run.status == 'submitted' %}<div class="alert alert-info py-2">Waiting for Management to approve. The figures cannot change while it waits.</div>{% endif %}
+{% if run.status == 'draft' and totals.blocking %}
+<div class="alert alert-danger py-2"><strong>{{ totals.blocking }} {% if totals.blocking == 1 %}person has{% else %}people have{% endif %} a problem to fix</strong> before this run can be sent for approval. Open the lines marked in red.</div>
+{% endif %}
+{% if run.status == 'draft' and totals.warnings %}
+<div class="alert alert-warning py-2">{{ totals.warnings }} {% if totals.warnings == 1 %}line needs{% else %}lines need{% endif %} a look (amber). They can still be approved.</div>
+{% endif %}
+
+<div class="row g-2 mb-3">
+  <div class="col-6 col-md"><div class="card border-0 shadow-sm"><div class="card-body py-2"><div class="small text-body-secondary">People</div><div class="fs-5">{{ totals.people }}</div></div></div></div>
+  <div class="col-6 col-md"><div class="card border-0 shadow-sm"><div class="card-body py-2"><div class="small text-body-secondary">Gross</div><div class="fs-5">{{ totals.gross|floatformat:3 }}</div></div></div></div>
+  <div class="col-6 col-md"><div class="card border-0 shadow-sm"><div class="card-body py-2"><div class="small text-body-secondary">Absence</div><div class="fs-5">{{ totals.absence|floatformat:3 }}</div></div></div></div>
+  <div class="col-6 col-md"><div class="card border-0 shadow-sm"><div class="card-body py-2"><div class="small text-body-secondary">SIO (employees)</div><div class="fs-5">{{ totals.sio_employee|floatformat:3 }}</div></div></div></div>
+  <div class="col-6 col-md"><div class="card border-0 shadow-sm"><div class="card-body py-2"><div class="small text-body-secondary">Additions / deductions</div><div class="fs-5">{{ totals.additions|floatformat:3 }} / {{ totals.deductions|floatformat:3 }}</div></div></div></div>
+  <div class="col-6 col-md"><div class="card border-0 shadow-sm bg-primary-subtle"><div class="card-body py-2"><div class="small text-body-secondary">Net pay</div><div class="fs-5 fw-semibold">{{ totals.net|floatformat:3 }}</div></div></div></div>
+</div>
+<div class="small text-body-secondary mb-2">Bank {{ totals.bank|floatformat:3 }} &middot; cash {{ totals.cash|floatformat:3 }} &middot; company SIO cost on top {{ totals.sio_employer|floatformat:3 }} BHD &middot; SIO gratuity contribution to pay the SIO {{ totals.eosg|floatformat:3 }} BHD</div>
+
+<div class="card shadow-sm border-0"><div class="table-responsive">
+  <table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>No.</th><th>Name</th><th class="text-end">Days</th><th class="text-end">Gross</th><th class="text-end">Absence</th><th class="text-end">SIO</th><th class="text-end">Adds</th><th class="text-end">Deducts</th><th class="text-end">Net</th><th>Paid by</th><th></th></tr></thead>
+    <tbody>
+    {% for l in lines %}
+      <tr class="{% if l.blocking %}table-danger{% elif l.warnings %}table-warning{% endif %}">
+        <td class="text-nowrap">{{ l.employee_no }}</td>
+        <td><a class="fw-medium text-decoration-none" href="{% url 'web:payroll_line' run.pk l.pk %}">{{ l.employee_name }}</a>
+          {% for i in l.issues %}<div class="small {% if i.level == 'block' %}text-danger{% else %}text-warning-emphasis{% endif %}">{{ i.text }}</div>{% endfor %}</td>
+        <td class="text-end">{{ l.days_employed }}</td>
+        <td class="text-end">{{ l.gross|floatformat:3 }}</td>
+        <td class="text-end">{{ l.absence_deduction|floatformat:3 }}</td>
+        <td class="text-end">{{ l.sio_employee|floatformat:3 }}</td>
+        <td class="text-end">{{ l.additions|floatformat:3 }}</td>
+        <td class="text-end">{{ l.deductions|floatformat:3 }}</td>
+        <td class="text-end fw-semibold">{{ l.net|floatformat:3 }}</td>
+        <td>{{ l.get_payment_label }}</td>
+        <td class="text-nowrap">{% if l.paid_on %}<span class="badge text-bg-success">Paid {{ l.paid_on|date:"d M" }}</span>{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="11" class="text-center text-body-secondary py-4">Nobody is in this run.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+
+<div class="card shadow-sm border-0 mt-3">
+  <div class="card-header bg-white py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <span class="fw-semibold">Additions and deductions</span>
+    {% if run.status == 'draft' and perms.payroll.add_payrollrun %}
+    <span class="d-flex gap-2">
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'web:payroll_adjustment_add' run.pk %}">Add</a>
+      <form method="post" action="{% url 'web:payroll_run_charges' run.pk %}" class="d-inline">{% csrf_token %}
+        <button class="btn btn-sm btn-outline-primary">Pick up charges{% if candidates %} ({{ candidates }}){% endif %}</button></form>
+    </span>
+    {% endif %}
+  </div>
+  <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>Person</th><th>What for</th><th>Type</th><th class="text-end">Amount</th><th></th></tr></thead>
+    <tbody>
+    {% for a in adjustments %}
+      <tr><td>{{ a.employee.employee_no }} {{ a.employee.full_name }}</td><td>{{ a.label }}</td>
+        <td>{{ a.get_kind_display }} <span class="small text-body-secondary">{{ a.get_category_display }}</span></td>
+        <td class="text-end">{% if a.kind == 'deduction' %}-{% endif %}{{ a.amount|floatformat:3 }}</td>
+        <td class="text-end">{% if run.status == 'draft' and perms.payroll.add_payrollrun %}
+          <form method="post" action="{% url 'web:payroll_adjustment_remove' run.pk a.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">Remove</button></form>{% endif %}</td></tr>
+    {% empty %}
+      <tr><td colspan="5" class="text-center text-body-secondary py-3">None.</td></tr>
+    {% endfor %}
+    </tbody></table></div>
+</div>
+<p class="small text-body-secondary mt-2">Anyone marked as Separated is not in a run; they are paid through final settlement. {% if run.kind == 'labor' %}Contractor-supplied labor is paid through the contractor statement, so it is not here.{% else %}Direct labor has its own run.{% endif %}</p>
+{% endblock %}

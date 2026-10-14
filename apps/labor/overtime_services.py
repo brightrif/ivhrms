@@ -135,6 +135,8 @@ def prepare_claims(user, project, location, first, last):
         overtime_claim__isnull=True).select_related("employee", "employee__labor_profile").order_by("employee_id", "date"))
     if not entries:
         raise LaborError("There are no confirmed hours without a claim in this period. Confirm the timesheet first.")
+    from . import locks  # payroll lock: prepare_claims
+    locks.ensure_open({e.employee_id for e in entries}, first, last, "preparing overtime claims")
     kinds, rates, created, skipped = {}, {}, 0, []
     for e in entries:
         label = f"{e.employee.employee_no} {e.date:%d %b}"
@@ -178,6 +180,8 @@ def decide(user, claims, approve, note=""):
         if claim.status != Claim.Status.PENDING:
             skipped += 1
             continue
+        from . import locks  # payroll lock: decide
+        locks.ensure_open([claim.employee_id], claim.date, claim.date, "deciding overtime")
         claim.status = Claim.Status.APPROVED if approve else Claim.Status.REJECTED
         claim.decided_by, claim.decided_at, claim.decision_note = user, timezone.now(), note[:255]
         claim.save()
@@ -192,6 +196,8 @@ def void_claims(user, project, location, first, last):
     claims = list(Claim.objects.for_user(user).filter(project=project, location=location, date__range=(first, last)))
     if not claims:
         raise LaborError("There are no overtime claims in this period.")
+    from . import locks  # payroll lock: void_claims
+    locks.ensure_open({c.employee_id for c in claims}, first, last, "voiding overtime claims")
     for c in claims:
         c.delete()
     return len(claims)

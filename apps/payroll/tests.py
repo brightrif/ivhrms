@@ -31,6 +31,22 @@ def make_profile(employee, engagement):
     return LaborProfile.objects.create(**kwargs)
 
 
+def make_renewal_payment(employee, task=None, **kw):
+    """A renewal payment for an employee's document, built through the compliance module's own service."""
+    from apps.compliance import services as compliance
+    from apps.compliance.models import Document, DocumentType, RenewalPayment
+
+    if task is None:
+        kind = DocumentType.objects.get_or_create(
+            code="residence-permit", defaults={"name": "Residence permit", "applies_to": "employee"})[0]
+        document = Document.objects.create(employee=employee, document_type=kind, expiry_date=date(2027, 1, 1))
+        task = compliance.open_renewal(document)
+    defaults = dict(paid_on=date(2026, 3, 5), government_fee=D("0"), service_fee=D("0"), fine=D("0"))
+    payment = RenewalPayment(**{**defaults, **kw})
+    compliance.record_payment(task, payment)
+    return payment
+
+
 class PayrollCase(TestCase):
     def setUp(self):
         self.co = Company.objects.create(code="IV1", name="IV One")
@@ -255,11 +271,11 @@ class CoverageTests(PayrollCase):
         second = self.person("Omar", "S-2")
         today = date(2025, 3, 1)
         self.assertEqual(services.coverage(self.hr, today), {
-            "total": 2, "staff_total": 2, "staff_without_salary": 2, "without_payment": 2})
+            "total": 2, "staff_total": 2, "staff_without_salary": 2, "without_payment": 2, "nationality_unknown": 2})
         self.pay(self.emp)
         services.save_payment_details(self.emp, method="cash")
         self.assertEqual(services.coverage(self.hr, today), {
-            "total": 2, "staff_total": 2, "staff_without_salary": 1, "without_payment": 1})
+            "total": 2, "staff_total": 2, "staff_without_salary": 1, "without_payment": 1, "nationality_unknown": 2})
         self.pay(second, start=date(2026, 1, 1))                                            # starts later: not paid yet
         self.assertEqual(services.coverage(self.hr, today)["staff_without_salary"], 1)
         self.assertEqual(services.coverage(self.hr, date(2026, 2, 1))["staff_without_salary"], 0)

@@ -7,11 +7,13 @@ from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, Max, OuterRef, Q
 
 from apps.employees.models import Employee
 
+from . import nationality
 from .models import AllowanceType, PaymentDetail, SalaryAllowance, SalaryRecord
+from .payrun import PayrollLine, PayrollRun
 
 CENT = Decimal("0.001")
 STAFF, LABOR, SEPARATED = Employee.WorkerType.STAFF, Employee.WorkerType.LABOR, Employee.Status.SEPARATED
@@ -37,13 +39,20 @@ def with_coverage(people, today):
                            has_payment=Exists(PaymentDetail.objects.filter(employee=OuterRef("pk"))))
 
 
+def nationality_gaps(user):
+    """Ids of staff whose nationality is blank or not recognised. SIO depends on it, so a run stops at each of them."""
+    return [pk for pk, text in in_payroll(user).filter(worker_type=STAFF).values_list("pk", "nationality")
+            if nationality.classify(text) == nationality.UNKNOWN]
+
+
 def coverage(user, today):
     """The gaps HR has to close before payroll can run."""
     people = with_coverage(in_payroll(user), today)
     staff = people.filter(worker_type=STAFF)
     return {"total": people.count(), "staff_total": staff.count(),
             "staff_without_salary": staff.filter(has_salary=False).count(),
-            "without_payment": people.filter(has_payment=False).count()}
+            "without_payment": people.filter(has_payment=False).count(),
+            "nationality_unknown": len(nationality_gaps(user))}
 
 
 # ------------------------------------------------------------------ allowance types
@@ -64,18 +73,21 @@ def _check_name_free(company, name, exclude_pk=None):
 
 
 @transaction.atomic
-def create_allowance_type(company, *, name, counts_for_sio=False):
+def create_allowance_type(company, *, name, counts_for_sio=False, counts_for_gratuity=False):
     name = _name(name)
     _check_name_free(company, name)
-    return AllowanceType.objects.create(company=company, name=name, counts_for_sio=bool(counts_for_sio))
+    return AllowanceType.objects.create(company=company, name=name, counts_for_sio=bool(counts_for_sio),
+                                        counts_for_gratuity=bool(counts_for_gratuity))
 
 
 @transaction.atomic
-def update_allowance_type(allowance, *, name, counts_for_sio):
+def update_allowance_type(allowance, *, name, counts_for_sio, counts_for_gratuity=None):
     allowance = AllowanceType.objects.select_for_update().get(pk=allowance.pk)
     name = _name(name)
     _check_name_free(allowance.company, name, exclude_pk=allowance.pk)
     allowance.name, allowance.counts_for_sio = name, bool(counts_for_sio)
+    if counts_for_gratuity is not None:
+        allowance.counts_for_gratuity = bool(counts_for_gratuity)
     allowance.save()
     return allowance
 
@@ -113,6 +125,15 @@ def _money(value, what):
     return amount
 
 
+def salary_locked_through(employee):
+    """The last day of the latest approved or paid payroll run that includes this person, or None. A salary cannot
+    start on or before that day, and a salary that was used in such a run cannot be corrected: it would quietly change
+    pay that was already approved."""
+    frozen = [PayrollRun.Status.APPROVED, PayrollRun.Status.PAID]
+    return (PayrollLine.objects.filter(employee=employee, run__status__in=frozen)
+            .aggregate(last=Max("run__period_end"))["last"])
+
+
 def _check_staff(employee, *, allow_separated=False):
     if employee.worker_type != STAFF:
         raise PayrollError("Salary records are for staff. Labor workers are paid from their pay terms under Labor.")
@@ -145,6 +166,11 @@ def change_salary(employee, *, effective_from, basic, allowances, reason, remark
     chosen = _chosen_allowances(employee, allowances)
     if effective_from < employee.joining_date:
         raise PayrollError(f"The salary cannot start before the joining date, {employee.joining_date:%d %b %Y}.")
+    locked = salary_locked_through(employee)
+    if locked and effective_from <= locked:
+        raise PayrollError(f"Payroll up to {locked:%d %b %Y} is already approved, so a new salary cannot start on or "
+                           f"before that date. Start it after {locked:%d %b %Y}, and add an adjustment to the next "
+                           "payroll run for any difference.")
     latest = SalaryRecord.objects.filter(employee=employee, effective_to__isnull=True).first()
     if latest and effective_from <= latest.effective_from:
         raise PayrollError(f"The new salary must start after the current one, which began on "
@@ -164,12 +190,17 @@ def correct_salary(record, *, basic, allowances, remarks):
     """Fix a mistake in the latest salary, in place. Only the latest can be corrected; earlier ones are history.
     The change is audited (the amounts are hidden there) and the reason is kept on the record.
 
-    Phase 2 must refuse this once a payroll run has used the record."""
+    It is refused once an approved or paid payroll run has used the record."""
     record = SalaryRecord.objects.select_for_update().select_related("employee").get(pk=record.pk)
     if record.effective_to is not None:
         raise PayrollError("Only the latest salary can be corrected. Earlier ones are history; start a new salary instead.")
     employee = record.employee
     _check_staff(employee, allow_separated=True)
+    locked = salary_locked_through(employee)
+    if locked and locked >= record.effective_from:
+        raise PayrollError(f"This salary was used in payroll that is already approved (up to {locked:%d %b %Y}), so "
+                           "it cannot be changed. Start a new salary instead, and add an adjustment to the next "
+                           "payroll run for any difference.")
     if not (remarks or "").strip():
         raise PayrollError("Say what was wrong, so the history makes sense later.")
     record.basic = _money(basic, "Basic salary")

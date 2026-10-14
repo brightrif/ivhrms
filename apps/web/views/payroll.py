@@ -20,7 +20,7 @@ from apps.web.forms.payroll import AllowanceTypeForm, PaymentForm, SalaryChangeF
 # Full-page layouts, side by side on a laptop screen so nothing needs scrolling. See form_layout.html.
 LAYOUTS = {
     "allowance": [{"title": "Allowance", "width": "col-lg-6",
-                   "rows": [["company"], ["name"], ["counts_for_sio"]]}],
+                   "rows": [["company"], ["name"], ["counts_for_sio"], ["counts_for_gratuity"]]}],
     "payment": [{"title": "How this person is paid", "width": "col-lg-7",
                  "rows": [["method"], ["bank_name", "iban"]]}],
 }
@@ -87,6 +87,8 @@ def payroll_home(request):
         people = people.filter(worker_type=Employee.WorkerType.STAFF, has_salary=False)
     elif show == "no_payment":
         people = people.filter(has_payment=False)
+    elif show == "nationality":
+        people = people.filter(pk__in=services.nationality_gaps(request.user))
     people = (people.select_related("company", "payment_detail")
               .prefetch_related(Prefetch("salary_records", queryset=SalaryRecord.objects
                                          .prefetch_related("allowances").order_by("-effective_from")))
@@ -208,7 +210,8 @@ def allowance_create(request):
     if request.method == "POST" and form.is_valid():
         cd = form.cleaned_data
         try:
-            services.create_allowance_type(cd["company"], name=cd["name"], counts_for_sio=cd["counts_for_sio"])
+            services.create_allowance_type(cd["company"], name=cd["name"], counts_for_sio=cd["counts_for_sio"],
+                                           counts_for_gratuity=cd["counts_for_gratuity"])
         except PayrollError as exc:
             form.add_error("name", str(exc))
         else:
@@ -224,7 +227,8 @@ def allowance_edit(request, pk):
     if request.method == "POST" and form.is_valid():
         cd = form.cleaned_data
         try:
-            services.update_allowance_type(allowance, name=cd["name"], counts_for_sio=cd["counts_for_sio"])
+            services.update_allowance_type(allowance, name=cd["name"], counts_for_sio=cd["counts_for_sio"],
+                                           counts_for_gratuity=cd["counts_for_gratuity"])
         except PayrollError as exc:
             form.add_error("name", str(exc))
         else:

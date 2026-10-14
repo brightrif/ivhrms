@@ -24,6 +24,11 @@ class AllowanceTypeForm(forms.Form):
         help_text="Tick if the SIO contribution is worked out on this allowance too. Ask the accountant; "
                   "it only matters for Bahraini staff.")
 
+    counts_for_gratuity = forms.BooleanField(
+        required=False, label="Social allowance (counts for gratuity)",
+        help_text="Tick for the social allowance, if the company pays one. Gratuity is worked out on basic salary plus "
+                  "this allowance only.")
+
     def __init__(self, *args, user, allowance=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.allowance = allowance
@@ -33,7 +38,8 @@ class AllowanceTypeForm(forms.Form):
             self.fields["company"].queryset = companies.filter(pk=allowance.company_id)
             self.fields["company"].disabled = True
             self.initial.update(company=allowance.company_id, name=allowance.name,
-                                counts_for_sio=allowance.counts_for_sio)
+                                counts_for_sio=allowance.counts_for_sio,
+                                counts_for_gratuity=allowance.counts_for_gratuity)
         else:
             ids = list(companies.values_list("pk", flat=True)[:2])
             if len(ids) == 1:
