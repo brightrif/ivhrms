@@ -20,6 +20,14 @@ def suggest_project_code(company, name, site=None):
         base = f"{base}-{site.code}"
     return _unique(Project.objects.filter(company=company) if company else Project.objects.none(), base)
 
+_LEGAL_WORDS = {"wll", "llc", "co", "company", "ltd", "limited", "inc", "bsc", "spc"}
+
+
+def suggest_company_code(name):
+    """'IV Spare Parts Company W.L.L.' -> ISP. Legal endings are ignored; a number is added if the code is taken."""
+    words = [w for w in name.split() if w.replace(".", "").lower() not in _LEGAL_WORDS]
+    return _unique(Company.objects.all(), _initials(" ".join(words) or name, "CO"))
+
 class CompanyError(Exception):
     pass
 

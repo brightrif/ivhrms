@@ -3,13 +3,19 @@ from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from django.http import HttpResponse
 
 from apps.employees.models import Employee
 from apps.organization import services
 
 from apps.web.forms.companies import CompanyForm
 from apps.web.access import hr_perm
+from apps.web.views.organization import _form_page
 
+COMPANY_SECTIONS = [
+    (7, "Company", [("name", "name_ar"), ("code", "currency")]),
+    (5, "Registration and address", [("cr_number", "sio_number"), "address"]),
+]
 
 def _company(request, pk):
     """Only companies this user may manage; anything else is a 404."""
@@ -32,8 +38,13 @@ def company_create(request):
         company = services.create_company(request.user, form.save(commit=False))
         messages.success(request, f"{company.name} was added.")
         return redirect("web:company_list")
-    return render(request, "web/form_page.html", {
-        "form": form, "title": "Add company", "back_url": reverse("web:company_list")})
+    return _form_page(request, form, "Add company", reverse("web:company_list"), COMPANY_SECTIONS, "Add company")
+
+@hr_perm("organization.add_company")
+def company_code_preview(request):
+    """The code a new company would get from its name; the add form fills the Code box with it."""
+    name = " ".join(request.GET.get("name", "").split())
+    return HttpResponse(services.suggest_company_code(name) if name else "")
 
 
 @hr_perm("organization.change_company")
@@ -44,8 +55,8 @@ def company_edit(request, pk):
         form.save()
         messages.success(request, "Company details updated.")
         return redirect("web:company_list")
-    return render(request, "web/form_page.html", {
-        "form": form, "title": f"Edit company: {company.name}", "back_url": reverse("web:company_list")})
+    return _form_page(request, form, f"Edit company: {company.name}", reverse("web:company_list"),
+                      COMPANY_SECTIONS, "Save changes")
 
 
 @hr_perm("organization.change_company")

@@ -83,6 +83,7 @@ MIDDLEWARE = [
     # Add any custom middleware here
     "apps.audit.middleware.AuditContextMiddleware",
     "apps.accounts.middleware.ForcePasswordChangeMiddleware",
+    "apps.web.middleware.HtmxSessionExpiredMiddleware",
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -175,6 +176,13 @@ HRMS_DEFAULT_WEEKLY_OFF = [4]   # Python weekday numbers: Monday=0 ... Friday=4,
 LOGIN_URL = "web:login"
 LOGIN_REDIRECT_URL = "web:dashboard"
 LOGOUT_REDIRECT_URL = "web:login"
+
+# Browsers share cookies between ports on the same host (localhost:8000 and localhost:8080), so each
+# environment gets its own cookie names and the two stop overwriting each other's login.
+COOKIE_PREFIX = env("COOKIE_PREFIX", default="ivhrms_dev")
+SESSION_COOKIE_NAME = f"{COOKIE_PREFIX}_sessionid"
+CSRF_COOKIE_NAME = f"{COOKIE_PREFIX}_csrftoken"
+
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
