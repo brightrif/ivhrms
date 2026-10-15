@@ -1,0 +1,89 @@
+# Ivhrms test stack: nginx -> gunicorn (web) -> Postgres, with Redis and a Celery worker + beat for the daily scans.
+# Open http://localhost:8080. Port 80 on your machine is NOT used. Another port:  HRMS_PORT=8090 docker compose up -d
+name: ivhrms
+
+x-app-env: &app-env
+  DJANGO_SETTINGS_MODULE: config.settings.docker
+  SECRET_KEY: "${HRMS_SECRET_KEY:-test-only-secret-key-change-before-any-real-use}"
+  DEBUG: "False"
+  ALLOWED_HOSTS: "${HRMS_ALLOWED_HOSTS:-*}"                  # fine on a private test machine; list real host names later
+  CSRF_TRUSTED_ORIGINS: "${HRMS_CSRF_ORIGINS:-}"              # needed only when served over HTTPS
+  DATABASE_URL: postgres://ivhrms:ivhrms_test_password@db:5432/ivhrms
+  CELERY_BROKER_URL: redis://redis:6379/0
+  HRMS_BASE_URL: "http://localhost:${HRMS_PORT:-8080}"         # the links inside alert emails
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ivhrms
+      POSTGRES_USER: ivhrms
+      POSTGRES_PASSWORD: ivhrms_test_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ivhrms -d ivhrms"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  web:
+    build: .
+    image: ivhrms-app
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    environment: *app-env
+    volumes:
+      - static:/app/staticfiles
+      - media:/app/media
+      - private_media:/app/private_media
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60 --forwarded-allow-ips='*'"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 90s                                        # the first start runs the migrations
+
+  celery:                                                      # the daily compliance and vehicle scans, and the emails they send
+    image: ivhrms-app
+    restart: unless-stopped
+    depends_on:
+      web: {condition: service_healthy}
+    environment: *app-env
+    volumes:
+      - private_media:/app/private_media
+    command: celery -A config worker --beat -l info -s /tmp/celerybeat-schedule
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      web: {condition: service_healthy}
+    ports:
+      - "${HRMS_PORT:-8080}:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - static:/srv/static:ro
+      - media:/srv/media:ro
+
+volumes:
+  pgdata:
+  static:
+  media:
+  private_media:

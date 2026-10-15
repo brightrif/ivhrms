@@ -1,0 +1,16 @@
+# keep secrets, local data and the Windows virtual environment out of the image
+.env
+.git
+.gitignore
+ivenv
+venv
+__pycache__
+*.pyc
+db.sqlite3
+media
+private_media
+staticfiles
+*.payroll1
+*.payroll2
+*.payroll3
+*.new
