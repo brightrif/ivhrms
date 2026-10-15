@@ -14,6 +14,7 @@ class Company(BaseModel):
     currency = models.CharField(max_length=3, default="BHD")
     is_active = models.BooleanField(default=True)
     runs_projects = models.BooleanField(default=False, help_text="Offered when adding a project.")
+    is_default = models.BooleanField(default=False, help_text="Chosen first on pages that ask for a company.")
 
     class Meta:
         verbose_name_plural = "companies"

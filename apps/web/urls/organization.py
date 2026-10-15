@@ -6,6 +6,7 @@ from apps.web.views import organization
 urlpatterns = [
     path("organization/", organization.organization_home, name="organization_home"),
     path("organization/projects-setting/<int:pk>/", organization.company_projects_set, name="company_projects_set"),
+    path("organization/default-company/", organization.company_default_set, name="company_default_set"),
     path("departments/", organization.department_list, name="department_list"),
     path("departments/new/", organization.department_create, name="department_create"),
     path("departments/<int:pk>/edit/", organization.department_edit, name="department_edit"),

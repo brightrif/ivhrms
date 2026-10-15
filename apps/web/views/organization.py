@@ -415,6 +415,18 @@ def company_projects_set(request, pk):
     return HttpResponse('<span class="badge text-bg-success">Runs projects</span>' if on
                         else '<span class="badge text-bg-secondary">No projects</span>')
 
+@login_required
+@require_POST
+def company_default_set(request):
+    """HTMX: choose the company that pages start on, or clear it (Settings > Organization)."""
+    if not request.user.has_perm("configuration.edit_settings_organization"):
+        raise PermissionDenied
+    raw = request.POST.get("default_company", "")
+    company = get_object_or_404(services.companies_for(request.user), pk=raw) if raw.isdigit() else None
+    services.set_default_company(company)
+    return HttpResponse('<span class="badge text-bg-success">Saved</span>' if company
+                        else '<span class="badge text-bg-secondary">No default</span>')
+
 
 @login_required
 def site_search(request):

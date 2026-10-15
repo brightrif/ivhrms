@@ -1,0 +1,13 @@
+<div class="d-flex align-items-center gap-2">
+  <select class="form-select w-auto" name="default_company" id="default-company" aria-label="Default company"
+          {% if not can_edit %}disabled{% endif %}
+          hx-post="{% url 'web:company_default_set' %}" hx-trigger="change"
+          hx-target="#default-company-state" hx-swap="innerHTML">
+    <option value="">No default (choose each time)</option>
+    {% for c in section.extra.company_choices %}
+    <option value="{{ c.pk }}"{% if c.is_default %} selected{% endif %}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
+  <span id="default-company-state"></span>
+</div>
+{% if not can_edit %}<div class="small text-body-secondary mt-2">You can see this but not change it.</div>{% endif %}

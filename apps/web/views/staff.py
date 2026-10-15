@@ -59,6 +59,19 @@ def employee_list(request):
     patch_vary_headers(resp, ["HX-Request"])
     return resp
 
+# helper for the Add staff page: the company dropdown starts on the person's own company, else the first one by name
+def _default_company_id(user):
+    """The company the Add staff page starts on: the one chosen in Settings > Organization, else the person's
+    own company, else the first one by name."""
+    companies = companies_for(user)
+    chosen = companies.filter(is_default=True).first()
+    if chosen:
+        return chosen.pk
+    own = getattr(getattr(user, "employee", None), "company_id", None)
+    company = companies.filter(pk=own).first() if own else None
+    company = company or companies.order_by("name").first()
+    return company.pk if company else None
+
 
 @hr_perm("employees.add_employee")
 def employee_create(request):
@@ -78,7 +91,7 @@ def employee_create(request):
                 messages.success(request, f"{employee.full_name} was added as {employee.employee_no}.")
                 return redirect("web:employee_detail", pk=employee.pk)
     else:
-        form = EmployeeForm(user=request.user, initial={"joining_date": timezone.localdate()})
+        form = EmployeeForm(user=request.user, company_id=_default_company_id(request.user), initial={"joining_date": timezone.localdate()})
     return render(request, "web/staff/form.html", {"form": form})
 
 

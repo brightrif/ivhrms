@@ -88,7 +88,17 @@ def set_active(company, active):
     company.is_active = active
     company.save(update_fields=["is_active"])
 
+@transaction.atomic
+def set_default_company(company):
+    """Make `company` the one pages start on (None clears it). Only one company can be the default."""
+    for other in Company.objects.filter(is_default=True).exclude(pk=getattr(company, "pk", None)):
+        other.is_default = False
+        other.save(update_fields=["is_default"])
+    if company is not None and not company.is_default:
+        company.is_default = True
+        company.save(update_fields=["is_default"])
 
+        
 @transaction.atomic
 def delete_company(company):
     blocking = blockers(company)
