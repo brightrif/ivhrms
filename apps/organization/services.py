@@ -88,17 +88,33 @@ def set_active(company, active):
     company.is_active = active
     company.save(update_fields=["is_active"])
 
-@transaction.atomic
-def set_default_company(company):
-    """Make `company` the one pages start on (None clears it). Only one company can be the default."""
-    for other in Company.objects.filter(is_default=True).exclude(pk=getattr(company, "pk", None)):
-        other.is_default = False
-        other.save(update_fields=["is_default"])
-    if company is not None and not company.is_default:
-        company.is_default = True
-        company.save(update_fields=["is_default"])
+DEFAULT_FIELDS = {"staff": "is_default", "labor": "is_default_labor"}
 
-        
+@transaction.atomic
+def set_default_company(company, kind="staff"):
+    """Make `company` the one the Add staff page (kind "staff") or Add labor page (kind "labor") starts on.
+    None clears it. Only one company can be the default of each kind."""
+    field = DEFAULT_FIELDS[kind]
+    for other in Company.objects.filter(**{field: True}).exclude(pk=getattr(company, "pk", None)):
+        setattr(other, field, False)
+        other.save(update_fields=[field])
+    if company is not None and not getattr(company, field):
+        setattr(company, field, True)
+        company.save(update_fields=[field])
+
+def default_company_id(user, kind="staff"):
+    """The company a page starts on: the one chosen for that page in Settings > Organization (labor follows the
+    staff choice when it has none), else the person's own company, else the first one by name."""
+    companies = companies_for(user)
+    for field in (DEFAULT_FIELDS[kind], DEFAULT_FIELDS["staff"]):
+        chosen = companies.filter(**{field: True}).first()
+        if chosen:
+            return chosen.pk
+    own = getattr(getattr(user, "employee", None), "company_id", None)
+    company = companies.filter(pk=own).first() if own else None
+    company = company or companies.order_by("name").first()
+    return company.pk if company else None
+
 @transaction.atomic
 def delete_company(company):
     blocking = blockers(company)

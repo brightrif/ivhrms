@@ -420,14 +420,16 @@ def company_projects_set(request, pk):
 @login_required
 @require_POST
 def company_default_set(request):
-    """HTMX: choose the company that pages start on, or clear it (Settings > Organization)."""
-    if not request.user.has_perm("configuration.edit_settings_organization"):
+    """HTMX: choose the company the Add staff page or (kind=labor) the Add labor page starts on."""
+    kind = "labor" if request.POST.get("kind") == "labor" else "staff"
+    perm = "configuration.edit_settings_labor" if kind == "labor" else "configuration.edit_settings_organization"
+    if not request.user.has_perm(perm):
         raise PermissionDenied
     raw = request.POST.get("default_company", "")
     company = get_object_or_404(services.companies_for(request.user), pk=raw) if raw.isdigit() else None
-    services.set_default_company(company)
+    services.set_default_company(company, kind)
     return HttpResponse('<span class="badge text-bg-success">Saved</span>' if company
-                        else '<span class="badge text-bg-secondary">No default</span>')
+                        else '<span class="badge text-bg-secondary">Not set</span>')
 
 @login_required
 @require_POST

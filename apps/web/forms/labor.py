@@ -8,11 +8,12 @@ from django.utils import timezone
 from apps.configuration import services as settings_service
 from apps.labor.models import Contractor, LaborProfile, LaborRate, Trade
 from apps.organization.models import Company
-from apps.organization.services import companies_for
+from apps.organization.services import companies_for, default_company_id
 from apps.web.forms.nationality import NationalityInput, NationalityMixin
 
 from apps.web.forms.common import date_input
 from apps.web.forms.phone import phone_field
+
 
 DAILY = LaborRate.WageBasis.DAILY
 
@@ -103,6 +104,7 @@ class LaborWorkerForm(NationalityMixin, _EngagementForm, _TermsForm):
         if len(ids) == 1:
             self.initial.setdefault("company", ids[0])
             self.fields["company"].widget = forms.HiddenInput()
+        self.initial.setdefault("company", default_company_id(user, "labor"))
         self.initial.setdefault("joining_date", timezone.localdate())
         for name, value in _worker_defaults().items():
             self.initial.setdefault(name, value)

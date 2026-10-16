@@ -25,8 +25,8 @@ register(Module(
                   "A company switched off keeps the projects it already has.",
             template="web/settings/_organization_projects.html", context=company_rows),
         Section(
-            title="Default company",
-            intro="The company chosen first on pages that ask for one, such as Add staff member. "
+            title="Default companies",
+            intro="The company each Add page starts on. Staff and labor can start on different companies. "
                   "You can still pick another company on the page.",
             template="web/settings/_organization_default_company.html", context=default_company_choices),
         Section(

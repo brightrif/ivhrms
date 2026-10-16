@@ -15,6 +15,7 @@ class Company(BaseModel):
     is_active = models.BooleanField(default=True)
     runs_projects = models.BooleanField(default=False, help_text="Offered when adding a project.")
     is_default = models.BooleanField(default=False, help_text="Chosen first on pages that ask for a company.")
+    is_default_labor = models.BooleanField(default=False, help_text="Chosen first when adding labor workers.")
 
     class Meta:
         verbose_name_plural = "companies"

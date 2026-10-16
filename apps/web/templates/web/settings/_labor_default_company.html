@@ -1,0 +1,14 @@
+<div class="d-flex align-items-center gap-2">
+  <select class="form-select w-auto" name="default_company" id="default-company-labor"
+          aria-label="Default company for new labor workers"
+          {% if not can_edit %}disabled{% endif %}
+          hx-post="{% url 'web:company_default_set' %}" hx-vals='{"kind": "labor"}' hx-trigger="change"
+          hx-target="#default-company-labor-state" hx-swap="innerHTML">
+    <option value="">Same as Add staff member</option>
+    {% for c in section.extra.company_choices %}
+    <option value="{{ c.pk }}"{% if c.is_default_labor %} selected{% endif %}>{{ c.name }}</option>
+    {% endfor %}
+  </select>
+  <span id="default-company-labor-state"></span>
+</div>
+{% if not can_edit %}<div class="small text-body-secondary mt-2">You can see this but not change it.</div>{% endif %}
