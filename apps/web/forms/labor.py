@@ -12,6 +12,7 @@ from apps.organization.services import companies_for
 from apps.web.forms.nationality import NationalityInput, NationalityMixin
 
 from apps.web.forms.common import date_input
+from apps.web.forms.phone import phone_field
 
 DAILY = LaborRate.WageBasis.DAILY
 
@@ -91,7 +92,7 @@ class LaborWorkerForm(NationalityMixin, _EngagementForm, _TermsForm):
     first_name = forms.CharField(max_length=80)
     last_name = forms.CharField(max_length=80, required=False)
     nationality = forms.CharField(max_length=60, required=False, widget=NationalityInput())
-    phone = forms.CharField(max_length=30, required=False)
+    phone = phone_field()
     joining_date = forms.DateField(widget=date_input(max="today"))
 
     def __init__(self, *args, user, **kwargs):
@@ -188,6 +189,7 @@ _DEFAULT_CHOICES = [("", "No default (HR chooses each time)"), ("True", "Yes"), 
 
 
 class ContractorForm(forms.ModelForm):
+    phone = phone_field()
     class Meta:
         model = Contractor
         fields = ["company", "name", "name_ar", "cr_number", "contact_person", "phone", "email", "address", "notes",

@@ -1,0 +1,58 @@
+<div class="table-responsive">
+  <table class="table table-sm align-middle mb-2">
+    <thead class="table-light"><tr><th>Country</th><th>Code</th><th>Offered</th></tr></thead>
+    <tbody>
+    {% for c in section.extra.countries %}
+      <tr>
+        <td class="fw-medium"><span class="fi fi-{{ c.iso|default:'xx' }} border me-2"></span>{{ c.name }}</td>
+        <td>+{{ c.dial_code }}</td>
+        <td>
+          <div class="d-flex align-items-center gap-2">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" role="switch" id="country-{{ c.pk }}" name="country-{{ c.pk }}"
+                     aria-label="{{ c.name }} phone code"{% if c.is_active %} checked{% endif %}{% if not can_edit %} disabled{% endif %}
+                     hx-post="{% url 'web:country_toggle' c.pk %}" hx-trigger="change"
+                     hx-target="#country-state-{{ c.pk }}" hx-swap="innerHTML">
+            </div>
+            <span id="country-state-{{ c.pk }}">{% if c.is_active %}<span class="badge text-bg-success">On</span>{% else %}<span class="badge text-bg-secondary">Off</span>{% endif %}</span>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if can_edit %}
+<div class="row g-2 align-items-start" data-add-country>
+  <div class="col-sm-4"><input class="form-control form-control-sm" name="new_country_name" maxlength="80"
+         placeholder="Country, e.g. Nepal" aria-label="New country name"></div>
+  <div class="col-sm-2"><input class="form-control form-control-sm" name="new_country_code" maxlength="5" inputmode="numeric"
+         placeholder="Code, 977" aria-label="New country dial code"></div>
+  <div class="col-sm-2"><input class="form-control form-control-sm" name="new_country_iso" maxlength="2"
+         placeholder="Flag, NP" aria-label="Two letters of the flag" style="text-transform:uppercase"></div>
+  <div class="col-sm-4"><button type="button" class="btn btn-outline-primary btn-sm w-100"
+         hx-post="{% url 'web:country_add' %}" hx-target="#country-add-error" hx-swap="innerHTML">Add country</button></div>
+</div>
+<div id="country-add-error" class="mt-1"></div>
+{% else %}
+<div class="small text-body-secondary">You can see this but not change it.</div>
+{% endif %}
+<script>
+  // Enter in the new-country boxes presses "Add country" instead of saving the whole settings page.
+  document.querySelectorAll("[data-add-country] input").forEach(function (box) {
+    box.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); box.closest("[data-add-country]").querySelector("button").click(); }
+    });
+  });
+  // If saving fails, put the switch back so the page never shows a state that was not saved.
+  ["htmx:responseError", "htmx:sendError"].forEach(function (name) {
+    document.body.addEventListener(name, function (e) {
+      var box = e.target;
+      if (box && box.name && box.name.indexOf("country-") === 0) {
+        box.checked = !box.checked;
+        var xhr = e.detail && e.detail.xhr;
+        alert(xhr && xhr.status === 409 ? xhr.responseText : "Could not save that change. Nothing was changed.");
+      }
+    });
+  });
+</script>

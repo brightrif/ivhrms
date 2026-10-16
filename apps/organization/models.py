@@ -93,3 +93,20 @@ class Project(BaseModel):
     def __str__(self):
         return f"{self.code} {self.name}"
 
+
+@audited(module="organization")
+class Country(BaseModel):
+    """A country whose phone code can be picked on phone boxes. Settings > Organization switches them on and off."""
+    name = models.CharField(max_length=80, unique=True)
+    dial_code = models.CharField(max_length=5, unique=True, help_text="Digits only, without the +, e.g. 973.")
+    iso = models.CharField("Flag", max_length=2, blank=True, help_text="Two letters of the flag, e.g. BH.")
+    is_active = models.BooleanField(default=False)
+    position = models.PositiveSmallIntegerField(default=100, help_text="Lower comes first in the list.")
+
+    class Meta:
+        ordering = ["position", "name"]
+        verbose_name_plural = "countries"
+
+    def __str__(self):
+        return f"{self.name} (+{self.dial_code})"
+

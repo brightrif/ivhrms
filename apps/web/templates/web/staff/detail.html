@@ -59,7 +59,7 @@
         <dt class="col-5 fw-normal text-body-secondary">Phone</dt><dd class="col-7 mb-0">{{ employee.phone|default:"-" }}</dd>
         <dt class="col-5 fw-normal text-body-secondary">WhatsApp</dt>
         <dd class="col-7 mb-0">
-          {{ employee.whatsapp_number|default:"-" }}
+          {% if employee.whatsapp_number %}{{ employee.whatsapp_number|international }}{% else %}-{% endif %}
           {% if employee.whatsapp_number %}
             {% if employee.whatsapp_verified %}{% status_badge "approved" "Verified" %}{% else %}{% status_badge "pending" "Not verified" %}{% endif %}
           {% endif %}

@@ -1,3 +1,4 @@
+import re
 from django.contrib import messages
 from django.db.models import Count, ProtectedError, RestrictedError
 from django.shortcuts import get_object_or_404, redirect, render
@@ -6,7 +7,7 @@ from django.views.decorators.http import require_POST
 
 from apps.employees.models import Employee
 from apps.organization import services
-from apps.organization.models import Department, Designation, Grade, Location, Project
+from apps.organization.models import Department, Designation, Grade, Location, Project, Country
 
 from apps.web.access import hr_perm
 from apps.web.forms.organization import DepartmentForm, DesignationForm, GradeForm, ProjectForm, SiteForm
@@ -15,7 +16,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 
 from django.http import HttpResponse, JsonResponse
-
+from django.utils.html import escape
+from django.contrib.staticfiles import finders
 
 WORKING = [Employee.Status.ACTIVE, Employee.Status.ON_NOTICE]
 
@@ -427,6 +429,50 @@ def company_default_set(request):
     return HttpResponse('<span class="badge text-bg-success">Saved</span>' if company
                         else '<span class="badge text-bg-secondary">No default</span>')
 
+@login_required
+@require_POST
+def country_toggle(request, pk):
+    """HTMX: switch a country's phone code on or off (Settings > Organization)."""
+    if not request.user.has_perm("configuration.edit_settings_organization"):
+        raise PermissionDenied
+    country = get_object_or_404(Country, pk=pk)
+    on = request.POST.get(f"country-{country.pk}") is not None
+    if not on and not Country.objects.filter(is_active=True).exclude(pk=country.pk).exists():
+        return HttpResponse("At least one country must stay on.", status=409)
+    if country.is_active != on:
+        country.is_active = on
+        country.save(update_fields=["is_active"])
+    return HttpResponse('<span class="badge text-bg-success">On</span>' if on
+                        else '<span class="badge text-bg-secondary">Off</span>')
+
+
+@login_required
+@require_POST
+def country_add(request):
+    """HTMX: add a country that is not in the list yet. It starts switched on."""
+    if not request.user.has_perm("configuration.edit_settings_organization"):
+        raise PermissionDenied
+    name = " ".join(request.POST.get("new_country_name", "").split())
+    code = re.sub(r"\D", "", request.POST.get("new_country_code", ""))
+    iso = request.POST.get("new_country_iso", "").strip().lower()
+    problem = None
+    if not name:
+        problem = "Enter the country name."
+    elif not 1 <= len(code) <= 4:
+        problem = "Enter the dial code, 1 to 4 digits, e.g. 977."
+    elif not re.fullmatch(r"[a-z]{2}", iso) or not finders.find(f"web/vendor/flag-icons/flags/4x3/{iso}.svg"):
+        problem = "Enter the two letters of the country's flag, e.g. NP for Nepal."
+    elif Country.objects.filter(name__iexact=name).exists():
+        problem = f"{name} is already in the list."
+    elif Country.objects.filter(dial_code=code).exists():
+        problem = "That dial code is already in the list."
+    if problem:
+        return HttpResponse(f'<span class="text-danger small">{escape(problem)}</span>')
+    Country.objects.create(name=name, dial_code=code, iso=iso, is_active=True)
+    messages.success(request, f"{name} (+{code}) was added.")
+    response = HttpResponse()
+    response["HX-Refresh"] = "true"
+    return response
 
 @login_required
 def site_search(request):

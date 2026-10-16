@@ -31,7 +31,7 @@ _ENGAGEMENT = {"title": "Engagement", "width": "col-lg-4",
 LAYOUTS = {
     "worker": [
         {"title": "Worker", "width": "col-lg-4",
-         "rows": [["company"], ["first_name", "last_name"], ["nationality", "phone"], ["joining_date"]]},
+         "rows": [["company"], ["first_name", "last_name"], ["nationality"], ["phone"], ["joining_date"]]},
         _ENGAGEMENT,
         {"title": "Pay", "width": "col-lg-4",
          "rows": [["wage_basis", "rate"], ["standard_hours"], ["overtime_eligible"], ["weekend_premium"], ["paid_holidays"]]},
@@ -47,7 +47,7 @@ LAYOUTS = {
               "rows": [["effective_from", "wage_basis"], ["rate", "standard_hours"], ["overtime_eligible"], ["weekend_premium"], ["paid_holidays"]]}],
     "contractor": [
         {"title": "Contractor", "width": "col-lg-7",
-         "rows": [["company", "name"], ["name_ar", "cr_number"], ["contact_person", "phone", "email"]]},
+         "rows": [["company", "name"], ["name_ar", "cr_number"], ["contact_person"], ["phone", "email"]]},
         {"title": "More", "width": "col-lg-5",
          "rows": [["address"], ["notes"], ["default_overtime", "default_weekend_premium"]]},
     ],

@@ -1,5 +1,7 @@
 from django import forms, template
 from django.utils.html import format_html
+from apps.web.forms.phone import split_number
+from apps.organization.models import Country
 
 register = template.Library()
 
@@ -16,6 +18,7 @@ STATUS_TONES = {
     "expired": "danger",
     "open": "primary",
 }
+
 
 
 @register.filter
@@ -53,3 +56,11 @@ def status_badge(code, label=None):
     return format_html(
         '<span class="badge rounded-pill bg-{0}-subtle text-{0}-emphasis border border-{0}-subtle">{1}</span>',
         tone, text)
+
+@register.filter
+def international(digits):
+    """'97333366235' -> '+973 33366235'. The country code is told from the countries in Settings."""
+    code, number = split_number(digits, list(Country.objects.all()), True)
+    if not number:
+        return ""
+    return f"+{code} {number}" if code else f"+{number}"

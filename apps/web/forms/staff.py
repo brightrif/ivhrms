@@ -13,6 +13,8 @@ from apps.organization.services import companies_for
 from apps.web.forms.nationality import NationalityInput, NationalityMixin
 
 from apps.web.forms.common import date_input
+from apps.web.forms.phone import phone_field, whatsapp_field
+
 
 ASSIGNMENT_FIELDS = ("employment_type", "department", "designation", "grade", "location", "reporting_manager")
 
@@ -39,6 +41,8 @@ class EmployeeForm(WhatsAppMixin, forms.ModelForm):
         widget=forms.CheckboxInput(attrs={"role": "switch"}))
     username = forms.CharField(required=False, max_length=150,
                                help_text="Leave blank to use the employee number, e.g. iv-0001.")
+    phone = phone_field()
+    whatsapp_number = whatsapp_field()
 
     class Meta:
         model = Employee
@@ -46,8 +50,7 @@ class EmployeeForm(WhatsAppMixin, forms.ModelForm):
                   "first_name", "last_name", "name_ar", "date_of_birth", "nationality",
                   "phone", "whatsapp_number", "email"]
         widgets = {"date_of_birth": date_input(), "joining_date": date_input(),"nationality": NationalityInput()}
-        help_texts = {"email": "Optional.",
-                      "whatsapp_number": "Optional. With country code, e.g. 97333123456."}
+        help_texts = {"email": "Optional."}
 
     def __init__(self, *args, user, company_id=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -97,6 +100,8 @@ class EmployeeForm(WhatsAppMixin, forms.ModelForm):
 
 class EmployeePersonalForm(WhatsAppMixin, forms.ModelForm):
     """Edit form: personal and contact details only. Assignment changes keep their history."""
+    phone = phone_field()
+    whatsapp_number = whatsapp_field()
     class Meta:
         model = Employee
         fields = ["first_name", "last_name", "name_ar", "date_of_birth", "nationality",
