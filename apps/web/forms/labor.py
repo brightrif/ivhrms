@@ -12,6 +12,7 @@ from apps.organization.services import companies_for, default_company_id
 from apps.web.forms.nationality import NationalityInput, NationalityMixin
 
 from apps.web.forms.common import date_input
+from apps.web.forms.nationality import NationalityField
 from apps.web.forms.phone import phone_field
 
 
@@ -92,7 +93,7 @@ class LaborWorkerForm(NationalityMixin, _EngagementForm, _TermsForm):
     company = forms.ModelChoiceField(queryset=Company.objects.none())
     first_name = forms.CharField(max_length=80)
     last_name = forms.CharField(max_length=80, required=False)
-    nationality = forms.CharField(max_length=60, required=False, widget=NationalityInput())
+    nationality = NationalityField()
     phone = phone_field()
     joining_date = forms.DateField(widget=date_input(max="today"))
 

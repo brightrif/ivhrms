@@ -13,6 +13,7 @@ from apps.organization.services import companies_for
 from apps.web.forms.nationality import NationalityInput, NationalityMixin
 
 from apps.web.forms.common import date_input
+from apps.web.forms.nationality import NationalityField
 from apps.web.forms.phone import phone_field, whatsapp_field
 
 
@@ -41,6 +42,7 @@ class EmployeeForm(WhatsAppMixin, forms.ModelForm):
         widget=forms.CheckboxInput(attrs={"role": "switch"}))
     username = forms.CharField(required=False, max_length=150,
                                help_text="Leave blank to use the employee number, e.g. iv-0001.")
+    nationality = NationalityField()
     phone = phone_field()
     whatsapp_number = whatsapp_field()
 
@@ -100,15 +102,20 @@ class EmployeeForm(WhatsAppMixin, forms.ModelForm):
 
 class EmployeePersonalForm(WhatsAppMixin, forms.ModelForm):
     """Edit form: personal and contact details only. Assignment changes keep their history."""
+    nationality = NationalityField()
     phone = phone_field()
     whatsapp_number = whatsapp_field()
     class Meta:
         model = Employee
         fields = ["first_name", "last_name", "name_ar", "date_of_birth", "nationality",
                   "email", "phone", "whatsapp_number"]
-        widgets = {"date_of_birth": date_input(), "nationality": NationalityInput()}
+        widgets = {"date_of_birth": date_input()}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["nationality"].keep = self.instance.nationality     # an older saved value stays valid
 
+        
 class AssignmentForm(forms.Form):
     effective_from = forms.DateField(widget=date_input())
     reason = forms.ChoiceField(choices=[c for c in EmploymentRecord.Reason.choices

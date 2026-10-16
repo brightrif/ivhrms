@@ -434,16 +434,20 @@ def company_default_set(request):
 @login_required
 @require_POST
 def country_toggle(request, pk):
-    """HTMX: switch a country's phone code on or off (Settings > Organization)."""
+    """HTMX: switch a country on or off for the phone-code list, or (which=nationality) the Nationality list."""
     if not request.user.has_perm("configuration.edit_settings_organization"):
         raise PermissionDenied
     country = get_object_or_404(Country, pk=pk)
-    on = request.POST.get(f"country-{country.pk}") is not None
-    if not on and not Country.objects.filter(is_active=True).exclude(pk=country.pk).exists():
+    if request.POST.get("which") == "nationality":
+        field, key = "is_nationality", f"nationality-{country.pk}"
+    else:
+        field, key = "is_active", f"country-{country.pk}"
+    on = request.POST.get(key) is not None
+    if not on and not Country.objects.filter(**{field: True}).exclude(pk=country.pk).exists():
         return HttpResponse("At least one country must stay on.", status=409)
-    if country.is_active != on:
-        country.is_active = on
-        country.save(update_fields=["is_active"])
+    if getattr(country, field) != on:
+        setattr(country, field, on)
+        country.save(update_fields=[field])
     return HttpResponse('<span class="badge text-bg-success">On</span>' if on
                         else '<span class="badge text-bg-secondary">Off</span>')
 
@@ -470,7 +474,7 @@ def country_add(request):
         problem = "That dial code is already in the list."
     if problem:
         return HttpResponse(f'<span class="text-danger small">{escape(problem)}</span>')
-    Country.objects.create(name=name, dial_code=code, iso=iso, is_active=True)
+    Country.objects.create(name=name, dial_code=code, iso=iso, is_active=True, is_nationality=True)
     messages.success(request, f"{name} (+{code}) was added.")
     response = HttpResponse()
     response["HX-Refresh"] = "true"

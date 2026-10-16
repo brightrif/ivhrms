@@ -1,6 +1,6 @@
 <div class="table-responsive">
   <table class="table table-sm align-middle mb-2">
-    <thead class="table-light"><tr><th>Country</th><th>Code</th><th>Offered</th></tr></thead>
+    <thead class="table-light"><tr><th>Country</th><th>Code</th><th>Phone list</th><th>Nationality</th></tr></thead>
     <tbody>
     {% for c in section.extra.countries %}
       <tr>
@@ -10,11 +10,22 @@
           <div class="d-flex align-items-center gap-2">
             <div class="form-check form-switch mb-0">
               <input class="form-check-input" type="checkbox" role="switch" id="country-{{ c.pk }}" name="country-{{ c.pk }}"
-                     aria-label="{{ c.name }} phone code"{% if c.is_active %} checked{% endif %}{% if not can_edit %} disabled{% endif %}
+                     aria-label="{{ c.name }} in the phone code list"{% if c.is_active %} checked{% endif %}{% if not can_edit %} disabled{% endif %}
                      hx-post="{% url 'web:country_toggle' c.pk %}" hx-trigger="change"
                      hx-target="#country-state-{{ c.pk }}" hx-swap="innerHTML">
             </div>
             <span id="country-state-{{ c.pk }}">{% if c.is_active %}<span class="badge text-bg-success">On</span>{% else %}<span class="badge text-bg-secondary">Off</span>{% endif %}</span>
+          </div>
+        </td>
+        <td>
+          <div class="d-flex align-items-center gap-2">
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" role="switch" id="nationality-{{ c.pk }}" name="nationality-{{ c.pk }}"
+                     aria-label="{{ c.name }} in the nationality list"{% if c.is_nationality %} checked{% endif %}{% if not can_edit %} disabled{% endif %}
+                     hx-post="{% url 'web:country_toggle' c.pk %}" hx-vals='{"which": "nationality"}' hx-trigger="change"
+                     hx-target="#nationality-state-{{ c.pk }}" hx-swap="innerHTML">
+            </div>
+            <span id="nationality-state-{{ c.pk }}">{% if c.is_nationality %}<span class="badge text-bg-success">On</span>{% else %}<span class="badge text-bg-secondary">Off</span>{% endif %}</span>
           </div>
         </td>
       </tr>
@@ -48,7 +59,7 @@
   ["htmx:responseError", "htmx:sendError"].forEach(function (name) {
     document.body.addEventListener(name, function (e) {
       var box = e.target;
-      if (box && box.name && box.name.indexOf("country-") === 0) {
+      if (box && box.name && /^(country|nationality)-/.test(box.name)) {
         box.checked = !box.checked;
         var xhr = e.detail && e.detail.xhr;
         alert(xhr && xhr.status === 409 ? xhr.responseText : "Could not save that change. Nothing was changed.");

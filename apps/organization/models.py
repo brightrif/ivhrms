@@ -102,6 +102,7 @@ class Country(BaseModel):
     dial_code = models.CharField(max_length=5, unique=True, help_text="Digits only, without the +, e.g. 973.")
     iso = models.CharField("Flag", max_length=2, blank=True, help_text="Two letters of the flag, e.g. BH.")
     is_active = models.BooleanField(default=False)
+    is_nationality = models.BooleanField(default=False, help_text="Offered in the Nationality list.")
     position = models.PositiveSmallIntegerField(default=100, help_text="Lower comes first in the list.")
 
     class Meta:

@@ -30,8 +30,9 @@ register(Module(
                   "You can still pick another company on the page.",
             template="web/settings/_organization_default_company.html", context=default_company_choices),
         Section(
-            title="Phone country codes",
-            intro="The countries offered in the country-code list of phone and WhatsApp boxes. Switch a country on "
-                  "to offer it, or add one that is not listed. Numbers already saved are never changed.",
+            title="Countries",
+            intro="Phone list: the countries offered in the country-code list of phone and WhatsApp boxes. "
+                  "Nationality: the countries offered in the Nationality box on staff and labor forms. "
+                  "Switch a country on to offer it, or add one that is not listed. Saved values are never changed.",
             template="web/settings/_organization_phone_codes.html", context=phone_countries),
     ]))
