@@ -10,8 +10,9 @@ from django.utils import timezone
 from django.utils.cache import patch_vary_headers
 from django.utils.html import format_html
 from django.views.decorators.http import require_POST
+from django.db import transaction
 
-from apps.employees import numbering, services
+from apps.employees import joining,numbering, services
 from apps.employees.models import Employee
 from apps.organization.services import companies_for
 from apps.web.access import hr_perm
@@ -124,9 +125,18 @@ def employee_edit(request, pk):
         obj = form.save(commit=False)
         if obj.whatsapp_number != old_number:
             obj.whatsapp_verified = False           # a new number must be verified again
-        obj.save()
-        messages.success(request, "Details updated.")
-        return redirect("web:employee_detail", pk=emp.pk)
+        new_joining = form.cleaned_data.get("joining_date") or obj.joining_date
+        try:
+            with transaction.atomic():
+                obj.save()
+                notes = joining.change_joining_date(obj, new_joining)
+        except joining.JoiningDateError as exc:
+            form.add_error("joining_date", str(exc))
+        else:
+            messages.success(request, "Details updated.")
+            for note in notes:
+                messages.warning(request, note)
+            return redirect("web:employee_detail", pk=emp.pk)
     return render(request, "web/form_page.html", {
         "form": form, "title": f"Edit details: {emp.full_name}",
         "back_url": reverse("web:employee_detail", args=[emp.pk])})

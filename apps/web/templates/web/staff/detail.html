@@ -25,6 +25,15 @@
     {% if perms.employees.change_employee %}
       <a class="btn btn-outline-primary" href="{% url 'web:employee_edit' employee.pk %}">Edit details</a>
       <a class="btn btn-primary" href="{% url 'web:employee_assign' employee.pk %}">Change assignment</a>
+      {% comment %} change labor to staff  {% endcomment %}
+      {% if perms.labor.add_laborprofile and employee.status != 'separated' %}
+        {% if employee.worker_type == 'labor' %}
+        <a class="btn btn-outline-primary" href="{% url 'web:employee_to_staff' employee.pk %}">Change to staff</a>
+        {% else %}
+        <a class="btn btn-outline-primary" href="{% url 'web:employee_to_labor' employee.pk %}">Change to labor</a>
+        {% endif %}
+      {% endif %}
+      {% comment %} change labor to staff Ends  {% endcomment %}
     {% endif %}
   </div>
 </div>

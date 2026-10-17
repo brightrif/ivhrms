@@ -56,5 +56,7 @@ class AddCrewForm(forms.Form):
                                                                 location__isnull=False)
                                         .exclude(pk__in=exclude_projects)
                                         .select_related("company", "location").order_by("code"))
-        self.fields["profiles"].queryset = LaborProfile.objects.for_user(user).select_related("employee", "company")
+        self.fields["profiles"].queryset = (LaborProfile.objects.for_user(user)
+                                            .filter(employee__worker_type="labor")
+                                            .select_related("employee", "company"))
         self.initial.setdefault("effective_from", timezone.localdate())

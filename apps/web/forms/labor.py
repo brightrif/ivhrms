@@ -14,7 +14,7 @@ from apps.web.forms.nationality import NationalityInput, NationalityMixin
 from apps.web.forms.common import date_input
 from apps.web.forms.nationality import NationalityField
 from apps.web.forms.phone import phone_field
-
+from apps.employees import numbering
 
 DAILY = LaborRate.WageBasis.DAILY
 
@@ -232,3 +232,80 @@ class TradeForm(forms.ModelForm):
 
     def clean_name(self):
         return " ".join(self.cleaned_data["name"].split())
+
+TERM_FIELDS = list(_TermsForm.base_fields)         # the pay fields, whatever this form has grown to include
+
+
+class ToLaborForm(_EngagementForm, _TermsForm):
+    """A staff member moves to site work. Someone who was labor before comes back on the pay they had then (HR changes
+    it afterwards under Change pay), so the pay boxes are shown only for someone who was never labor."""
+    effective_from = forms.DateField(widget=date_input(max="today"), label="Labor from")
+    number = forms.ChoiceField(label="Employee number")
+    remarks = forms.CharField(required=False, max_length=150, label="Note")
+
+    def __init__(self, *args, employee, user, previous=None, earlier=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = [("new", f"New labor number ({numbering.peek(employee.company, 'labor')})"),
+                   ("keep", f"Keep {employee.employee_no}")]
+        if previous:
+            choices.insert(0, ("previous", f"Their earlier labor number ({previous})"))
+        self.fields["number"].choices = choices
+        self.initial.setdefault("effective_from", timezone.localdate())
+        self.initial.setdefault("number", "previous" if previous else "new")
+        for name, value in _worker_defaults().items():
+            self.initial.setdefault(name, value)
+        old = getattr(employee, "labor_profile", None)                 # a former labor record pre-fills the form
+        if old:
+            self.initial.update(engagement=old.engagement, contractor=old.contractor_id,
+                                trade=old.trade_id, notes=old.notes)
+        if earlier:
+            for name in TERM_FIELDS:
+                self.fields.pop(name, None)
+        self._set_choices(Contractor.objects.for_user(user).filter(company_id=employee.company_id))
+
+class WorkerDetailsForm(forms.Form):
+    """The Worker card: name, nationality, phone and joining date."""
+    first_name = forms.CharField(max_length=80)
+    last_name = forms.CharField(max_length=80, required=False)
+    nationality = NationalityField()
+    phone = phone_field()
+    joining_date = forms.DateField(
+        widget=date_input(max="today"),
+        help_text="An earlier date also moves the first assignment, shift and pay line. A later date is refused "
+                  "if something is already recorded before it.")
+
+    def __init__(self, *args, employee, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initial.update(first_name=employee.first_name, last_name=employee.last_name,
+                            nationality=employee.nationality, phone=employee.phone,
+                            joining_date=employee.joining_date)
+        self.fields["nationality"].keep = employee.nationality          # an older saved value stays valid
+
+
+class CorrectPayForm(_TermsForm):
+    """Fix a mistake in the current pay line, in place. New pay from a later date is Change pay."""
+
+    def __init__(self, *args, profile, **kwargs):
+        super().__init__(*args, **kwargs)
+        current = profile.current_rate
+        if current:
+            self.initial.update({n: getattr(current, n) for n in TERM_FIELDS if hasattr(current, n)})
+        if profile.engagement == "contracted":                          # contracted workers are always paid by the day
+            self.fields["wage_basis"].choices = [(DAILY, "Daily wage")]
+
+
+class LaborFullEditForm(WorkerDetailsForm, _EngagementForm, _TermsForm):
+    """Everything on the labor page at once: worker, engagement and the current pay line."""
+
+    def __init__(self, *args, employee, profile, user, **kwargs):
+        super().__init__(*args, employee=employee, **kwargs)
+        self.initial.update(engagement=profile.engagement, contractor=profile.contractor_id,
+                            trade=profile.trade_id, notes=profile.notes)
+        current = profile.current_rate
+        if current:
+            self.initial.update({n: getattr(current, n) for n in TERM_FIELDS if hasattr(current, n)})
+        else:
+            for name in TERM_FIELDS:
+                self.fields.pop(name, None)
+        self._set_choices(Contractor.objects.for_user(user).filter(company_id=profile.company_id),
+                          current_trade=profile.trade)

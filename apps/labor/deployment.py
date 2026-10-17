@@ -30,6 +30,8 @@ def _same_place(allocation, project, location, work_order):
 def _check_destination(employee, project, location, work_order, effective_from):
     if not LaborProfile.objects.filter(employee=employee).exists():
         raise LaborError("This worker has no labor profile yet.")
+    if employee.worker_type != Employee.WorkerType.LABOR:
+        raise LaborError(f"{employee.full_name} is a staff member now, not a labor worker.")
     if employee.status == Employee.Status.SEPARATED:
         raise LaborError("This worker has left the company.")
     if project.company_id != employee.company_id:
@@ -127,8 +129,9 @@ def allocation_on(employee, on_date):
 def unallocated_profiles(user):
     """Labor workers, still with the company, who are on no project right now. Shared workers serve them all."""
     placed = LaborAllocation.objects.filter(effective_to__isnull=True).values("employee_id")
-    return (LaborProfile.objects.for_user(user).exclude(employee__status=Employee.Status.SEPARATED)
-            .exclude(serves_all_projects=True).exclude(employee_id__in=placed))
+    return (LaborProfile.objects.for_user(user).filter(employee__worker_type=Employee.WorkerType.LABOR)
+        .exclude(employee__status=Employee.Status.SEPARATED)
+        .exclude(serves_all_projects=True).exclude(employee_id__in=placed))
 
 
 def site_overview(user):

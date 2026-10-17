@@ -61,7 +61,9 @@ class TransferForm(_PlaceForm):
 
     def __init__(self, *args, user, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["profiles"].queryset = (LaborProfile.objects.for_user(user).select_related("employee", "company"))
+        self.fields["profiles"].queryset = (LaborProfile.objects.for_user(user)
+                                            .filter(employee__worker_type="labor")
+                                            .select_related("employee", "company"))
         self._set_place_choices(companies_for(user))
 
 

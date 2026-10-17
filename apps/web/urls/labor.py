@@ -1,9 +1,12 @@
 from django.urls import path
 
-from apps.web.views import labor, labor_attendance, labor_overtime, labor_reports, labor_sites, labor_timesheet
-from apps.web.views import labor_team
-from apps.web.views import labor_split
-from apps.web.views import labor_projects
+from apps.web.views import (
+    labor, labor_attendance, labor_overtime, 
+    labor_reports, labor_sites, labor_timesheet,
+    labor_team,labor_edit_cards,labor_split, labor_projects
+)
+
+
 
 urlpatterns = [
     path("labor/", labor.labor_list, name="labor_list"),
@@ -46,4 +49,7 @@ urlpatterns = [
     path("labor/trades/new/", labor.trade_create, name="labor_trade_create"),
     path("labor/trades/<int:pk>/edit/", labor.trade_edit, name="labor_trade_edit"),
     path("labor/trades/<int:pk>/toggle/", labor.trade_toggle, name="labor_trade_toggle"),
+    path("labor/<int:pk>/worker/", labor_edit_cards.labor_worker_edit, name="labor_worker_edit"),
+    path("labor/<int:pk>/pay/correct/", labor_edit_cards.labor_pay_correct, name="labor_pay_correct"),
+    path("labor/<int:pk>/full-edit/", labor_edit_cards.labor_full_edit, name="labor_full_edit"),
 ]

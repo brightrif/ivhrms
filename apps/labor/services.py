@@ -116,6 +116,8 @@ def change_rate(profile, *, effective_from, wage_basis, rate, standard_hours, ov
     profile = LaborProfile.objects.select_for_update().select_related("employee").get(pk=profile.pk)
     if profile.employee.status == Employee.Status.SEPARATED:
         raise LaborError("This worker has left the company.")
+    if profile.employee.worker_type != Employee.WorkerType.LABOR:
+        raise LaborError("This person is a staff member now, so there are no labor pay terms to change.")
     _check_terms(wage_basis=wage_basis, rate=rate, standard_hours=standard_hours, engagement=profile.engagement)
     from . import locks  # payroll lock: change_rate
     locks.ensure_open([profile.employee_id], effective_from, None, "starting new pay terms then")
@@ -180,7 +182,8 @@ def unassigned_workers(user):
 
 
 def active_workers(contractor):
-    return contractor.workers.exclude(employee__status=Employee.Status.SEPARATED).count()
+    return (contractor.workers.filter(employee__worker_type=Employee.WorkerType.LABOR)
+            .exclude(employee__status=Employee.Status.SEPARATED).count())
 
 
 @transaction.atomic

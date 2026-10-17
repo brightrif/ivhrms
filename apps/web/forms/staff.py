@@ -15,7 +15,7 @@ from apps.web.forms.nationality import NationalityInput, NationalityMixin
 from apps.web.forms.common import date_input
 from apps.web.forms.nationality import NationalityField
 from apps.web.forms.phone import phone_field, whatsapp_field
-
+from apps.employees import numbering
 
 ASSIGNMENT_FIELDS = ("employment_type", "department", "designation", "grade", "location", "reporting_manager")
 
@@ -105,6 +105,12 @@ class EmployeePersonalForm(WhatsAppMixin, forms.ModelForm):
     nationality = NationalityField()
     phone = phone_field()
     whatsapp_number = whatsapp_field()
+    joining_date = forms.DateField(
+        required=False, widget=date_input(max="today"),
+        help_text="An earlier date also moves the first assignment record. A later date is refused if something "
+                  "is already recorded before it.")
+    field_order = ["first_name", "last_name", "joining_date"]
+
     class Meta:
         model = Employee
         fields = ["first_name", "last_name", "name_ar", "date_of_birth", "nationality",
@@ -114,6 +120,7 @@ class EmployeePersonalForm(WhatsAppMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["nationality"].keep = self.instance.nationality     # an older saved value stays valid
+        self.initial.setdefault("joining_date", self.instance.joining_date)
 
         
 class AssignmentForm(forms.Form):
@@ -163,3 +170,29 @@ class AssignmentForm(forms.Form):
                 seen.add(mgr.pk)
                 mgr = mgr.reporting_manager
         return cd
+
+class ToStaffForm(forms.Form):
+    """A labor worker becomes a staff member (a promotion)."""
+    effective_from = forms.DateField(widget=date_input(max="today"), label="Staff from")
+    employment_type = forms.ChoiceField(choices=Employee.EmploymentType.choices)
+    designation = forms.ModelChoiceField(queryset=Designation.objects.filter(is_active=True),
+                                         empty_label="Select a designation")
+    department = forms.ModelChoiceField(queryset=Department.objects.none(), required=False, empty_label="Assign later")
+    reporting_manager = forms.ModelChoiceField(queryset=Employee.objects.none(), required=False,
+                                               empty_label="Assign later", label="Reports to")
+    number = forms.ChoiceField(label="Employee number")
+    remarks = forms.CharField(required=False, max_length=150, label="Note")
+
+    def __init__(self, *args, employee, previous=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["department"].queryset = Department.objects.filter(company=employee.company, is_active=True)
+        self.fields["reporting_manager"].queryset = (Employee.objects.filter(company=employee.company)
+                                                     .exclude(pk=employee.pk).exclude(status=Employee.Status.SEPARATED))
+        choices = [("new", f"New staff number ({numbering.peek(employee.company, Employee.WorkerType.STAFF)})"),
+                   ("keep", f"Keep {employee.employee_no}")]
+        if previous:
+            choices.insert(0, ("previous", f"Their earlier staff number ({previous})"))
+        self.fields["number"].choices = choices
+        self.initial.setdefault("effective_from", timezone.localdate())
+        self.initial.setdefault("employment_type", employee.employment_type)
+        self.initial.setdefault("number", "previous" if previous else "new")

@@ -83,6 +83,7 @@ def labor_list(request):
     open_allocations = LaborAllocation.objects.filter(effective_to__isnull=True).select_related(
         "project", "location", "work_order")
     qs = (LaborProfile.objects.for_user(request.user)
+          .filter(employee__worker_type=Employee.WorkerType.LABOR)
           .select_related("employee", "company", "trade", "contractor")
           .prefetch_related("rates", Prefetch("employee__labor_allocations", queryset=open_allocations,
                                               to_attr="open_allocs")))

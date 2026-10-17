@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.web.views import staff
+from apps.web.views import staff, worker_type
 
 
 urlpatterns = [
@@ -12,4 +12,6 @@ urlpatterns = [
     path("staff/<int:pk>/assignment/", staff.employee_assign, name="employee_assign"),
     path("staff/<int:pk>/login/", staff.employee_login, name="employee_login"),
     path("staff/next-number/", staff.employee_next_number, name="employee_next_number"),
+    path("staff/<int:pk>/to-staff/", worker_type.employee_to_staff, name="employee_to_staff"),
+    path("staff/<int:pk>/to-labor/", worker_type.employee_to_labor, name="employee_to_labor"),
 ]

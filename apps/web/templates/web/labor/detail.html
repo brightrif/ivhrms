@@ -10,14 +10,21 @@
   <div class="d-flex flex-wrap gap-2">
     <a class="btn btn-outline-secondary" href="{% url 'web:labor_list' %}">All workers</a>
     <a class="btn btn-outline-secondary" href="{% url 'web:employee_detail' emp.pk %}">Employee record</a>
-    {% if perms.labor.change_laborprofile and emp.status != 'separated' %}<a class="btn btn-outline-primary" href="{% url 'web:labor_edit' profile.pk %}">Edit</a>{% endif %}
-    {% if perms.labor.add_laborrate and emp.status != 'separated' %}<a class="btn btn-primary" href="{% url 'web:labor_rate_change' profile.pk %}">Change pay</a>{% endif %}
+    {% if perms.labor.change_laborprofile and perms.employees.change_employee and perms.labor.add_laborrate and emp.status != 'separated' %}
+      <a class="btn btn-outline-primary" href="{% url 'web:labor_full_edit' profile.pk %}">Edit</a>
+    {% endif %}
+    {% if perms.labor.add_laborrate and emp.status != 'separated' %}
+      <a class="btn btn-primary" href="{% url 'web:labor_rate_change' profile.pk %}">Change pay</a>
+    {% endif %}
+    {% if perms.labor.change_laborprofile and perms.employees.change_employee and emp.status != 'separated' and emp.worker_type == 'labor' %}
+      <a class="btn btn-outline-primary" href="{% url 'web:employee_to_staff' emp.pk %}">Change to staff</a>
+    {% endif %}
   </div>
 </div>
 
 <div class="row g-3">
-  <div class="col-lg-4"><div class="card shadow-sm border-0 h-100"><div class="card-body">
-    <h2>Worker</h2>
+      <div class="col-lg-4"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="d-flex justify-content-between align-items-start"><h2>Worker</h2>{% if perms.employees.change_employee and emp.status != 'separated' %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:labor_worker_edit' profile.pk %}" title="Edit worker details" aria-label="Edit worker details"><i class="bi bi-pencil"></i></a>{% endif %}</div>
     <dl class="row mb-0 small">
       <dt class="col-5">Company</dt><dd class="col-7">{{ profile.company.name }}</dd>
       <dt class="col-5">Joined</dt><dd class="col-7">{{ emp.joining_date|date:"d M Y" }}</dd>
@@ -27,7 +34,7 @@
   </div></div></div>
 
   <div class="col-lg-4"><div class="card shadow-sm border-0 h-100"><div class="card-body">
-    <h2>Engagement</h2>
+                <div class="d-flex justify-content-between align-items-start"><h2>Engagement</h2>{% if perms.labor.change_laborprofile and emp.status != 'separated' %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:labor_edit' profile.pk %}" title="Edit engagement" aria-label="Edit engagement"><i class="bi bi-pencil"></i></a>{% endif %}</div>
     <dl class="row mb-0 small">
       <dt class="col-5">Engaged as</dt><dd class="col-7">{{ profile.get_engagement_display }}</dd>
       <dt class="col-5">Contractor</dt><dd class="col-7">{{ profile.contractor.name|default:"None (engaged directly)" }}</dd>
@@ -37,7 +44,7 @@
   </div></div></div>
 
   <div class="col-lg-4"><div class="card shadow-sm border-0 h-100"><div class="card-body">
-    <h2>Pay</h2>
+            <div class="d-flex justify-content-between align-items-start"><h2>Pay</h2>{% if show_rates and perms.labor.add_laborrate and emp.status != 'separated' %}<span class="d-flex gap-1"><a class="btn btn-sm btn-outline-secondary" href="{% url 'web:labor_pay_correct' profile.pk %}" title="Correct a mistake in the current pay" aria-label="Correct a mistake in the current pay"><i class="bi bi-pencil"></i></a><a class="btn btn-sm btn-outline-primary" href="{% url 'web:labor_rate_change' profile.pk %}" title="Change pay from a date" aria-label="Change pay from a date"><i class="bi bi-cash-coin"></i></a></span>{% endif %}</div>
     {% if show_rates %}
       {% with r=profile.current_rate %}
       {% if r %}
