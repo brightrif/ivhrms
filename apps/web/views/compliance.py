@@ -3,7 +3,7 @@ from pathlib import Path
 
 from django.contrib import messages
 from django.db.models import Q
-from django.http import FileResponse, Http404, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -15,6 +15,9 @@ from apps.compliance import schedule, services
 from apps.compliance.models import Document, DocumentType, RenewalPayment, RenewalTask
 from apps.employees.models import Employee
 from apps.organization.services import companies_for
+
+from urllib.parse import urlparse
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from apps.web.forms.compliance import (
     DocumentForm,
@@ -34,7 +37,7 @@ LAYOUTS = {
     "document": [
         {"title": "Document", "width": "col-lg-7",
          "rows": [["company", "employee", "document_type"], ["reference_name", "number"],
-                  ["issue_date", "expiry_date"]]},
+                  ["registration_date","issue_date", "expiry_date"]]},
         {"title": "Handling", "width": "col-lg-5",
          "rows": [["responsible", "agent_name"], ["file"], ["notes"]]},
     ],
@@ -155,6 +158,19 @@ def document_detail(request, pk):
         "open_task": next((t for t in tasks if t.status == RenewalTask.Status.OPEN and t.document_id == doc.pk), None),
         "alerts": doc.alerts.all()[:8]})
 
+def _origin(request):
+    """The page the person came from ('' if unknown). Cancel and a saved form return there."""
+    url = request.GET.get("next", "")
+    if request.method == "GET":
+        if not url:
+            ref = request.META.get("HTTP_REFERER", "")
+            url = ref if ref and urlparse(ref).path != request.path else ""
+        request.session["add_origin"] = url
+    elif not url:
+        url = request.session.get("add_origin", "")
+    safe = url and url_has_allowed_host_and_scheme(
+        url, allowed_hosts={request.get_host()}, require_https=request.is_secure())
+    return url if safe else ""
 
 @hr_perm("compliance.add_document")
 def document_create(request):
@@ -162,7 +178,10 @@ def document_create(request):
     wanted = (("company", request.GET.get("company")), ("employee", request.GET.get("employee")),
               ("document_type", request.GET.get("type")))
     initial = {k: v for k, v in wanted if v and v.isdigit()}
-    form = DocumentForm(request.POST or None, request.FILES or None, user=request.user, kind=kind, initial=initial)
+    locked = [k for k in initial if k in ("document_type", kind)]      # chosen on the page before: fixed here
+    origin = _origin(request)
+    form = DocumentForm(request.POST or None, request.FILES or None, user=request.user, kind=kind,
+                        initial=initial, locked=locked)
     if request.method == "POST" and form.is_valid():
         try:
             doc = services.create_document(request.user, form.save(commit=False))
@@ -170,11 +189,9 @@ def document_create(request):
             form.add_error(None, str(exc))
         else:
             messages.success(request, f"{doc.label} was added.")
-            return redirect("web:compliance_detail", pk=doc.pk)
-    back = reverse("web:compliance_documents")
-    if kind == "employee" and initial.get("employee"):
-        back = reverse("web:employee_detail", args=[initial["employee"]])        # opened from the staff page
-    return _form_page(request, form, f"Add {kind} document", back, "document")
+            return redirect(origin or reverse("web:compliance_detail", args=[doc.pk]))
+    return _form_page(request, form, f"Add {kind} document", origin or reverse("web:compliance_documents"),
+                      "document")
 
 
 @hr_perm("compliance.change_document")
@@ -341,3 +358,31 @@ def type_toggle(request, pk):
     dtype.save(update_fields=["is_active"])
     messages.success(request, f"{dtype.name} was {'reactivated' if dtype.is_active else 'deactivated'}.")
     return redirect("web:compliance_types")
+
+@hr_perm("compliance.view_document")
+def staff_search(request):
+    """JSON for the Responsible box: staff matching what was typed. Never labour, never people who left.
+    Nothing typed lists the first ten."""
+    qs = (Employee.objects.for_user(request.user).exclude(status=Employee.Status.SEPARATED)
+          .exclude(worker_type=Employee.WorkerType.LABOR))
+    for word in request.GET.get("q", "").split():
+        qs = qs.filter(Q(first_name__icontains=word) | Q(last_name__icontains=word)
+                       | Q(employee_no__icontains=word))
+    return JsonResponse({"results": [{"id": e.pk, "name": e.full_name}
+                                     for e in qs.order_by("first_name", "last_name")[:10]]})
+
+@hr_perm("compliance.view_document")
+def employee_search(request):
+    """JSON for the document form's Employee box: never someone who left and, once a document type is chosen, never
+    someone who already holds a current one of it. Nothing typed lists the first ten."""
+    qs = Employee.objects.for_user(request.user).exclude(status=Employee.Status.SEPARATED)
+    type_id = request.GET.get("type", "")
+    if type_id.isdigit():
+        held = Document.objects.filter(is_current=True, document_type_id=int(type_id), employee__isnull=False,
+                                       dependant__isnull=True, reference_name="").values("employee_id")
+        qs = qs.exclude(pk__in=held)
+    for word in request.GET.get("q", "").split():
+        qs = qs.filter(Q(first_name__icontains=word) | Q(last_name__icontains=word)
+                       | Q(employee_no__icontains=word))
+    return JsonResponse({"results": [{"id": e.pk, "name": e.full_name, "code": e.employee_no}
+                                     for e in qs.order_by("first_name", "last_name")[:10]]})

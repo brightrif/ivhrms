@@ -19,6 +19,7 @@
         <a class="btn btn-outline-primary" href="{% url 'web:compliance_edit' doc.pk %}">Edit</a>
         <a class="btn btn-primary" href="{% url 'web:compliance_renew' doc.pk %}">Renew</a>
       {% endif %}
+      {% if doc.is_current and not doc.vehicle_id and not doc.dependant_id and perms.compliance.add_document %}<a class="btn btn-outline-secondary btn-sm" href="{% url 'web:compliance_create' %}{% if doc.employee_id %}?kind=employee&amp;employee={{ doc.employee_id }}{% endif %}"><i class="bi bi-plus-lg me-1"></i>Add another document</a>{% endif %}
       {% if not open_task and perms.compliance.add_renewaltask %}
         <a class="btn btn-outline-primary" href="{% url 'web:compliance_task_create' doc.pk %}">Start renewal</a>
       {% endif %}
@@ -42,10 +43,11 @@
         {% if doc.reference_name %}<dt class="col-5 fw-normal text-body-secondary">Reference</dt><dd class="col-7 mb-0">{{ doc.reference_name }}</dd>{% endif %}
         <dt class="col-5 fw-normal text-body-secondary">Number</dt><dd class="col-7 mb-0">{{ doc.number|default:"-" }}</dd>
         <dt class="col-5 fw-normal text-body-secondary">Issued</dt><dd class="col-7 mb-0">{{ doc.issue_date|date:"d M Y"|default:"-" }}</dd>
+          {% if doc.registration_date %}<dt class="col-5 fw-normal text-body-secondary">Registration date</dt><dd class="col-7 mb-0">{{ doc.registration_date|date:"d M Y" }}</dd>{% endif %}
         <dt class="col-5 fw-normal text-body-secondary">Expires</dt><dd class="col-7 mb-0">{{ doc.expiry_date|date:"d M Y" }}</dd>
         <dt class="col-5 fw-normal text-body-secondary">Authority</dt><dd class="col-7 mb-0">{{ doc.document_type.authority|default:"-" }}</dd>
         <dt class="col-5 fw-normal text-body-secondary">Responsible</dt>
-        <dd class="col-7 mb-0">{% if doc.responsible %}{{ doc.responsible.get_full_name|default:doc.responsible.username }}{% else %}<span class="text-body-secondary">Not assigned</span>{% endif %}</dd>
+        <dd class="col-7 mb-0">{% if doc.responsible %}{{ doc.responsible.full_name }}{% else %}<span class="text-body-secondary">Not assigned</span>{% endif %}</dd>
         <dt class="col-5 fw-normal text-body-secondary">Handled by</dt><dd class="col-7 mb-0">{{ doc.agent_name|default:"-" }}</dd>
         {% if doc.notes %}<dt class="col-5 fw-normal text-body-secondary">Notes</dt><dd class="col-7 mb-0">{{ doc.notes|linebreaksbr }}</dd>{% endif %}
       </dl>

@@ -7,7 +7,7 @@ from apps.employees.models import Employee
 
 from apps.web.forms.common import date_input
 from apps.web.forms.compliance import SCAN_ATTRS, SCAN_HELP, _employee_label, _people_field
-
+from apps.web.forms.compliance import _staff_field,default_responsible
 
 class DependantForm(forms.ModelForm):
     """Add or edit a family member. The sponsor is chosen when adding and cannot be changed afterwards."""
@@ -55,8 +55,11 @@ class FamilyDocumentForm(forms.ModelForm):
         dtype.queryset = (DocumentType.objects.filter(is_active=True, applies_to=DocumentType.AppliesTo.DEPENDANT)
                           .exclude(pk__in=held).order_by("name"))
         dtype.empty_label = "Choose a document"
-        self.initial.setdefault("responsible", user.pk)
-        _people_field(self.fields["responsible"], user, self.instance.responsible_id)
+        
+        default = default_responsible(user)
+        if default is not None:
+            self.initial.setdefault("responsible", default.pk)
+        _staff_field(self, user, self.instance.responsible_id)
 
     def clean(self):
         cd = super().clean()

@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import slugify
+from django.urls import reverse
 
 from apps.compliance import schedule, services
 from apps.compliance.models import Document, DocumentType, RenewalPayment, RenewalTask
@@ -14,6 +15,7 @@ from apps.compliance.validators import validate_extension, validate_file_size
 from apps.employees.models import Employee
 from apps.organization.models import Company
 from apps.organization.services import companies_for
+from apps.web.forms.widgets import StaffSearchWidget, EmployeeSearchWidget
 
 from apps.web.forms.common import date_input
 
@@ -23,8 +25,12 @@ SCAN_HELP = "PDF, JPG or PNG, up to 10 MB."
 
 
 def responsible_users(user, include_pk=None):
+    """Who can be made responsible, so the alert emails reach them: superusers, people with access to the viewer's
+    companies, and staff who have a login (their employee record is in those companies and they have not left)."""
     User = get_user_model()
-    condition = Q(is_superuser=True) | Q(company_access__company__in=companies_for(user))
+    companies = companies_for(user)
+    condition = (Q(company_access__company__in=companies)
+                 | (Q(employee__company__in=companies) & ~Q(employee__status=Employee.Status.SEPARATED)))
     if include_pk:
         condition |= Q(pk=include_pk)
     return (User.objects.filter(is_active=True).filter(condition).distinct()
@@ -41,6 +47,35 @@ def _people_field(field, user, include_pk=None, empty="Not assigned"):
     field.required = False
     field.empty_label = empty
 
+def responsible_staff(user, include_pk=None):
+    """Active staff (never labour) of the companies the person can see, plus the one already chosen."""
+    qs = (Employee.objects.for_user(user).exclude(status=Employee.Status.SEPARATED)
+          .exclude(worker_type=Employee.WorkerType.LABOR))
+    if include_pk:
+        qs = Employee.objects.filter(Q(pk=include_pk) | Q(pk__in=qs.values("pk")))
+    return qs.order_by("first_name", "last_name")
+
+def default_responsible(user):
+    """Whoever is signed in, if they are staff; otherwise an HR staff member of the companies they can see."""
+    me = getattr(user, "employee", None)
+    if (me is not None and me.worker_type == Employee.WorkerType.STAFF
+            and me.status != Employee.Status.SEPARATED):
+        return me
+    return (Employee.objects.for_user(user).filter(user__groups__name="HR", user__is_active=True)
+            .exclude(status=Employee.Status.SEPARATED).exclude(worker_type=Employee.WorkerType.LABOR)
+            .order_by("employee_no").first())
+
+def _staff_label(e):
+    return e.full_name
+
+def _staff_field(form, user, include_pk=None):
+    """Responsible: a search box (type a name, pick from the list) instead of a long drop-down."""
+    field = form.fields["responsible"]
+    field.widget = StaffSearchWidget(reverse("web:staff_search"), "Search staff by name")
+    field.queryset = responsible_staff(user, include_pk)       # after the widget, so the widget gets its choices
+    field.label_from_instance = _staff_label
+    field.required = False
+    field.widget.typed = form.data.get("responsible_text", "") if form.is_bound else ""
 
 def _employee_label(e):
     return f"{e.employee_no} - {e.full_name}" if e.employee_no else e.full_name
@@ -53,18 +88,21 @@ class DocumentForm(forms.ModelForm):
 
     class Meta:
         model = Document
-        fields = ["company", "employee", "document_type", "reference_name", "number", "issue_date", "expiry_date",
-                  "responsible", "agent_name", "file", "notes"]
+        fields = ["company", "employee", "document_type", "reference_name", "number","registration_date",
+                   "issue_date", "expiry_date","responsible", "agent_name", "file", "notes"]
         widgets = {
-            "issue_date": date_input(max="today"), "expiry_date": date_input(min_from="id_issue_date"),
-            "file": forms.FileInput(attrs=SCAN_ATTRS), "notes": forms.Textarea(attrs={"rows": 2}),
+            "registration_date": date_input(max="today"),
+            "issue_date": date_input(max="today"), 
+            "expiry_date": date_input(min_from="id_issue_date"),
+            "file": forms.FileInput(attrs=SCAN_ATTRS), 
+            "notes": forms.Textarea(attrs={"rows": 2}),
         }
         labels = {"document_type": "Document type", "agent_name": "Handled by (agent / PRO)",
                   "file": "Scanned copy", "number": "Certificate / reference number"}
         help_texts = {"reference_name": "Only if there are several of this type, e.g. a branch name.",
                       "file": SCAN_HELP}
 
-    def __init__(self, *args, user, kind="company", **kwargs):
+    def __init__(self, *args, user, kind="company",locked=(), **kwargs):
         super().__init__(*args, **kwargs)
         editing = bool(self.instance.pk)
         if editing:
@@ -76,6 +114,7 @@ class DocumentForm(forms.ModelForm):
             del self.fields["employee"]
         else:
             del self.fields["company"]                # an employee's document is in the employee's company
+            del self.fields["registration_date"]      # only company documents have one
             employee.help_text = ""                   # (the model's note is about the data, not about this form)
 
         if editing:                                   # who and what an existing document is cannot change
@@ -102,8 +141,28 @@ class DocumentForm(forms.ModelForm):
                                      .select_related("company").order_by("company__name", "employee_no"))
                 employee.label_from_instance = _employee_label
                 employee.empty_label = "Choose an employee"
-            self.initial.setdefault("responsible", user.pk)
-        _people_field(self.fields["responsible"], user, self.instance.responsible_id)
+            default = default_responsible(user)
+            if default is not None:
+                self.initial.setdefault("responsible", default.pk)
+        _staff_field(self, user, self.instance.responsible_id)
+
+        for name in locked:                                   # chosen on the page before: that one only, fixed
+            field = self.fields.get(name)
+            if field is not None and self.initial.get(name):
+                field.queryset = field.queryset.filter(pk=self.initial[name])
+                field.disabled = True
+        if kind == "employee" and not self.instance.pk and "employee" not in locked:
+            emp = self.fields["employee"]                     # a search box, not a list of everyone
+            emp.widget = EmployeeSearchWidget(reverse("web:employee_search"), "Search by name or number",
+                                              depends_on="id_document_type")
+            emp.queryset = Employee.objects.for_user(user).exclude(status=Employee.Status.SEPARATED)
+            emp.label_from_instance = _employee_label
+            emp.widget.typed = self.data.get("employee_text", "") if self.is_bound else ""
+        if "employee" in locked and "document_type" not in locked and self.initial.get("employee"):
+            held = Document.objects.filter(employee_id=self.initial["employee"], dependant__isnull=True,
+                                           is_current=True, reference_name="").values("document_type_id")
+            dtype = self.fields["document_type"]             # not the ones this person already has
+            dtype.queryset = dtype.queryset.exclude(pk__in=held)
 
     def clean_reference_name(self):
         return " ".join(self.cleaned_data.get("reference_name", "").split())
@@ -113,6 +172,16 @@ class DocumentForm(forms.ModelForm):
         issue, expiry = cd.get("issue_date"), cd.get("expiry_date")
         if issue and expiry and expiry < issue:
             self.add_error("expiry_date", "The expiry date cannot be before the issue date.")
+        registered = cd.get("registration_date")
+
+        employee, dtype = cd.get("employee"), cd.get("document_type")
+        if (not self.instance.pk and employee and dtype and not cd.get("reference_name")
+                and Document.objects.filter(employee=employee, dependant__isnull=True, document_type=dtype,
+                                            is_current=True, reference_name="").exists()):
+            self.add_error("employee", f"{employee.full_name} already has a current {dtype.name}. Renew it instead.")
+            
+        if registered and registered > timezone.localdate():
+            self.add_error("registration_date", "The registration date cannot be in the future.")
         dtype, ref = cd.get("document_type"), cd.get("reference_name", "")
         # Checked here because Django skips a conditional unique rule whose condition field is not on the form
         if self.kind == "company":

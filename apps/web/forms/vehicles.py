@@ -9,7 +9,7 @@ from apps.vehicles.models import Vehicle
 
 from apps.web.forms.common import date_input
 from apps.web.forms.compliance import SCAN_ATTRS, SCAN_HELP, _people_field
-
+from apps.web.forms.compliance import _staff_field,default_responsible
 
 class VehicleForm(forms.ModelForm):
     class Meta:
@@ -81,8 +81,10 @@ class VehicleDocumentForm(forms.ModelForm):
         else:
             dtype.queryset = DocumentType.objects.filter(is_active=True,
                                                          applies_to=DocumentType.AppliesTo.VEHICLE)
-            self.initial.setdefault("responsible", user.pk)
-        _people_field(self.fields["responsible"], user, self.instance.responsible_id)
+            default = default_responsible(user)
+            if default is not None:
+                self.initial.setdefault("responsible", default.pk)
+        _staff_field(self, user, self.instance.responsible_id)
 
     def clean(self):
         cd = super().clean()

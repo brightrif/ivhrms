@@ -22,4 +22,6 @@ urlpatterns = [
     path("compliance/types/new/", compliance.type_create, name="compliance_type_create"),
     path("compliance/types/<int:pk>/edit/", compliance.type_edit, name="compliance_type_edit"),
     path("compliance/types/<int:pk>/toggle/", compliance.type_toggle, name="compliance_type_toggle"),
+    path("compliance/staff-search/", compliance.staff_search, name="staff_search"),
+    path("compliance/employee-search/", compliance.employee_search, name="employee_search"),
 ]

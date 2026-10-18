@@ -99,6 +99,7 @@ def renew_document(doc, user, *, expiry_date, number="", issue_date=None, file=N
     old.save(update_fields=["is_current"])
     new = Document(company_id=old.company_id, employee_id=old.employee_id, document_type_id=old.document_type_id,
                    reference_name=old.reference_name, number=number or old.number, issue_date=issue_date,
+                   registration_date=old.registration_date,
                    expiry_date=expiry_date, responsible_id=old.responsible_id, agent_name=old.agent_name,
                    vehicle_id=old.vehicle_id, dependant_id=old.dependant_id,
                    notes=notes, previous=old)
@@ -123,7 +124,7 @@ def open_renewal(doc, *, assignee=None, due_date=None, estimated_cost=None, note
     if doc.renewal_tasks.filter(status=TaskStatus.OPEN).exists():
         raise ComplianceError("A renewal is already open for this document.")
     return RenewalTask.objects.create(
-        document=doc, assignee=assignee or doc.responsible, due_date=due_date or doc.expiry_date,
+        document=doc, assignee=assignee or (doc.responsible.user if doc.responsible_id else None) , due_date=due_date or doc.expiry_date,
         estimated_cost=estimated_cost, notes=notes)
 
 
@@ -250,8 +251,6 @@ def recipients(doc, escalate):
     groups = ["HR", "Finance"] + (["Management"] if escalate else [])
     ids = set(User.objects.filter(is_active=True, groups__name__in=groups,
                                   company_access__company_id=doc.company_id).values_list("pk", flat=True))
-    if doc.responsible_id:
-        ids.add(doc.responsible_id)
     return list(User.objects.filter(pk__in=ids, is_active=True))
 
 
@@ -280,7 +279,7 @@ def build_message(doc, days_left):
     if doc.number:
         lines.append(f"Number: {doc.number}")
     if doc.responsible:
-        lines.append(f"Responsible: {doc.responsible.get_full_name() or doc.responsible.username}")
+         lines.append(f"Responsible: {doc.responsible.full_name}")
     if doc.agent_name:
         lines.append(f"Handled by: {doc.agent_name}")
     link = _link(doc)
@@ -291,7 +290,11 @@ def build_message(doc, days_left):
 
 
 def _send(doc, users, days_left):
-    addresses = [u.email for u in users if u.email]
+    addresses = {u.email for u in users if u.email}
+    staff = doc.responsible
+    if staff is not None:                    # the responsible staff member is told, with or without a login
+        addresses.add(staff.email or (staff.user.email if staff.user_id else ""))
+    addresses = sorted(a for a in addresses if a)
     if not addresses:
         return 0                                   # nobody has an email: the dashboard still shows it
     subject, body = build_message(doc, days_left)

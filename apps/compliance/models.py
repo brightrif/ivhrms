@@ -74,10 +74,13 @@ class Document(BaseModel):
                               help_text="Set for a family member's document. The employee is then the sponsor.")
     reference_name = models.CharField(max_length=120, blank=True)
     number = models.CharField(max_length=60, blank=True)
+    registration_date = models.DateField(
+        null=True, blank=True,
+        help_text="When the company or licence was first registered. It does not change when the document is renewed.")
     issue_date = models.DateField(null=True, blank=True)
     expiry_date = models.DateField()
-    responsible = models.ForeignKey("accounts.User", null=True, blank=True, on_delete=models.SET_NULL,
-                                    related_name="+")
+    responsible = models.ForeignKey("employees.Employee", null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name="+", help_text="The staff member who is told when this is due.")
     agent_name = models.CharField(max_length=120, blank=True)
     file = models.FileField(storage=private_storage, upload_to=document_path, max_length=200, blank=True,
                             validators=[validate_extension, validate_file_size])

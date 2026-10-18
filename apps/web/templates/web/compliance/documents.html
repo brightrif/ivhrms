@@ -54,7 +54,7 @@
         {% if multi_company %}<td>{{ d.company.code }}</td>{% endif %}
         <td>{{ d.number|default:"-" }}</td>
         <td class="text-nowrap">{{ d.expiry_date|date:"d M Y" }}</td>
-        <td>{% if d.responsible %}{{ d.responsible.get_full_name|default:d.responsible.username }}{% else %}-{% endif %}</td>
+        <td>{% if d.responsible %}{{ d.responsible.full_name }}{% else %}-{% endif %}</td>
         <td>{% if d.is_current %}{% status_badge d.state d.due_text %}{% else %}{% status_badge "cancelled" "Older version" %}{% endif %}</td>
       </tr>
     {% empty %}
