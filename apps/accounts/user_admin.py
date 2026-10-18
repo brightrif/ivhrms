@@ -3,7 +3,7 @@
 Used by Settings > Users (superuser only, like the Access grid). It changes only group membership, company access and
 whether the login is switched on. What each group may do is set on the Access tab."""
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import IntegrityError,transaction
 from django.utils.crypto import get_random_string
 
 from apps.audit import services as audit
@@ -38,17 +38,33 @@ def create_user(actor, *, username, first_name="", last_name="", email="", group
     password = _temporary_password()
     user = User(username=username, first_name=(first_name or "").strip(), last_name=(last_name or "").strip(),
                 email=(email or "").strip(), must_change_password=True)
+
     user.set_password(password)
-    user.save()
+    try:
+        with transaction.atomic():
+            user.save()
+    except IntegrityError:                    # two people saved the same name at the same moment
+        raise UserAdminError(f"The username '{username}' is already taken.")
     _log(actor, user, f"created the login {username}")
+
     set_access(actor, user, groups=groups, companies=companies)
     return user, {"username": user.username, "password": password}
 
 
 @transaction.atomic
-def set_access(actor, user, *, groups, companies, is_active=None):
+def set_access(actor, user, *, groups, companies, is_active=None, username=None):
     """Make the person's groups and companies match the lists given. Returns what changed, in words."""
     changes = []
+    if username is not None and username != user.username:
+        old = user.username
+        user.username = username
+        try:
+            with transaction.atomic():
+                user.save(update_fields=["username"])
+        except IntegrityError:
+            raise UserAdminError(f"The username '{username}' is already taken.")
+        changes.append(f"changed the username {old} to {username}")
+        
     wanted = {g.pk: g for g in groups}
     have = {g.pk: g for g in user.groups.all()}
     for pk, group in wanted.items():

@@ -33,7 +33,21 @@
   <div class="col-lg-7">
     <form method="post">
       {% csrf_token %}
-      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+      {% if form.non_field_errors %}
+
+            <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+        <h2>Username</h2>
+        <input type="text" name="username" id="{{ form.username.id_for_label }}" autocomplete="off"
+               class="form-control{% if form.username.errors %} is-invalid{% endif %}"
+               value="{{ form.username.value|default_if_none:'' }}"
+               data-username-check="{% url 'web:username_check' %}" data-username-exclude="{{ target.pk }}">
+        {% include "web/_username_check.html" %}
+        {% for e in form.username.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+        <div class="form-text">What the person types to sign in. Their password stays the same; tell them the new name.</div>
+      </div></div>
+      
+      <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+      {% endif %}
       <div class="row g-3">
         <div class="col-md-6">
           <div class="card shadow-sm border-0 h-100"><div class="card-body">

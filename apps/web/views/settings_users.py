@@ -5,12 +5,15 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.cache import patch_vary_headers
 from django.views.decorators.http import require_POST
+
+from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.http import JsonResponse
 
 from apps.accounts import user_admin
 from apps.employees import services as employee_services
@@ -105,6 +108,9 @@ def users_for_employee(request):
                            | Q(employee_no__icontains=word))
         rows = list(qs.select_related("company", "designation").order_by("employee_no")[:PICK_LIMIT + 1])
         more, rows = len(rows) > PICK_LIMIT, rows[:PICK_LIMIT]
+        for e in rows:
+            e.suggested = employee_services.default_username(e)
+
         if not rows:
             hint = "Nobody without a login matches that."
     ctx = {"q": q, "rows": rows, "hint": hint, "more": more, "limit": PICK_LIMIT}
@@ -120,7 +126,8 @@ def users_for_employee(request):
 def users_create_login(request, pk):
     employee = get_object_or_404(Employee.objects.for_user(request.user), pk=pk)
     try:
-        credentials = employee_services.create_login(employee)
+        credentials = employee_services.create_login(employee,
+                                                     username=request.POST.get("username", "").strip() or None)
     except employee_services.EmployeeError as exc:
         messages.error(request, str(exc))
         return redirect("web:settings_user_for_employee")
@@ -138,7 +145,7 @@ def users_detail(request, pk):
         cd = form.cleaned_data
         try:
             changes = user_admin.set_access(request.user, target, groups=cd["groups"], companies=cd["companies"],
-                                            is_active=cd["is_active"])
+                                            is_active=cd["is_active"], username=cd["username"])
         except user_admin.UserAdminError as exc:
             form.add_error(None, str(exc))
         else:
@@ -163,3 +170,26 @@ def users_reset(request, pk):
     _remember(request, target, credentials)
     messages.success(request, "A new temporary password was issued. It is shown once, below.")
     return redirect("web:settings_user", pk=target.pk)
+
+@login_required
+def username_check(request):
+    """JSON for the live 'is this username free?' line. ?u=<name>&exclude=<user id to leave out>."""
+    me = request.user
+    if not (me.is_superuser or me.has_perm("employees.manage_logins") or me.has_perm("employees.add_employee")):
+        raise PermissionDenied
+    name = request.GET.get("u", "").strip()
+    if not name:
+        return JsonResponse({"state": "empty"})
+    try:
+        UnicodeUsernameValidator()(name)
+        if len(name) > 150:
+            raise ValidationError("too long")
+    except ValidationError:
+        return JsonResponse({"state": "invalid",
+                             "message": "Letters, numbers and @ . + - _ only, with no spaces."})
+    taken = User.objects.filter(username__iexact=name)
+    if request.GET.get("exclude", "").isdigit():
+        taken = taken.exclude(pk=int(request.GET["exclude"]))
+    if taken.exists():
+        return JsonResponse({"state": "taken", "message": f"'{name}' is already taken."})
+    return JsonResponse({"state": "free", "message": "Available."})

@@ -1,19 +1,29 @@
-"""My attendance: the monthly view and correction requests."""
+"""My attendance: the month as a calendar, the day panel, and correction requests."""
 
 from calendar import monthrange
 from collections import Counter
 from datetime import date, datetime, timedelta
 
-from django.http import Http404
+from django.contrib.contenttypes.models import ContentType
+from django.http import Http404, HttpResponse
 from django.shortcuts import render
+from django.template.loader import render_to_string
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_POST, require_http_methods
 
 from apps.attendance import services as att_services
 from apps.attendance.models import Attendance, AttendanceCorrection
+from apps.core.models import ApprovalRequest
 from apps.scheduling.services import day_types, shift_on
 from apps.web.access import employee_required
 from apps.web.forms.attendance import CorrectionForm
+
+# the letter on a day tile and its colour, by recorded status
+MARKS = {
+    "present": ("P", "success"), "late_entry": ("P", "warning"), "early_exit": ("P", "warning"),
+    "half_day": ("\u00bd", "info"), "absent": ("A", "danger"), "paid_leave": ("L", "leave"),
+    "unpaid_leave": ("UL", "leave"), "holiday": ("Hol", "off"), "weekly_off": ("Off", "off"),
+}
 
 
 def _parse_month(value, today):
@@ -31,6 +41,29 @@ def _parse_day(value):
         raise Http404
 
 
+def _optional_day(value):
+    try:
+        return date.fromisoformat(value or "")
+    except ValueError:
+        return None
+
+
+def _mark(rec, kind, future, before_join):
+    """(letter, colour name, words) for one day."""
+    if before_join:
+        return "", "blank", "Before joining"
+    if rec:
+        mark, tone = MARKS.get(rec.status, ("?", "none"))
+        return mark, tone, rec.get_status_display()
+    if kind == "holiday":
+        return "Hol", "off", "Holiday"
+    if kind == "weekly_off":
+        return "Off", "off", "Weekly off"
+    if future:
+        return "", "future", "Not yet"
+    return "?", "none", "No entry"
+
+
 def _day_rows(emp, first, last):
     today = timezone.localdate()
     records = {a.date: a for a in Attendance.objects.filter(employee=emp, date__range=(first, last))}
@@ -40,11 +73,73 @@ def _day_rows(emp, first, last):
                   .values_list("date", flat=True))
     rows, d = [], first
     while d <= last:
-        rec = records.get(d)
+        rec, before = records.get(d), d < emp.joining_date
+        mark, tone, label = _mark(rec, kinds[d], d > today, before)
         rows.append({"date": d, "rec": rec, "kind": kinds[d], "future": d > today, "pending": d in pending,
-                     "can_correct": d <= today and d not in pending and not (rec and rec.is_locked)})
+                     "before_join": before, "mark": mark, "tone": tone, "label": label, "is_today": d == today,
+                     "can_correct": d <= today and not before and d not in pending
+                                    and not (rec and rec.is_locked)})
         d += timedelta(days=1)
     return rows
+
+
+def _last_outcome(emp, d):
+    """How the last decided correction for this day ended, with the manager's comment if it was turned down."""
+    corr = (AttendanceCorrection.objects.filter(employee=emp, date=d)
+            .exclude(status=AttendanceCorrection.Status.PENDING).order_by("-id").first())
+    if corr is None:
+        return None
+    comment = ""
+    if corr.status == AttendanceCorrection.Status.REJECTED:
+        ct = ContentType.objects.get_for_model(AttendanceCorrection)
+        approval = ApprovalRequest.objects.filter(content_type=ct, object_id=str(corr.pk)).order_by("-id").first()
+        act = approval.actions.filter(decision="reject").order_by("-acted_at").first() if approval else None
+        comment = act.comment if act else ""
+    return {"corr": corr, "comment": comment}
+
+
+def _panel_context(request, d, form=None, errors=None, show_form=False):
+    """Everything the day panel shows. A plain click shows details only; the form comes with ?form=1 (or when a sent
+    form had a problem and is shown again with its errors)."""
+    emp = request.employee
+    row = _day_rows(emp, d, d)[0]
+    pending = None
+    if row["pending"]:
+        pending = (AttendanceCorrection.objects
+                   .filter(employee=emp, date=d, status=AttendanceCorrection.Status.PENDING).order_by("-id").first())
+    first = d.replace(day=1)
+    last = first.replace(day=monthrange(first.year, first.month)[1])
+    wanted = row["can_correct"] and (form is not None or show_form)
+    return {"pr": row, "piso": d.isoformat(), "pmanager": emp.reporting_manager, "ppending": pending,
+            "poutcome": None if pending else _last_outcome(emp, d), "perror": errors,
+            "pform": (form or CorrectionForm()) if wanted else None,
+            "pprev": (d - timedelta(days=1)).isoformat() if d > first else None,      # arrows stay inside the month
+            "pnext": (d + timedelta(days=1)).isoformat() if d < last else None}
+
+
+def _submit_correction(request, emp, d, form):
+    """Check the form and send the correction for approval. True when it was sent; otherwise the reason is on the
+    form. One place for both the list rows and the calendar panel."""
+    if not form.is_valid():
+        return False
+    cd = form.cleaned_data
+    if d < emp.joining_date:
+        form.add_error(None, "That date is before your joining date.")
+        return False
+    check_in = timezone.make_aware(datetime.combine(d, cd["check_in"])) if cd["check_in"] else None
+    check_out = None
+    if cd["check_out"]:
+        out_date, shift = d, shift_on(emp, d)
+        if shift and shift.crosses_midnight and cd["check_out"] <= (cd["check_in"] or shift.start_time):
+            out_date = d + timedelta(days=1)                     # night shift ends the next morning
+        check_out = timezone.make_aware(datetime.combine(out_date, cd["check_out"]))
+    try:
+        att_services.request_correction(emp, d, cd["status"], requested_by=request.user,
+                                        reason=cd["reason"], check_in=check_in, check_out=check_out)
+    except att_services.AttendanceError as exc:
+        form.add_error(None, str(exc))
+        return False
+    return True
 
 
 @employee_required
@@ -58,11 +153,45 @@ def attendance(request):
                "half": counts["half_day"], "absent": counts["absent"],
                "leave": counts["paid_leave"] + counts["unpaid_leave"], "late": counts["late_entry"]}
     nxt = last + timedelta(days=1)
-    return render(request, "web/attendance/month.html", {
+    ctx = {
         "rows": rows, "summary": summary, "month": first,
         "prev_month": (first - timedelta(days=1)).strftime("%Y-%m"),
         "next_month": nxt.strftime("%Y-%m") if nxt <= today else None,
-    })
+        "this_month": today.strftime("%Y-%m"), "is_this_month": first == today.replace(day=1),
+        "lead": range((first.weekday() + 1) % 7),                 # blank tiles before the 1st (the week starts Sunday)
+        "selected_iso": "",
+    }
+    chosen = _optional_day(request.GET.get("day"))
+    if not (chosen and first <= chosen <= last):
+        chosen = today if first == today.replace(day=1) else None      # this month: today is open by default
+    if chosen:
+        ctx.update(_panel_context(request, chosen, show_form=request.GET.get("form") == "1"))
+        ctx["selected_iso"] = chosen.isoformat()
+    return render(request, "web/attendance/month.html", ctx)
+
+
+@employee_required
+def attendance_day(request, day):
+    """The panel for one day: what was recorded, and the correction form when one can be asked for."""
+    d = _parse_day(day)
+    return render(request, "web/attendance/_day_panel.html",
+                  _panel_context(request, d, show_form=request.GET.get("form") == "1"))
+
+
+@employee_required
+@require_POST
+def attendance_day_correct(request, day):
+    """Send a correction from the calendar panel. Answers with the new panel and the updated day tile."""
+    emp, d = request.employee, _parse_day(day)
+    form = CorrectionForm(request.POST)
+    sent = _submit_correction(request, emp, d, form)
+    ctx = _panel_context(request, d, form=None if sent else form,
+                         errors=None if sent else list(form.non_field_errors()))
+    html = render_to_string("web/attendance/_day_panel.html", ctx, request=request)
+    if sent:                                            # the tile on the grid gets its pending dot
+        html += render_to_string("web/attendance/_day_tile.html",
+                                 {"r": ctx["pr"], "oob": True, "selected_iso": ctx["piso"]}, request=request)
+    return HttpResponse(html)
 
 
 @employee_required
@@ -80,26 +209,9 @@ def attendance_correct(request, day):
         return render(request, "web/attendance/_correction_form.html", {**ctx, "form": CorrectionForm()})
 
     form = CorrectionForm(request.POST)
-    if form.is_valid():
-        cd = form.cleaned_data
-        if d < emp.joining_date:
-            form.add_error(None, "That date is before your joining date.")
-        else:
-            check_in = timezone.make_aware(datetime.combine(d, cd["check_in"])) if cd["check_in"] else None
-            check_out = None
-            if cd["check_out"]:
-                out_date, shift = d, shift_on(emp, d)
-                if shift and shift.crosses_midnight and cd["check_out"] <= (cd["check_in"] or shift.start_time):
-                    out_date = d + timedelta(days=1)             # night shift ends the next morning
-                check_out = timezone.make_aware(datetime.combine(out_date, cd["check_out"]))
-            try:
-                att_services.request_correction(emp, d, cd["status"], requested_by=request.user,
-                                                reason=cd["reason"], check_in=check_in, check_out=check_out)
-            except att_services.AttendanceError as exc:
-                form.add_error(None, str(exc))
-            else:
-                resp = render(request, "web/attendance/_row.html", {"r": _day_rows(emp, d, d)[0]})
-                resp["HX-Retarget"] = f"#att-row-{d.isoformat()}"     # replace the whole row, not the form
-                resp["HX-Reswap"] = "outerHTML"
-                return resp
+    if _submit_correction(request, emp, d, form):
+        resp = render(request, "web/attendance/_row.html", {"r": _day_rows(emp, d, d)[0]})
+        resp["HX-Retarget"] = f"#att-row-{d.isoformat()}"     # replace the whole row, not the form
+        resp["HX-Reswap"] = "outerHTML"
+        return resp
     return render(request, "web/attendance/_correction_form.html", {**ctx, "form": form})

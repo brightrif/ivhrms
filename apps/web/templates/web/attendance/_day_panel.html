@@ -1,0 +1,71 @@
+{% load bs %}
+<div class="card-body" data-iso="{{ piso }}">
+  <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+    <h2 class="mb-0">{{ pr.date|date:"D j F" }}</h2>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Another day">
+      {% if pprev %}<a class="btn btn-outline-secondary" aria-label="Previous day" href="?month={{ pr.date|date:'Y-m' }}&amp;day={{ pprev }}#day-panel"
+         hx-get="{% url 'web:attendance_day' pprev %}" hx-target="#day-panel" hx-swap="innerHTML" hx-push-url="false"><i class="bi bi-chevron-left"></i></a>
+      {% else %}<span class="btn btn-outline-secondary disabled"><i class="bi bi-chevron-left"></i></span>{% endif %}
+      {% if pnext %}<a class="btn btn-outline-secondary" aria-label="Next day" href="?month={{ pr.date|date:'Y-m' }}&amp;day={{ pnext }}#day-panel"
+         hx-get="{% url 'web:attendance_day' pnext %}" hx-target="#day-panel" hx-swap="innerHTML" hx-push-url="false"><i class="bi bi-chevron-right"></i></a>
+      {% else %}<span class="btn btn-outline-secondary disabled"><i class="bi bi-chevron-right"></i></span>{% endif %}
+    </div>
+  </div>
+  <div class="mb-2">
+    {% if pr.rec %}{% status_badge pr.rec.status pr.rec.get_status_display %}
+    {% elif pr.kind == 'holiday' %}{% status_badge "holiday" "Holiday" %}
+    {% elif pr.kind == 'weekly_off' %}{% status_badge "weekly_off" "Weekly off" %}
+    {% elif pr.before_join %}<span class="badge text-bg-secondary">Before joining</span>
+    {% elif pr.future %}<span class="badge text-bg-light border">Not yet</span>
+    {% else %}<span class="badge text-bg-secondary">No entry</span>{% endif %}
+  </div>
+
+  <dl class="row small mb-3">
+    {% if pr.rec.check_in or pr.rec.check_out %}
+      <dt class="col-4 fw-normal text-body-secondary">In and out</dt>
+      <dd class="col-8 mb-1">{% if pr.rec.check_in %}{{ pr.rec.check_in|time:"H:i" }}{% else %}-{% endif %} to {% if pr.rec.check_out %}{{ pr.rec.check_out|time:"H:i" }}{% else %}-{% endif %}</dd>
+    {% endif %}
+    {% if pr.rec.late_minutes %}<dt class="col-4 fw-normal text-body-secondary">Late</dt><dd class="col-8 mb-1">{{ pr.rec.late_minutes }} minutes</dd>{% endif %}
+    {% if pr.rec.early_exit_minutes %}<dt class="col-4 fw-normal text-body-secondary">Left early</dt><dd class="col-8 mb-1">{{ pr.rec.early_exit_minutes }} minutes</dd>{% endif %}
+    {% if pr.rec.remarks %}<dt class="col-4 fw-normal text-body-secondary">Note</dt><dd class="col-8 mb-1">{{ pr.rec.remarks }}</dd>{% endif %}
+    {% if not pr.rec %}
+      <dd class="col-12 mb-0 text-body-secondary">
+        {% if pr.before_join %}This date is before your joining date.
+        {% elif pr.kind == 'holiday' %}A public holiday.
+        {% elif pr.kind == 'weekly_off' %}Your weekly off day.
+        {% elif pr.future %}This day has not happened yet.
+        {% else %}Nothing was recorded for this day.{% endif %}
+      </dd>
+    {% endif %}
+  </dl>
+
+  {% if ppending %}
+    <div class="alert alert-warning py-2 small mb-0">
+      <i class="bi bi-hourglass-split me-1"></i><strong>Correction pending.</strong>
+      You asked for {{ ppending.get_requested_status_display|default:ppending.requested_status }}{% if ppending.check_in %}, {{ ppending.check_in|time:"H:i" }}{% if ppending.check_out %} to {{ ppending.check_out|time:"H:i" }}{% endif %}{% endif %}.
+      Waiting for {{ pmanager.full_name|default:"your reporting manager" }}.
+      {% if ppending.reason %}<div class="mt-1 text-body-secondary">Your reason: {{ ppending.reason }}</div>{% endif %}
+    </div>
+  {% elif pform %}
+    <div class="fw-medium mb-2">Ask for a correction</div>
+    <form class="form-compact" hx-post="{% url 'web:attendance_day_correct' piso %}" hx-target="#day-panel" hx-swap="innerHTML">
+      {% csrf_token %}
+      {{ pform }}
+      <button class="btn btn-primary btn-sm">Submit for approval</button>
+      <a class="btn btn-outline-secondary btn-sm" href="?month={{ pr.date|date:'Y-m' }}&amp;day={{ piso }}#day-panel"
+         hx-get="{% url 'web:attendance_day' piso %}" hx-target="#day-panel" hx-swap="innerHTML" hx-push-url="false">Cancel</a>
+    </form>
+  {% elif pr.can_correct %}
+    {% if poutcome %}
+      <div class="small mb-2 {% if poutcome.corr.status == 'rejected' %}text-danger{% else %}text-body-secondary{% endif %}">
+        <i class="bi bi-info-circle me-1"></i>Your last correction for this day was {{ poutcome.corr.get_status_display|lower }}{% if poutcome.comment %}: {{ poutcome.comment }}{% endif %}.
+      </div>
+    {% endif %}
+    <a class="btn btn-primary btn-sm" href="?month={{ pr.date|date:'Y-m' }}&amp;day={{ piso }}&amp;form=1#day-panel"
+       hx-get="{% url 'web:attendance_day' piso %}?form=1" hx-target="#day-panel" hx-swap="innerHTML" hx-push-url="false"><i class="bi bi-pencil-square me-1"></i>Ask for a correction</a>
+  {% else %}
+    {% if perror %}<div class="alert alert-danger py-2 small mb-2">{{ perror|join:" " }}</div>{% endif %}
+    {% if pr.rec.is_locked %}<div class="small text-body-secondary"><i class="bi bi-lock me-1"></i>This day belongs to a closed payroll period, so it can't be corrected.</div>
+    {% elif pr.future %}<div class="small text-body-secondary">No correction is needed for a day that has not happened yet.</div>{% endif %}
+  {% endif %}
+</div>

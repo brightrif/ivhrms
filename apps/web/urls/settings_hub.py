@@ -13,4 +13,5 @@ urlpatterns = [
     path("settings/users/<int:pk>/", settings_users.users_detail, name="settings_user"),
     path("settings/users/<int:pk>/reset/", settings_users.users_reset, name="settings_user_reset"),
     path("settings/<slug:module>/", settings_hub.settings_module, name="settings_module"),
+    path("settings/users/check/", settings_users.username_check, name="username_check"),
 ]

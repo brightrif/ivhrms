@@ -85,6 +85,8 @@
             A temporary password is generated and shown once after saving. The employee must change it at first sign-in.
           </div>
         </fieldset>
+        <script>document.getElementById("id_username").setAttribute("data-username-check", "{% url 'web:username_check' %}");</script>
+        {% include "web/_username_check.html" %}
       </div></div>
     </div>
   </div>

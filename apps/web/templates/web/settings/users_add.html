@@ -15,10 +15,11 @@
       {% for f in form.visible_fields|slice:":4" %}
         <div class="mb-3">
           <label class="form-label" for="{{ f.id_for_label }}">{{ f.label }}</label>
-          <input type="{% if f.name == 'email' %}email{% else %}text{% endif %}" class="form-control{% if f.errors %} is-invalid{% endif %}" id="{{ f.id_for_label }}" name="{{ f.html_name }}" value="{{ f.value|default_if_none:'' }}">
+           <input type="{% if f.name == 'email' %}email{% else %}text{% endif %}" class="form-control{% if f.errors %} is-invalid{% endif %}" id="{{ f.id_for_label }}" name="{{ f.html_name }}" value="{{ f.value|default_if_none:'' }}"{% if f.name == 'username' %} autocomplete="off" data-username-check="{% url 'web:username_check' %}"{% endif %}>
           {% for e in f.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
         </div>
       {% endfor %}
+      {% include "web/_username_check.html" %}
       <div class="form-text">A temporary password is made and shown once after saving. The person must change it at first sign-in.</div>
     </div></div>
   </div>

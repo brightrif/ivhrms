@@ -1,0 +1,77 @@
+{% extends "web/base.html" %}
+{% block title %}Confirm attendance{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Staff</h1>
+</div>
+{% include "web/staff/_tabs.html" with tab="attendance" %}
+
+<div class="mb-3">
+  <h2 class="mb-1">Confirm attendance
+    <span class="text-body-secondary fw-normal">{% if period == "month" %}{{ first|date:"F Y" }}{% elif period == "week" %}{{ first|date:"j M" }} to {{ last|date:"j M Y" }}{% else %}{{ first|date:"l j F Y" }}{% endif %}</span></h2>
+  <div class="text-body-secondary">
+    {% if plan.entries %}
+      This will create <strong>{{ plan.entries|length }}</strong> attendance entr{{ plan.entries|length|pluralize:"y,ies" }}:
+      {% for label, n in plan.counts %}<strong>{{ n }}</strong> {{ label|lower }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+      Once saved, an entry can only be changed by a correction that the manager approves.
+    {% else %}
+      No attendance entries will be created.
+    {% endif %}
+  </div>
+  {% if plan.rest_counts %}
+    <div class="text-body-secondary mt-1"><i class="bi bi-calendar-check me-1"></i>Also recorded as rest days, so payroll sees them:
+      {% for label, n in plan.rest_counts %}<strong>{{ n }}</strong> {{ label }}{% if not forloop.last %}, {% endif %}{% endfor %}.</div>
+  {% endif %}
+  {% if plan.rest_worked %}
+    <div class="text-body-secondary mt-1"><i class="bi bi-arrow-repeat me-1"></i><strong>{{ plan.rest_worked }}</strong> of the entries replace a weekly off or holiday, because the person worked.</div>
+  {% endif %}
+</div>
+
+{% if plan.skipped %}
+<div class="alert alert-warning">
+  <div class="fw-medium mb-1"><i class="bi bi-exclamation-triangle me-1"></i>{{ plan.skipped|length }} will be left out</div>
+  <ul class="mb-0 small">{% for line in plan.skipped %}<li>{{ line }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+{% if plan.entries %}
+<div class="card shadow-sm border-0 mb-3"><div class="card-body p-0"><div class="table-responsive">
+  <table class="table align-middle mb-0">
+    <thead class="table-light"><tr><th>No.</th><th>Employee</th><th>Will get</th><th>Replaces a rest day</th></tr></thead>
+    <tbody>
+    {% for line in plan.people %}
+      <tr>
+        <td class="text-nowrap">{{ line.employee.employee_no }}</td>
+        <td class="fw-medium">{{ line.employee.full_name }}</td>
+        <td>{% for label, n in line.counts %}<span class="me-2">{{ n }} {{ label|lower }}</span>{% endfor %}</td>
+        <td>{% if line.rest_worked %}{{ line.rest_worked }}{% else %}<span class="text-body-secondary">-</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div></div>
+{% endif %}
+
+<div class="d-flex flex-wrap gap-2">
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="confirm">
+    <input type="hidden" name="period" value="{{ period }}">
+    <input type="hidden" name="date" value="{{ first|date:'Y-m-d' }}">
+    <input type="hidden" name="fill" value="{{ fill }}">
+    <input type="hidden" name="q" value="{{ f.q }}"><input type="hidden" name="department" value="{{ f.department }}"><input type="hidden" name="employee" value="{{ f.employee }}">
+    {% for k, v in hidden %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <button class="btn btn-primary"><i class="bi bi-check2-circle me-1"></i>Confirm and save</button>
+  </form>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="edit">
+    <input type="hidden" name="period" value="{{ period }}">
+    <input type="hidden" name="date" value="{{ first|date:'Y-m-d' }}">
+    <input type="hidden" name="fill" value="{{ fill }}">
+    <input type="hidden" name="q" value="{{ f.q }}"><input type="hidden" name="department" value="{{ f.department }}"><input type="hidden" name="employee" value="{{ f.employee }}">
+    {% for k, v in hidden %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <button class="btn btn-outline-secondary">Back to edit</button>
+  </form>
+</div>
+{% endblock %}

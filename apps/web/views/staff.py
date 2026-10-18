@@ -113,7 +113,8 @@ def employee_detail(request, pk):
         credentials = None
     history = emp.history.select_related("department", "designation", "reporting_manager")
     return render(request, "web/staff/detail.html",
-                  {"employee": emp, "history": history, "credentials": credentials})
+                  {"employee": emp, "history": history, "credentials": credentials,
+                   "suggested_username": "" if emp.user_id else services.default_username(emp)})
 
 
 @hr_perm("employees.change_employee")
@@ -167,7 +168,8 @@ def employee_assign(request, pk):
 def employee_login(request, pk):
     emp = _scoped_employee(request, pk)
     try:
-        credentials = services.reset_password(emp) if emp.user_id else services.create_login(emp)
+        credentials = (services.reset_password(emp) if emp.user_id else
+                       services.create_login(emp, username=request.POST.get("username", "").strip() or None))
     except services.EmployeeError as exc:
         messages.error(request, str(exc))
     else:

@@ -1,0 +1,102 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}Staff attendance{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Staff</h1>
+</div>
+{% include "web/staff/_tabs.html" with tab="attendance" %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h2 class="mb-0">Give attendance <span class="text-body-secondary fw-normal">{{ d|date:"l j F Y" }}</span></h2>
+    <div class="small text-body-secondary">Nothing is saved until you review it and confirm. A day that is already recorded is never changed here; it needs a correction.</div>
+  </div>
+  <div class="btn-group btn-group-sm" role="group" aria-label="Change day">
+    <a class="btn btn-outline-secondary" href="?date={{ prev_day }}{% if f.q %}&amp;q={{ f.q|urlencode }}{% endif %}{% if f.department %}&amp;department={{ f.department }}{% endif %}{% if f.employee %}&amp;employee={{ f.employee }}{% endif %}"><i class="bi bi-chevron-left"></i> Previous day</a>
+    {% if d != today %}<a class="btn btn-outline-secondary" href="?{% if f.q %}q={{ f.q|urlencode }}{% endif %}">Today</a>{% endif %}
+    {% if next_day %}
+      <a class="btn btn-outline-secondary" href="?date={{ next_day }}{% if f.q %}&amp;q={{ f.q|urlencode }}{% endif %}{% if f.department %}&amp;department={{ f.department }}{% endif %}{% if f.employee %}&amp;employee={{ f.employee }}{% endif %}">Next day <i class="bi bi-chevron-right"></i></a>
+    {% else %}<span class="btn btn-outline-secondary disabled">Next day <i class="bi bi-chevron-right"></i></span>{% endif %}
+  </div>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+  <input type="hidden" name="date" value="{{ d|date:'Y-m-d' }}">
+  <div class="col-md-4">
+    <div class="input-group">
+      <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+      <input type="search" name="q" value="{{ f.q }}" class="form-control" placeholder="Name or employee number">
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <select name="department" class="form-select" onchange="this.form.submit()">
+      <option value="">All departments</option>
+      {% for dep in departments %}<option value="{{ dep.pk }}"{% if dep.pk|stringformat:"s" == f.department %} selected{% endif %}>{{ dep.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-secondary">Search</button></div>
+  {% if f.employee %}<input type="hidden" name="employee" value="{{ f.employee }}"><div class="col-auto align-self-center small text-body-secondary">Showing one person. <a href="?date={{ d|date:'Y-m-d' }}">Show everyone</a></div>{% endif %}
+</form>
+
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="date" value="{{ d|date:'Y-m-d' }}">
+  <input type="hidden" name="q" value="{{ f.q }}">
+  <input type="hidden" name="department" value="{{ f.department }}">
+  <input type="hidden" name="employee" value="{{ f.employee }}">
+  <input type="hidden" name="action" value="review">
+
+  <div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="small text-body-secondary">{{ open_count }} to give, {{ recorded_count }} already recorded</div>
+      {% if open_count %}
+      <label class="d-flex align-items-center gap-2 small mb-0">Give every empty working day
+        <select name="fill" class="form-select form-select-sm w-auto">
+          <option value="">(only what I choose below)</option>
+          {% for key, label in statuses %}<option value="{{ key }}"{% if fill == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+    </div>
+    <div class="card-body p-0"><div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light"><tr><th>No.</th><th>Employee</th><th>Day</th><th>Attendance</th><th>In</th><th>Out</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr{% if not r.open %} class="table-light"{% endif %}>
+            <td class="text-nowrap">{{ r.employee.employee_no }}</td>
+            <td class="fw-medium">{{ r.employee.full_name }}{% if r.employee.department %}<div class="small text-body-secondary fw-normal">{{ r.employee.department.name }}</div>{% endif %}</td>
+            <td>{% if r.kind == 'holiday' %}{% status_badge "holiday" "Holiday" %}{% elif r.kind == 'weekly_off' %}{% status_badge "weekly_off" "Weekly off" %}{% else %}<span class="small text-body-secondary">Working day</span>{% endif %}</td>
+            {% if r.open %}
+              <td style="min-width:9rem">
+                <select name="s_{{ r.employee.pk }}" class="form-select form-select-sm" aria-label="Attendance for {{ r.employee.full_name }}">
+                  <option value="">-</option>
+                  {% for key, label in statuses %}<option value="{{ key }}"{% if r.status == key %} selected{% endif %}>{{ label }}</option>{% endfor %}
+                </select>
+              </td>
+              <td style="width:7rem"><input type="time" name="i_{{ r.employee.pk }}" value="{{ r.check_in }}" class="form-control form-control-sm" aria-label="Check-in"></td>
+              <td style="width:7rem"><input type="time" name="o_{{ r.employee.pk }}" value="{{ r.check_out }}" class="form-control form-control-sm" aria-label="Check-out"></td>
+            {% else %}
+              <td colspan="3">{% status_badge r.record.status r.record.get_status_display %}
+                <span class="small text-body-secondary ms-1">{% if r.record.check_in %}{{ r.record.check_in|time:"H:i" }}{% endif %}{% if r.record.check_out %} to {{ r.record.check_out|time:"H:i" }}{% endif %}</span>
+                <span class="small text-body-secondary ms-2">Already recorded</span></td>
+            {% endif %}
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="text-center text-body-secondary py-4">No staff to show for this day.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div></div>
+    {% if capped %}<div class="card-footer bg-white small text-body-secondary">Showing the first {{ rows|length }}. Search or choose a department to see others.</div>{% endif %}
+  </div>
+
+  {% if open_count %}
+  <div class="form-actions mt-3">
+    <button class="btn btn-primary"><i class="bi bi-clipboard-check me-1"></i>Review and confirm</button>
+    <span class="small text-body-secondary ms-2">You will see exactly what will be created before it is saved.</span>
+  </div>
+  {% endif %}
+</form>
+{% endblock %}

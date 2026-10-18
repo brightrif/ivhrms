@@ -1,0 +1,251 @@
+from datetime import date, datetime, time, timedelta
+from unittest.mock import patch
+
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+
+from apps.accounts.models import User
+from apps.attendance import services as att_services
+from apps.attendance.models import Attendance, AttendanceCorrection
+from apps.employees.models import Employee
+from apps.organization.models import Company
+from apps.web.views.attendance import _mark
+
+
+def _all_working(emp, first, last):
+    """The scheduling answer for these tests: every day is an ordinary working day."""
+    out, d = {}, first
+    while d <= last:
+        out[d] = "working"
+        d += timedelta(days=1)
+    return out
+
+
+class CalendarCase(TestCase):
+    def setUp(self):
+        patcher = patch("apps.web.views.attendance.day_types", side_effect=_all_working)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.co = Company.objects.create(code="C1", name="Company One")
+        self.user = User.objects.create_user("ali", password="pw")
+        boss_user = User.objects.create_user("boss", password="pw")
+        self.boss = Employee.objects.create(company=self.co, employee_no="B1", first_name="Mona",
+                                            joining_date=date(2020, 1, 1), user=boss_user)
+        self.emp = Employee.objects.create(company=self.co, employee_no="E1", first_name="Ali",
+                                           joining_date=date(2020, 1, 1), user=self.user,
+                                           reporting_manager=self.boss)
+        self.client.force_login(self.user)
+        self.today = timezone.localdate()
+        self.past = self.today - timedelta(days=2)
+        self.month = self.past.strftime("%Y-%m")
+
+    def at(self, d, hour, minute=0):
+        return timezone.make_aware(datetime.combine(d, time(hour, minute)))
+
+    def page(self, **params):
+        params.setdefault("month", self.month)
+        return self.client.get(reverse("web:attendance"), params)
+
+    def panel(self, d):
+        return self.client.get(reverse("web:attendance_day", args=[d.isoformat()]))
+
+    def send(self, d, **data):
+        body = {"status": "present", "check_in": "", "check_out": "", "reason": "Forgot to punch in"}
+        body.update(data)
+        return self.client.post(reverse("web:attendance_day_correct", args=[d.isoformat()]), body)
+
+
+class PageTests(CalendarCase):
+    def test_the_page_is_the_calendar_and_the_old_table_is_gone(self):
+        resp = self.page()
+        self.assertContains(resp, 'id="att-grid"')
+        self.assertContains(resp, f'id="att-day-{self.past.isoformat()}"')
+        self.assertNotContains(resp, "att-row-")
+        self.assertNotContains(resp, "Request correction")
+
+    def test_an_old_link_to_the_list_still_opens_the_calendar(self):
+        resp = self.page(view="list")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'id="att-grid"')
+
+    def test_today_is_marked(self):
+        resp = self.client.get(reverse("web:attendance"))
+        today = next(r for r in resp.context["rows"] if r["is_today"])
+        self.assertEqual(today["date"], self.today)
+        self.assertContains(resp, f'id="att-day-{self.today.isoformat()}" class="att-day att-')
+        self.assertEqual(sum(1 for r in resp.context["rows"] if r["is_today"]), 1)
+
+    def test_the_month_starts_under_the_right_weekday(self):
+        # 1 October 2026 is a Thursday, and the week starts on Sunday: four blank tiles first
+        resp = self.page(month="2026-10")
+        self.assertEqual(len(resp.context["lead"]), 4)
+        self.assertEqual(len(self.page(month="2026-11").context["lead"]), 0)       # 1 November 2026 is a Sunday
+
+    def test_a_chosen_day_opens_its_panel_with_details_but_no_form(self):
+        resp = self.page(day=self.past.isoformat())
+        self.assertEqual(resp.context["selected_iso"], self.past.isoformat())
+        self.assertContains(resp, "Ask for a correction")                 # the button
+        self.assertNotContains(resp, "hx-post")                           # but not the form
+
+    def test_the_form_opens_only_when_asked_for_even_without_javascript(self):
+        resp = self.page(day=self.past.isoformat(), form="1")
+        self.assertContains(resp, "hx-post")
+        self.assertContains(resp, "Submit for approval")
+
+    def test_the_current_month_opens_on_today(self):
+        resp = self.client.get(reverse("web:attendance"))
+        self.assertEqual(resp.context["selected_iso"], self.today.isoformat())
+
+    def test_another_month_opens_with_no_day_chosen(self):
+        other = (self.today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+        resp = self.page(month=other)
+        self.assertEqual(resp.context["selected_iso"], "")
+        self.assertContains(resp, "Select a day")
+
+    def test_a_bad_day_or_one_outside_the_month_is_ignored(self):
+        other = self.past - timedelta(days=45)
+        for bad in ("not-a-date", other.isoformat()):
+            resp = self.page(day=bad)
+            self.assertIn(resp.context["selected_iso"], ("", self.today.isoformat()))
+            self.assertNotEqual(resp.context["selected_iso"], other.isoformat())
+
+    def test_days_before_joining_are_blank_and_cannot_be_corrected(self):
+        Employee.objects.filter(pk=self.emp.pk).update(joining_date=self.today)
+        resp = self.panel(self.past)
+        self.assertContains(resp, "before your joining date")
+        self.assertNotContains(resp, "hx-post")
+        self.assertNotContains(resp, "Ask for a correction")
+
+
+class TileTests(CalendarCase):
+    def test_the_letter_and_colour_follow_the_recorded_status(self):
+        att_services.mark_attendance(self.emp, self.past, "absent")
+        tile = next(r for r in self.page().context["rows"] if r["date"] == self.past)
+        self.assertEqual((tile["mark"], tile["tone"], tile["can_correct"]), ("A", "danger", True))
+        self.assertContains(self.page(), "att-danger")
+
+    def test_the_mapping_of_every_kind_of_day(self):
+        class Rec:
+            def __init__(self, status):
+                self.status = status
+
+            def get_status_display(self):
+                return self.status
+
+        self.assertEqual(_mark(Rec("present"), "working", False, False)[:2], ("P", "success"))
+        self.assertEqual(_mark(Rec("late_entry"), "working", False, False)[:2], ("P", "warning"))
+        self.assertEqual(_mark(Rec("half_day"), "working", False, False)[:2], ("\u00bd", "info"))
+        self.assertEqual(_mark(Rec("paid_leave"), "working", False, False)[:2], ("L", "leave"))
+        self.assertEqual(_mark(None, "weekly_off", False, False)[:2], ("Off", "off"))
+        self.assertEqual(_mark(None, "holiday", False, False)[:2], ("Hol", "off"))
+        self.assertEqual(_mark(None, "working", False, False)[:2], ("?", "none"))
+        self.assertEqual(_mark(None, "working", True, False)[:2], ("", "future"))
+        self.assertEqual(_mark(None, "working", False, True)[:2], ("", "blank"))
+
+    def test_a_pending_correction_puts_a_dot_on_the_tile(self):
+        AttendanceCorrection.objects.create(employee=self.emp, date=self.past, requested_status="present",
+                                            reason="Forgot to punch in")
+        self.assertContains(self.page(), "att-dot")
+        self.assertContains(self.page(), "correction pending")
+
+
+class PanelTests(CalendarCase):
+    def test_what_was_recorded_is_shown(self):
+        att_services.mark_attendance(self.emp, self.past, "present",
+                                     check_in=self.at(self.past, 8, 2), check_out=self.at(self.past, 17, 5))
+        resp = self.panel(self.past)
+        self.assertContains(resp, "08:02")
+        self.assertContains(resp, "17:05")
+
+    def test_a_plain_click_shows_details_and_a_button_not_the_form(self):
+        resp = self.panel(self.past)
+        self.assertContains(resp, "Ask for a correction")
+        self.assertNotContains(resp, "hx-post")
+
+    def test_asking_opens_the_form_and_it_can_be_cancelled(self):
+        resp = self.client.get(reverse("web:attendance_day", args=[self.past.isoformat()]), {"form": "1"})
+        self.assertContains(resp, "hx-post")
+        self.assertContains(resp, "Cancel")
+
+    def test_a_future_day_offers_nothing_even_when_asked(self):
+        tomorrow = self.today + timedelta(days=1)
+        for params in ({}, {"form": "1"}):
+            resp = self.client.get(reverse("web:attendance_day", args=[tomorrow.isoformat()]), params)
+            self.assertContains(resp, "has not happened yet")
+            self.assertNotContains(resp, "hx-post")
+            self.assertNotContains(resp, "Ask for a correction")
+
+    def test_the_arrows_stay_inside_the_month(self):
+        first = date(2026, 5, 1)
+        last = date(2026, 5, 31)
+        self.assertIsNone(self.panel(first).context["pprev"])
+        self.assertEqual(self.panel(first).context["pnext"], "2026-05-02")
+        self.assertIsNone(self.panel(last).context["pnext"])
+        self.assertEqual(self.panel(last).context["pprev"], "2026-05-30")
+
+    def test_the_panel_names_its_day_for_the_page_to_highlight(self):
+        self.assertContains(self.panel(self.past), f'data-iso="{self.past.isoformat()}"')
+
+    def test_a_day_in_a_closed_payroll_period_says_why(self):
+        att_services.mark_attendance(self.emp, self.past, "present")
+        Attendance.objects.filter(employee=self.emp, date=self.past).update(is_locked=True)
+        resp = self.panel(self.past)
+        self.assertContains(resp, "closed payroll period")
+        self.assertNotContains(resp, "hx-post")
+        self.assertNotContains(resp, "Ask for a correction")
+
+    def test_a_pending_correction_shows_what_was_asked_and_who_is_waited_for(self):
+        AttendanceCorrection.objects.create(employee=self.emp, date=self.past, requested_status="present",
+                                            reason="Door reader was down")
+        resp = self.panel(self.past)
+        self.assertContains(resp, "Correction pending")
+        self.assertContains(resp, "Mona")
+        self.assertContains(resp, "Door reader was down")
+        self.assertNotContains(resp, "hx-post")
+        self.assertNotContains(resp, "Ask for a correction")
+
+    def test_a_turned_down_correction_is_remembered(self):
+        AttendanceCorrection.objects.create(employee=self.emp, date=self.past, requested_status="present",
+                                            reason="Forgot", status="rejected")
+        self.assertContains(self.panel(self.past), "was rejected")
+
+
+class SendTests(CalendarCase):
+    def fake(self, emp, d, status, **kw):
+        return AttendanceCorrection.objects.create(employee=emp, date=d, requested_status=status,
+                                                   reason=kw["reason"], check_in=kw.get("check_in"),
+                                                   check_out=kw.get("check_out"))
+
+    def test_no_reason_means_nothing_is_sent(self):
+        with patch("apps.web.views.attendance.att_services.request_correction") as sent:
+            resp = self.send(self.past, reason="")
+        self.assertContains(resp, "This field is required")
+        self.assertNotContains(resp, "hx-swap-oob")
+        sent.assert_not_called()
+
+    def test_a_good_request_answers_with_the_panel_and_the_updated_tile(self):
+        with patch("apps.web.views.attendance.att_services.request_correction", side_effect=self.fake):
+            resp = self.send(self.past, check_in="08:00", check_out="17:00")
+        self.assertContains(resp, "Correction pending")
+        self.assertContains(resp, 'hx-swap-oob="outerHTML"')
+        self.assertContains(resp, f'id="att-day-{self.past.isoformat()}"')
+        self.assertContains(resp, "att-dot")
+
+    def test_a_refusal_from_the_rules_is_shown_in_the_panel(self):
+        error = att_services.AttendanceError("That date belongs to a closed payroll period.")
+        with patch("apps.web.views.attendance.att_services.request_correction", side_effect=error):
+            resp = self.send(self.past)
+        self.assertContains(resp, "closed payroll period")
+        self.assertNotContains(resp, "hx-swap-oob")
+
+    def test_the_old_list_endpoints_still_work(self):
+        url = reverse("web:attendance_correct", args=[self.past.isoformat()])
+        self.assertContains(self.client.get(url), "Submit for approval")
+        with patch("apps.web.views.attendance.att_services.request_correction", side_effect=self.fake):
+            resp = self.client.post(url, {"status": "present", "reason": "Forgot", "check_in": "", "check_out": ""})
+        self.assertEqual(resp["HX-Retarget"], f"#att-row-{self.past.isoformat()}")
+        self.assertContains(resp, "Correction pending")
+
+    def test_only_a_post_can_send(self):
+        self.assertEqual(self.client.get(reverse("web:attendance_day_correct", args=[self.past.isoformat()])).status_code, 405)

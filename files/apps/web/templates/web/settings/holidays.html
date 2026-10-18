@@ -1,0 +1,42 @@
+{% extends "web/base.html" %}
+{% block title %}Holidays{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Settings</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:weekly_off' %}"><i class="bi bi-calendar-week me-1"></i>Weekly off</a>
+    {% if perms.scheduling.add_holiday %}<a class="btn btn-primary" href="{% url 'web:holiday_add' %}"><i class="bi bi-plus-lg me-1"></i>Add a holiday</a>{% endif %}
+  </div>
+</div>
+{% include "web/settings/_tabs.html" %}
+<p class="text-body-secondary">Public holidays. They count as paid rest days in attendance and are not charged against leave where the leave type says so. Islamic holidays move every year, so check these each year. Days already recorded are never changed when a holiday is added, edited or switched off.</p>
+
+<div class="btn-group btn-group-sm mb-3" role="group" aria-label="Year">
+  {% for y in years %}<a class="btn {% if y == year %}btn-secondary{% else %}btn-outline-secondary{% endif %}" href="?year={{ y }}">{{ y }}</a>{% endfor %}
+</div>
+
+<div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive">
+  <table class="table align-middle mb-0">
+    <thead class="table-light"><tr><th>Date</th><th>Day</th><th>Holiday</th><th>Applies to</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for h in rows %}
+      <tr{% if not h.is_active %} class="opacity-50"{% endif %}>
+        <td class="text-nowrap">{{ h.date|date:"d M Y" }}</td>
+        <td>{{ h.date|date:"D" }}</td>
+        <td class="fw-medium">{{ h.name }}{% if h.name_ar %}<div class="small text-body-secondary fw-normal" dir="rtl">{{ h.name_ar }}</div>{% endif %}</td>
+        <td>{% if h.company %}{{ h.company.name }}{% else %}<span class="badge text-bg-secondary">Every company</span>{% endif %}</td>
+        <td>{% if h.is_active %}<span class="badge text-bg-success">On</span>{% else %}<span class="badge text-bg-secondary">Switched off</span>{% endif %}</td>
+        <td class="text-end text-nowrap">
+          {% if perms.scheduling.change_holiday %}
+            <a class="btn btn-sm btn-outline-secondary" href="{% url 'web:holiday_edit' h.pk %}">Rename</a>
+            <form method="post" action="{% url 'web:holiday_toggle' h.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">{% if h.is_active %}Switch off{% else %}Switch on{% endif %}</button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="text-center text-body-secondary py-4">No holidays are set for {{ year }}.{% if perms.scheduling.add_holiday %} Press "Add a holiday".{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div></div>
+{% endblock %}

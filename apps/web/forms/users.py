@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.contrib.auth.validators import UnicodeUsernameValidator
 
 from apps.organization.models import Company, CompanyAccess
 
@@ -20,7 +21,7 @@ def _companies():
 
 class UserCreateForm(forms.Form):
     """A login for someone who is not an employee record (for an employee, use 'For an employee')."""
-    username = forms.CharField(max_length=150)
+    username = forms.CharField(max_length=150, validators=[UnicodeUsernameValidator()])
     first_name = forms.CharField(max_length=150, required=False)
     last_name = forms.CharField(max_length=150, required=False)
     email = forms.EmailField(required=False)
@@ -36,6 +37,7 @@ class UserCreateForm(forms.Form):
 
 class UserAccessForm(forms.Form):
     """What an existing person may reach: their groups, their companies, and whether the login is on."""
+    username = forms.CharField(max_length=150, validators=[UnicodeUsernameValidator()])
     groups = _groups()
     companies = _companies()
     is_active = forms.BooleanField(required=False, label="Login is switched on",
@@ -43,7 +45,15 @@ class UserAccessForm(forms.Form):
 
     def __init__(self, *args, target, **kwargs):
         super().__init__(*args, **kwargs)
+        self.target = target
+        self.initial.setdefault("username", target.username)
         self.initial.setdefault("groups", list(target.groups.values_list("pk", flat=True)))
         self.initial.setdefault("companies", list(CompanyAccess.objects.filter(user=target)
                                                   .values_list("company_id", flat=True)))
         self.initial.setdefault("is_active", target.is_active)
+
+    def clean_username(self):
+        username = self.cleaned_data["username"].strip()
+        if get_user_model().objects.filter(username__iexact=username).exclude(pk=self.target.pk).exists():
+            raise forms.ValidationError("That username is already taken.")
+        return username

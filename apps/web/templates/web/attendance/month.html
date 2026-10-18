@@ -1,14 +1,56 @@
 {% extends "web/base.html" %}
 {% block title %}My attendance{% endblock %}
 {% block content %}
+<style>
+  .att-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .att-dow div { font-size: .75rem; color: var(--bs-secondary-color); text-align: center; }
+  .att-day { position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 68px;
+             padding: .3rem .4rem; border-radius: .5rem; border: 1px solid var(--bs-border-color); background: var(--bs-body-bg);
+             color: var(--bs-body-color); text-decoration: none; }
+  .att-day:hover { border-color: var(--bs-primary); }
+  .att-day.is-selected { outline: 2px solid var(--bs-primary); outline-offset: 1px; }
+  .att-num { font-size: .75rem; color: var(--bs-secondary-color); }
+  .att-today .att-num { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem;
+                        border-radius: 50%; background: var(--bs-primary); color: #fff; font-weight: 600; }
+  .att-mark { font-size: 1.05rem; font-weight: 600; text-align: center; line-height: 1; }
+  .att-time { font-size: .65rem; color: var(--bs-secondary-color); text-align: center; min-height: .9rem; white-space: nowrap; }
+  .att-dot { position: absolute; top: .35rem; right: .35rem; width: .5rem; height: .5rem; border-radius: 50%; background: var(--bs-warning); }
+  .att-success { background: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); }
+  .att-warning { background: var(--bs-warning-bg-subtle); color: var(--bs-warning-text-emphasis); }
+  .att-info { background: var(--bs-info-bg-subtle); color: var(--bs-info-text-emphasis); }
+  .att-danger { background: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); }
+  .att-leave { background: color-mix(in srgb, var(--bs-purple) 14%, var(--bs-body-bg)); color: var(--bs-purple); }
+  .att-off { background: var(--bs-tertiary-bg); color: var(--bs-secondary-color); }
+  .att-none { border-style: dashed; }
+  .att-future, .att-blank { opacity: .45; }
+  .att-legend i { display: inline-block; width: 1.1rem; height: 1.1rem; line-height: 1.05rem; border-radius: .3rem; text-align: center;
+                  font-size: .65rem; font-style: normal; font-weight: 600; margin-right: .35rem; border: 1px solid var(--bs-border-color); }
+  @media (max-width: 575.98px) { .att-time { display: none; } .att-day { min-height: 50px; padding: .25rem .3rem; } .att-grid { gap: 3px; } }
+  @media (min-width: 992px) { .att-sheet { position: sticky; top: 1rem; } }
+  @media (max-width: 991.98px) {
+    .att-js .att-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1050; max-height: 85vh; overflow-y: auto;
+                         background: var(--bs-body-bg); border-radius: 1rem 1rem 0 0; box-shadow: 0 -.5rem 1.5rem rgba(0,0,0,.2);
+                         transform: translateY(105%); transition: transform .2s ease; padding: 0 .5rem .75rem; }
+    .att-js .att-sheet.is-open { transform: translateY(0); }
+    .att-js .att-sheet #day-panel { box-shadow: none !important; background: transparent; }
+    .att-bar { position: sticky; top: 0; z-index: 1; background: var(--bs-body-bg); display: flex; align-items: center;
+               justify-content: space-between; padding: .6rem .25rem .1rem; }
+    .att-grip { width: 2.5rem; height: .3rem; border-radius: .2rem; background: var(--bs-border-color); }
+    .att-backdrop.is-open { display: block; position: fixed; inset: 0; z-index: 1045; background: rgba(0,0,0,.35); }
+  }
+  .att-backdrop { display: none; }
+</style>
+<script>document.documentElement.classList.add("att-js");</script>
+
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <h1 class="mb-0">Attendance <span class="text-body-secondary fw-normal">{{ month|date:"F Y" }}</span></h1>
-  <div class="btn-group" role="group" aria-label="Change month">
-    <a class="btn btn-outline-secondary btn-sm" href="?month={{ prev_month }}"><i class="bi bi-chevron-left"></i> Previous</a>
+  <div class="btn-group btn-group-sm" role="group" aria-label="Change month">
+    <a class="btn btn-outline-secondary" href="?month={{ prev_month }}"><i class="bi bi-chevron-left"></i> Previous</a>
+    {% if not is_this_month %}<a class="btn btn-outline-secondary" href="?month={{ this_month }}">This month</a>{% endif %}
     {% if next_month %}
-      <a class="btn btn-outline-secondary btn-sm" href="?month={{ next_month }}">Next <i class="bi bi-chevron-right"></i></a>
+      <a class="btn btn-outline-secondary" href="?month={{ next_month }}">Next <i class="bi bi-chevron-right"></i></a>
     {% else %}
-      <span class="btn btn-outline-secondary btn-sm disabled">Next <i class="bi bi-chevron-right"></i></span>
+      <span class="btn btn-outline-secondary disabled">Next <i class="bi bi-chevron-right"></i></span>
     {% endif %}
   </div>
 </div>
@@ -26,10 +68,70 @@
     <div class="small text-body-secondary">Late</div><div class="fs-4 fw-semibold">{{ summary.late }}</div></div></div></div>
 </div>
 
-<div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive">
-  <table class="table align-middle mb-0">
-    <thead class="table-light"><tr><th>Date</th><th>Day</th><th>Status</th><th>In / out</th><th></th></tr></thead>
-    <tbody>{% for r in rows %}{% include "web/attendance/_row.html" %}{% endfor %}</tbody>
-  </table>
-</div></div></div>
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card shadow-sm border-0"><div class="card-body">
+      <div class="att-grid att-dow mb-1" aria-hidden="true">
+        <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+      </div>
+      <div class="att-grid" id="att-grid">
+        {% for _ in lead %}<div></div>{% endfor %}
+        {% for r in rows %}{% include "web/attendance/_day_tile.html" %}{% endfor %}
+      </div>
+      <div class="att-legend d-flex flex-wrap gap-3 small text-body-secondary mt-3">
+        <span><i class="att-success">P</i>Present</span>
+        <span><i class="att-warning">P</i>Late or left early</span>
+        <span><i class="att-info">&frac12;</i>Half day</span>
+        <span><i class="att-danger">A</i>Absent</span>
+        <span><i class="att-leave">L</i>Leave</span>
+        <span><i class="att-off">Off</i>Weekly off or holiday</span>
+        <span><i class="att-none">?</i>No entry</span>
+        <span><span class="d-inline-block rounded-circle bg-warning me-1" style="width:.55rem;height:.55rem"></span>Correction pending</span>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="col-lg-4">
+    <div id="att-sheet" class="att-sheet" role="region" aria-label="Day details">
+      <div class="att-bar d-lg-none"><span class="att-grip"></span><button type="button" class="btn-close" id="att-sheet-close" aria-label="Close"></button></div>
+      <div id="day-panel" class="card shadow-sm border-0" aria-live="polite">
+        {% if pr %}{% include "web/attendance/_day_panel.html" %}
+        {% else %}<div class="card-body text-body-secondary"><i class="bi bi-hand-index me-1"></i>Select a day to see what was recorded and to ask for a correction.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+<div id="att-backdrop" class="att-backdrop"></div>
+
+<script>
+  (function () {
+    var sheet = document.getElementById("att-sheet"), back = document.getElementById("att-backdrop"),
+        small = window.matchMedia("(max-width: 991.98px)");
+    function select(iso) {
+      var grid = document.getElementById("att-grid");
+      if (!grid) return;
+      grid.querySelectorAll(".att-day.is-selected").forEach(function (t) { t.classList.remove("is-selected"); });
+      var tile = document.getElementById("att-day-" + iso);
+      if (tile) tile.classList.add("is-selected");
+    }
+    function openSheet() { if (small.matches) { sheet.classList.add("is-open"); back.classList.add("is-open"); } }
+    function closeSheet() { sheet.classList.remove("is-open"); back.classList.remove("is-open"); }
+    document.body.addEventListener("htmx:afterSwap", function (e) {      // any day chosen: mark its tile, open the sheet on phones
+      var t = e.detail && e.detail.target;
+      if (!t || t.id !== "day-panel") return;
+      var marker = t.querySelector("[data-iso]");
+      if (marker) select(marker.dataset.iso);
+      openSheet();
+    });
+    back.addEventListener("click", closeSheet);
+    document.getElementById("att-sheet-close").addEventListener("click", closeSheet);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeSheet(); });
+    var bar = sheet.querySelector(".att-bar"), y0 = null;               // swipe the bar down to close
+    bar.addEventListener("touchstart", function (e) { y0 = e.touches[0].clientY; }, { passive: true });
+    bar.addEventListener("touchend", function (e) {
+      if (y0 !== null && e.changedTouches[0].clientY - y0 > 60) closeSheet();
+      y0 = null;
+    }, { passive: true });
+  })();
+</script>
 {% endblock %}

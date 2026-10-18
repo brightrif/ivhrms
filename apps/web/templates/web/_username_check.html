@@ -1,0 +1,34 @@
+<script>
+(function () {
+  document.querySelectorAll("input[data-username-check]:not([data-username-ready])").forEach(function (input) {
+    input.setAttribute("data-username-ready", "1");
+    var hint = document.createElement("div");
+    hint.className = "form-text"; hint.setAttribute("aria-live", "polite");
+    (input.closest("[data-username-group]") || input).insertAdjacentElement("afterend", hint);
+    var url = input.dataset.usernameCheck, exclude = input.dataset.usernameExclude || "",
+        suggest = input.dataset.usernameSuggest || "", original = input.value.trim().toLowerCase(), timer, asked = "";
+
+    function paint(state, message) {
+      input.classList.toggle("is-valid", state === "free");
+      input.classList.toggle("is-invalid", state === "taken" || state === "invalid");
+      hint.className = "form-text " + (state === "free" ? "text-success" :
+                                       (state === "taken" || state === "invalid") ? "text-danger" : "");
+      hint.textContent = message || "";
+    }
+    function check() {
+      var typed = input.value.trim(), name = typed || suggest;
+      if (!name) { paint("empty", ""); return; }
+      if (exclude && name.toLowerCase() === original) { paint("empty", "This is the current username."); return; }
+      asked = name;
+      fetch(url + "?u=" + encodeURIComponent(name) + (exclude ? "&exclude=" + encodeURIComponent(exclude) : ""))
+        .then(function (r) { return r.ok ? r.json() : { state: "empty" }; })
+        .then(function (data) {
+          if ((input.value.trim() || suggest) !== asked) return;     // they typed again meanwhile
+          paint(data.state, (typed ? "" : "Automatic name " + name + ": ") + (data.message || ""));
+        });
+    }
+    input.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(check, 300); });
+    if (!input.value.trim() && suggest) check();                     // blank box: check the automatic name now
+  });
+})();
+</script>

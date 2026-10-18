@@ -1,0 +1,9 @@
+{% with iso=r.date|date:"Y-m-d" %}<a id="att-day-{{ iso }}" class="att-day att-{{ r.tone }}{% if r.future and not r.rec %} att-future{% endif %}{% if iso == selected_iso %} is-selected{% endif %}"
+   href="?month={{ r.date|date:'Y-m' }}&amp;day={{ iso }}&amp;view=calendar#day-panel"
+   hx-get="{% url 'web:attendance_day' iso %}" hx-target="#day-panel" hx-swap="innerHTML" hx-push-url="false"{% if oob %} hx-swap-oob="outerHTML"{% endif %}
+   aria-label="{{ r.date|date:'j F' }}, {{ r.label }}{% if r.pending %}, correction pending{% endif %}">
+  <span class="att-num">{{ r.date|date:"j" }}</span>
+  <span class="att-mark">{{ r.mark }}</span>
+  <span class="att-time">{% if r.rec.check_in %}{{ r.rec.check_in|time:"H:i" }}{% if r.rec.check_out %}&ndash;{{ r.rec.check_out|time:"H:i" }}{% endif %}{% endif %}</span>
+  {% if r.pending %}<span class="att-dot" title="Correction pending"></span>{% endif %}
+</a>{% endwith %}

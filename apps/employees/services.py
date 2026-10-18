@@ -1,10 +1,13 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import IntegrityError,transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.crypto import get_random_string
+
+from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.core.exceptions import ValidationError
 
 from .models import Employee, EmploymentRecord
 from .signals import employee_onboarded
@@ -71,14 +74,26 @@ def create_login(employee, *, username=None):
         raise EmployeeError("This employee already has a login.")
     if employee.status == Employee.Status.SEPARATED:
         raise EmployeeError("This employee has left the company.")
+    
     username = (username or default_username(employee)).strip()
+    try:
+        UnicodeUsernameValidator()(username)
+        if len(username) > 150:
+            raise ValidationError("too long")
+    except ValidationError:
+        raise EmployeeError("A username can use letters, numbers and @ . + - _ only (no spaces).")
     if User.objects.filter(username__iexact=username).exists():
         raise EmployeeError(f"The username '{username}' is already taken.")
     password = _temporary_password()
     user = User(username=username, email=employee.email, first_name=employee.first_name,
                 last_name=employee.last_name, must_change_password=True)
     user.set_password(password)
-    user.save()
+    try:
+        with transaction.atomic():
+            user.save()
+    except IntegrityError:                    # two people saved the same name at the same moment
+        raise EmployeeError(f"The username '{username}' is already taken.")
+    
     employee.user = user
     employee.save(update_fields=["user"])
     return {"username": user.username, "password": password}
