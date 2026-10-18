@@ -123,3 +123,7 @@ class DependantAttachment(BaseModel):
 
     def __str__(self):
         return f"{self.get_kind_display()} - {self.dependant.full_name}"
+
+from . import sponsor  # noqa: E402,F401  (who may have a family visa)
+
+from . import status  # noqa: E402,F401  (family status requests)

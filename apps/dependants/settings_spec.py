@@ -40,5 +40,7 @@ register(Module(
         Capability("Process visa requests: submit and record the result", "dependants.change_familyvisarequest"),
         Capability("See visa costs and receipts", "dependants.view_visapayment"),
         Capability("Record visa costs", "dependants.add_visapayment"),
+        Capability("Decide who may have a family visa", "dependants.change_familyvisaexception",
+                   "Allow or refuse the family visa option for one person. HR and Management by default."),
     ],
 ))

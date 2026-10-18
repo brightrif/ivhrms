@@ -8,3 +8,9 @@ def visa_decided(sender, approval, **kwargs):
     from . import visa_services
     if approval.flow.code == visa_services.FLOW_CODE:
         visa_services.finalize(approval)
+
+@receiver(approval_completed)
+def status_decided(sender, approval, **kwargs):
+    from . import status_services
+    if approval.flow.code == status_services.FLOW_CODE:
+        status_services.finalize(approval)

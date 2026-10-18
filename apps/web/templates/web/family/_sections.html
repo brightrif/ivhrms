@@ -1,4 +1,6 @@
+{% load family_card %}
 <ul class="nav nav-pills small mb-3">
+  {% if perms.dependants.view_familystatusrequest %}{% status_waiting as waiting %}<li class="nav-item"><a class="nav-link{% if section == 'status' %} active{% endif %}" href="{% url 'web:employee_family_status' %}">Status requests{% if waiting %} <span class="badge text-bg-danger rounded-pill">{{ waiting }}</span>{% endif %}</a></li>{% endif %}
   <li class="nav-item"><a class="nav-link{% if section == 'members' %} active{% endif %}" href="{% url 'web:employee_family' %}">Family members</a></li>
   {% if perms.dependants.view_familyvisarequest %}<li class="nav-item"><a class="nav-link{% if section == 'requests' %} active{% endif %}" href="{% url 'web:employee_family_requests' %}">Visa requests</a></li>{% endif %}
   {% if perms.dependants.view_visapayment %}<li class="nav-item"><a class="nav-link{% if section == 'costs' %} active{% endif %}" href="{% url 'web:employee_family_costs' %}">Visa costs</a></li>{% endif %}

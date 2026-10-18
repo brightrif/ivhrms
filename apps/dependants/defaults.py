@@ -14,9 +14,11 @@ FLOW_CODE = "dependants.visa"
 
 GROUP_PERMISSIONS = {
     "HR": {"dependant": ["view", "add", "change"], "dependantattachment": ["view", "add"],
-           "familyvisarequest": ["view", "add", "change"], "visapayment": ["view", "add"]},
+           "familyvisarequest": ["view", "add", "change"], "visapayment": ["view", "add"],
+           "familyvisaexception": ["view", "add", "change"]},
     "Finance": {"dependant": ["view"], "familyvisarequest": ["view"], "visapayment": ["view", "add"]},
-    "Management": {"dependant": ["view"], "familyvisarequest": ["view"], "visapayment": ["view"]},
+    "Management": {"dependant": ["view"], "familyvisarequest": ["view"], "visapayment": ["view"],
+                   "familyvisaexception": ["view", "add", "change"]},
 }
 
 
@@ -43,6 +45,9 @@ def ensure_system_defaults(sender=None, using=DEFAULT_DB_ALIAS, **kwargs):
     if "dependants_dependant" not in tables:
         return
     _ensure_visa_flow(using, tables)
+    from .status_defaults import ensure_status_flow
+
+    ensure_status_flow(using, tables)
     from django.contrib.auth.models import Group, Permission
 
     for group_name, models_ in GROUP_PERMISSIONS.items():

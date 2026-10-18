@@ -1,0 +1,85 @@
+{% extends "web/base.html" %}
+{% block title %}{{ target.username }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Settings</h1>
+</div>
+{% include "web/settings/_tabs.html" %}
+
+{% if credentials %}
+<div class="alert alert-warning">
+  <div class="fw-semibold mb-1"><i class="bi bi-key me-1"></i>Temporary login. This is shown only once.</div>
+  <div>Username: <code>{{ credentials.username }}</code></div>
+  <div>Temporary password: <code>{{ credentials.password }}</code></div>
+  <div class="small mt-1">Give it to the person securely. They must choose a new password at first sign-in.</div>
+</div>
+{% endif %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h2 class="mb-0">{{ target.username }}{% if target.is_superuser %} <span class="badge text-bg-dark">Superuser</span>{% endif %}</h2>
+    <div class="text-body-secondary">{{ target.get_full_name|default:"No name" }}{% if target.email %} &middot; {{ target.email }}{% endif %}
+      {% if employee %} &middot; <a href="{% url 'web:employee_detail' employee.pk %}">{{ employee.employee_no }}</a>{% endif %}</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:settings_users' %}">All users</a>
+    <form method="post" action="{% url 'web:settings_user_reset' target.pk %}" onsubmit="return confirm('Issue a new temporary password for {{ target.username|escapejs }}?')">
+      {% csrf_token %}<button class="btn btn-outline-secondary">Reset password</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <form method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="card shadow-sm border-0 h-100"><div class="card-body">
+            <h2>Groups</h2>
+            <div class="small text-body-secondary mb-2">What each group may do is set on the <a href="{% url 'web:settings_access' %}">Access</a> tab.</div>
+            {% for c in form.groups %}<div class="form-check">{{ c.tag }} <label class="form-check-label" for="{{ c.id_for_label }}">{{ c.choice_label }}</label></div>{% empty %}<p class="small text-body-secondary mb-0">No groups yet.</p>{% endfor %}
+          </div></div>
+        </div>
+        <div class="col-md-6">
+          <div class="card shadow-sm border-0 h-100"><div class="card-body">
+            <h2>Companies</h2>
+            <div class="small text-body-secondary mb-2">The companies this person works in. Lists show only these.</div>
+            {% for c in form.companies %}<div class="form-check">{{ c.tag }} <label class="form-check-label" for="{{ c.id_for_label }}">{{ c.choice_label }}</label></div>{% empty %}<p class="small text-body-secondary mb-0">No companies yet.</p>{% endfor %}
+          </div></div>
+        </div>
+        <div class="col-12">
+          <div class="card shadow-sm border-0"><div class="card-body">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" role="switch" id="{{ form.is_active.id_for_label }}" name="is_active"{% if form.is_active.value %} checked{% endif %}{% if is_self %} disabled{% endif %}>
+              <label class="form-check-label fw-medium" for="{{ form.is_active.id_for_label }}">Login is switched on</label>
+            </div>
+            <div class="form-text">{% if is_self %}You cannot switch off your own login.{% else %}Switch it off to stop someone signing in, without deleting anything.{% endif %}</div>
+            {% if is_self %}<input type="hidden" name="is_active" value="on">{% endif %}
+          </div></div>
+        </div>
+      </div>
+      <div class="form-actions mt-3"><button class="btn btn-primary">Save</button></div>
+    </form>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0"><div class="card-body">
+      <h2>What this person can reach</h2>
+      {% for level, text in hints %}
+        <div class="small mb-2 {% if level == 'warning' %}text-warning-emphasis{% else %}text-body-secondary{% endif %}"><i class="bi {% if level == 'warning' %}bi-exclamation-triangle{% else %}bi-info-circle{% endif %} me-1"></i>{{ text }}</div>
+      {% endfor %}
+      {% if rights %}
+        <div class="small text-body-secondary mt-3 mb-1">Rights from the Access tab, through their groups:</div>
+        {% for module, labels in rights %}
+          <div class="small fw-medium mt-2">{{ module }}</div>
+          <ul class="small mb-0">{% for l in labels %}<li>{{ l }}</li>{% endfor %}</ul>
+        {% endfor %}
+      {% elif not target.is_superuser %}
+        <div class="small text-body-secondary mt-3">None of the rights on the Access tab yet.</div>
+      {% endif %}
+    </div></div>
+  </div>
+</div>
+{% endblock %}

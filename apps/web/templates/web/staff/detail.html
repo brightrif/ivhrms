@@ -38,6 +38,7 @@
   </div>
 </div>
 
+{% load family_card %}{% employee_family_card employee %}
 <div class="row g-3 mb-4">
   <div class="col-lg-4">
     <div class="card shadow-sm border-0 h-100"><div class="card-body">
@@ -79,7 +80,7 @@
 
   <div class="col-lg-4">
     <div class="card shadow-sm border-0 h-100"><div class="card-body">
-      <h2>Web login</h2>
+      <div class="d-flex justify-content-between align-items-start"><h2>Web login</h2>{% if employee.user and user.is_superuser %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:settings_user' employee.user.pk %}">Set access</a>{% endif %}</div>
       {% if employee.user %}
         <p class="mb-2">Username <code>{{ employee.user.username }}</code>
           {% if employee.user.must_change_password %}{% status_badge "pending" "Waiting for first sign-in" %}{% endif %}</p>

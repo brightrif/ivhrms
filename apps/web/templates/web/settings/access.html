@@ -5,12 +5,12 @@
   <h1 class="mb-0">Settings</h1>
 </div>
 {% include "web/settings/_tabs.html" %}
-<p class="text-body-secondary">Choose which groups may do what. A superuser can always do everything. Which company someone can act in is set separately, under their company access.</p>
+<p class="text-body-secondary">Choose which groups may do what. A superuser can always do everything. Who is in which group, and which companies they work in, is set under <a href="{% url 'web:settings_users' %}">Users</a>.</p>
 <form method="post">
   {% csrf_token %}
   <div class="card shadow-sm border-0"><div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
-      <thead class="table-light"><tr><th>Right</th>{% for g in groups %}<th class="text-center">{{ g.name }}</th>{% endfor %}</tr></thead>
+      <thead class="table-light"><tr><th>Right</th>{% for g in groups %}<th class="text-center"><a class="text-decoration-none" href="{% url 'web:settings_users' %}?group={{ g.pk }}">{{ g.name }}</a><div class="small fw-normal text-body-secondary">{{ g.member_count|default:0 }} user{{ g.member_count|pluralize }}</div></th>{% endfor %}</tr></thead>
       <tbody>
       {% regroup rows by module as by_module %}
       {% for block in by_module %}

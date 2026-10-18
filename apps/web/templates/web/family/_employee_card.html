@@ -1,0 +1,50 @@
+{% if show %}
+<div class="card shadow-sm border-0 mb-3"><div class="card-body">
+  <div class="row g-3 align-items-center">
+    <div class="col-lg-7">
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        <h2 class="mb-0">Family status</h2>
+        {% if status.allowed %}<span class="badge text-bg-success">{{ status.text }}</span>{% else %}<span class="badge text-bg-secondary">{{ status.text }}</span>{% endif %}
+      </div>
+      {% if status.reason %}<div class="small text-body-secondary">{{ status.reason }}</div>{% endif %}
+      {% if open_req %}
+        <div class="mt-2">{% include "web/family/_status_progress.html" with progress=progress %}</div>
+        <div class="small text-body-secondary mt-1">
+          {% if open_req.status == 'waiting_hr' %}The employee asked. HR reviews it, then sends it to {{ manager.full_name|default:"the reporting manager" }}.
+          {% else %}Waiting for {{ manager.full_name|default:"the reporting manager" }}.{% endif %}
+          <a href="{% url 'web:employee_family_status_request' open_req.pk %}">Open the request</a>
+        </div>
+      {% elif last %}
+        <div class="small text-danger mt-1"><i class="bi bi-x-circle me-1"></i>The last request was {{ last.get_status_display|lower }}{% if last.hr_note or last.decided_note %}: {{ last.hr_note|default:last.decided_note }}{% endif %}.</div>
+      {% elif not status.allowed %}
+        <div class="small text-body-secondary mt-1">No family can be recorded and no family visa requested until the manager approves family status.</div>
+      {% endif %}
+    </div>
+    <div class="col-lg-5">
+      <div class="d-flex flex-wrap justify-content-lg-end gap-2">
+        {% if can_forward %}
+          <form method="post" action="{% url 'web:employee_family_status_forward' open_req.pk %}?next={{ next_url|urlencode }}">{% csrf_token %}<button class="btn btn-primary">Send to manager</button></form>
+          <a class="btn btn-outline-danger" href="{% url 'web:employee_family_status_decline' open_req.pk %}">Decline</a>
+        {% elif can_request %}
+          <a class="btn btn-primary" href="{% url 'web:employee_family_status_add' emp.pk %}?next={{ next_url|urlencode }}"><i class="bi bi-send me-1"></i>Request family status</a>
+        {% endif %}
+        {% if can_add %}
+          <a class="btn btn-primary" href="{% url 'web:employee_family_add' %}?employee={{ emp.pk }}&amp;next={{ next_url|urlencode }}"><i class="bi bi-plus-lg me-1"></i>Add family member</a>
+        {% endif %}
+        {% if can_remove %}
+          <a class="btn btn-outline-secondary" href="{% url 'web:employee_family_visa_edit' emp.pk %}?next={{ next_url|urlencode }}">{% if status.allowed %}Remove status{% else %}Change{% endif %}</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% if members %}
+  <hr class="my-3">
+  <div class="small text-body-secondary mb-1">Family</div>
+  <ul class="list-inline mb-0">
+    {% for m in members %}
+    <li class="list-inline-item me-3"><a class="text-decoration-none" href="{% url 'web:employee_family_detail' m.pk %}">{{ m.full_name }}</a> <span class="text-body-secondary">{{ m.get_relationship_display }}</span></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div></div>
+{% endif %}

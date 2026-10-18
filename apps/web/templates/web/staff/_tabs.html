@@ -1,5 +1,5 @@
 <ul class="nav nav-tabs mb-3">
   <li class="nav-item"><a class="nav-link{% if tab == 'staff' %} active{% endif %}" href="{% url 'web:employee_list' %}">Staff</a></li>
-  {% if perms.dependants.view_dependant %}<li class="nav-item"><a class="nav-link{% if tab == 'family' %} active{% endif %}" href="{% url 'web:employee_family' %}">Family &amp; Visas</a></li>{% endif %}
+  {% if perms.dependants.view_dependant %}<li class="nav-item"><a class="nav-link{% if tab == 'family' %} active{% endif %}" href="{% if perms.dependants.view_familystatusrequest %}{% url 'web:employee_family_status' %}{% else %}{% url 'web:employee_family' %}{% endif %}">Family &amp; Visas</a></li>{% endif %}
   {% if perms.airtickets.view_ticketentitlement %}<li class="nav-item"><a class="nav-link{% if tab == 'tickets' %} active{% endif %}" href="{% url 'web:employee_tickets' %}">Air Tickets</a></li>{% endif %}
 </ul>

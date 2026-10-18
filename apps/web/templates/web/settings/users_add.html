@@ -1,0 +1,40 @@
+{% extends "web/base.html" %}
+{% block title %}Add a login{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Settings</h1>
+</div>
+{% include "web/settings/_tabs.html" %}
+<form method="post" class="row g-3">
+  {% csrf_token %}
+  <div class="col-lg-5">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <h2>Login without an employee record</h2>
+      <p class="small text-body-secondary">For an administrator or an outside user. For someone on your staff or labor list, use "Login for an employee" instead, so the login is linked to their record.</p>
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+      {% for f in form.visible_fields|slice:":4" %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ f.id_for_label }}">{{ f.label }}</label>
+          <input type="{% if f.name == 'email' %}email{% else %}text{% endif %}" class="form-control{% if f.errors %} is-invalid{% endif %}" id="{{ f.id_for_label }}" name="{{ f.html_name }}" value="{{ f.value|default_if_none:'' }}">
+          {% for e in f.errors %}<div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+      <div class="form-text">A temporary password is made and shown once after saving. The person must change it at first sign-in.</div>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>Groups</h2>
+      {% for c in form.groups %}<div class="form-check">{{ c.tag }} <label class="form-check-label" for="{{ c.id_for_label }}">{{ c.choice_label }}</label></div>{% empty %}<p class="small text-body-secondary mb-0">No groups yet.</p>{% endfor %}
+    </div></div>
+    <div class="card shadow-sm border-0"><div class="card-body">
+      <h2>Companies</h2>
+      {% for c in form.companies %}<div class="form-check">{{ c.tag }} <label class="form-check-label" for="{{ c.id_for_label }}">{{ c.choice_label }}</label></div>{% empty %}<p class="small text-body-secondary mb-0">No companies yet.</p>{% endfor %}
+    </div></div>
+  </div>
+  <div class="col-12 form-actions">
+    <button class="btn btn-primary">Create login</button>
+    <a class="btn btn-outline-secondary" href="{% url 'web:settings_users' %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

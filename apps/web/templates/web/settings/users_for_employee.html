@@ -1,0 +1,22 @@
+{% extends "web/base.html" %}
+{% block title %}Login for an employee{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Settings</h1>
+  <a class="btn btn-outline-secondary" href="{% url 'web:settings_users' %}">Back to users</a>
+</div>
+{% include "web/settings/_tabs.html" %}
+<div class="card shadow-sm border-0 mb-3"><div class="card-body">
+  <h2>Login for an employee</h2>
+  <p class="small text-body-secondary mb-2">Find the employee. Only people with no login yet are listed, best matches only. The login is linked to their record; next you choose what they can reach.</p>
+  <form method="get" hx-get="{% url 'web:settings_user_for_employee' %}" hx-trigger="input delay:300ms" hx-target="#results" hx-push-url="false">
+    <div class="row"><div class="col-md-6 col-lg-5">
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Name or employee number" autofocus autocomplete="off">
+      </div>
+    </div></div>
+  </form>
+</div></div>
+<div id="results">{% include "web/settings/_users_for_employee_results.html" %}</div>
+{% endblock %}

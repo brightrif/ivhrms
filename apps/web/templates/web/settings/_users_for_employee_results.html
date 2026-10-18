@@ -1,0 +1,25 @@
+{% if rows %}
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr><th>No.</th><th>Employee</th><th>Company</th><th>Type</th><th></th></tr></thead>
+      <tbody>
+      {% for e in rows %}
+        <tr>
+          <td class="text-nowrap">{{ e.employee_no }}</td>
+          <td class="fw-medium">{{ e.full_name }}</td>
+          <td>{{ e.company.code }}</td>
+          <td>{{ e.get_worker_type_display }}</td>
+          <td class="text-end">
+            <form method="post" action="{% url 'web:settings_user_create_login' e.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-primary">Create login</button></form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% if more %}<div class="card-footer bg-white small text-body-secondary">Showing the first {{ limit }}. Type more to narrow the list.</div>{% endif %}
+</div>
+{% else %}
+<div class="text-body-secondary py-3">{{ hint }}</div>
+{% endif %}

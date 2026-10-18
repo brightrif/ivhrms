@@ -75,7 +75,7 @@ class DepartmentForm(forms.ModelForm):
 class DesignationForm(forms.ModelForm):
     class Meta:
         model = Designation
-        fields = ["name"]
+        fields = ["name", "family_visa_default"]
 
     def clean_name(self):
         name = " ".join(self.cleaned_data["name"].split())

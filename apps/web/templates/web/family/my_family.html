@@ -1,0 +1,55 @@
+{% extends "web/base.html" %}
+{% block title %}My family{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">My family</h1>
+  {% if can_request %}<a class="btn btn-primary" href="{% url 'web:my_family_request' %}"><i class="bi bi-send me-1"></i>Request family status</a>{% endif %}
+</div>
+
+<div class="card shadow-sm border-0 mb-3"><div class="card-body">
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+    <h2 class="mb-0">Family status</h2>
+    {% if status.allowed %}<span class="badge text-bg-success">{{ status.text }}</span>{% else %}<span class="badge text-bg-secondary">{{ status.text }}</span>{% endif %}
+  </div>
+  {% if open_req %}
+    <div class="mt-2">{% include "web/family/_status_progress.html" with progress=progress %}</div>
+    <div class="small text-body-secondary mt-1">
+      {% if open_req.status == 'waiting_hr' %}HR is reviewing your request, then it goes to your reporting manager.{% else %}It is with your reporting manager.{% endif %}
+    </div>
+    {% if can_withdraw %}
+      <form method="post" action="{% url 'web:my_family_withdraw' open_req.pk %}" class="mt-2" onsubmit="return confirm('Withdraw your request?')">{% csrf_token %}<button class="btn btn-sm btn-outline-secondary">Withdraw my request</button></form>
+    {% endif %}
+  {% elif last %}
+    <div class="small text-danger mt-1"><i class="bi bi-x-circle me-1"></i>Your last request was {{ last.get_status_display|lower }}{% if last.hr_note or last.decided_note %}: {{ last.hr_note|default:last.decided_note }}{% endif %}.</div>
+  {% elif not status.allowed %}
+    <div class="small text-body-secondary mt-1">Family details are recorded by HR once your manager has approved family status. You can ask for it with the button above.</div>
+  {% endif %}
+</div></div>
+
+{% if members %}
+<div class="card shadow-sm border-0"><div class="card-body p-0"><div class="table-responsive">
+  <table class="table align-middle mb-0">
+    <thead class="table-light"><tr><th>Family member</th><th>Relationship</th><th>Files</th></tr></thead>
+    <tbody>
+    {% for m in members %}
+      <tr>
+        <td class="fw-medium">{{ m.full_name }}{% if m.date_of_birth %}<div class="small text-body-secondary fw-normal">Born {{ m.date_of_birth|date:"d M Y" }}</div>{% endif %}</td>
+        <td>{{ m.get_relationship_display }}</td>
+        <td>
+          {% for d in m.docs %}{% if d.file %}<div class="small"><i class="bi bi-file-earmark-text me-1"></i>{{ d.document_type.name }}{% if d.expiry_date %} <span class="text-body-secondary">(expires {{ d.expiry_date|date:"d M Y" }})</span>{% endif %}
+            <a href="{% url 'web:my_family_file' 'doc' d.pk %}" target="_blank">View</a> &middot; <a href="{% url 'web:my_family_file' 'doc' d.pk %}?download=1">Download</a></div>{% endif %}{% endfor %}
+          {% for p in m.papers %}{% if p.file %}<div class="small"><i class="bi bi-paperclip me-1"></i>{{ p.get_kind_display }}
+            <a href="{% url 'web:my_family_file' 'paper' p.pk %}" target="_blank">View</a> &middot; <a href="{% url 'web:my_family_file' 'paper' p.pk %}?download=1">Download</a></div>{% endif %}{% endfor %}
+          {% if not m.docs and not m.papers %}<span class="small text-body-secondary">No files yet.</span>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div></div>
+<div class="card-footer bg-white small text-body-secondary">This page is read-only. HR records and updates your family details. Every download is recorded in the audit log.</div>
+</div>
+{% else %}
+<p class="text-body-secondary">No family members are recorded yet.</p>
+{% endif %}
+{% endblock %}

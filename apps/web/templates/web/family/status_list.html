@@ -1,0 +1,82 @@
+{% extends "web/base.html" %}
+{% block title %}Family status requests{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Staff</h1>
+  {% if perms.dependants.add_familystatusrequest %}
+  <a class="btn btn-primary" href="{% url 'web:employee_family_pick' %}"><i class="bi bi-plus-lg me-1"></i>Request family status</a>
+  {% endif %}
+</div>
+{% include "web/staff/_tabs.html" with tab="family" %}
+{% include "web/family/_sections.html" with section="status" %}
+
+{% if waiting_hr %}
+<div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <div><i class="bi bi-hourglass-split me-1"></i><strong>{{ waiting_hr }}</strong> request{{ waiting_hr|pluralize }} from employees {{ waiting_hr|pluralize:"is,are" }} waiting for HR.</div>
+  <a class="btn btn-sm btn-warning" href="?status=waiting_hr">Show {{ waiting_hr|pluralize:"it,them" }}</a>
+</div>
+{% endif %}
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-md-4">
+    <div class="input-group">
+      <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+      <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Search employee or number">
+    </div>
+  </div>
+  {% if multi_company %}
+  <div class="col-6 col-md-2">
+    <select name="company" class="form-select" onchange="this.form.submit()">
+      <option value="">All companies</option>
+      {% for c in companies %}<option value="{{ c.pk }}"{% if c.pk|stringformat:"s" == company %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  <div class="col-6 col-md-3">
+    <select name="status" class="form-select" onchange="this.form.submit()">
+      <option value="open"{% if status == 'open' %} selected{% endif %}>In progress</option>
+      <option value="all"{% if status == 'all' %} selected{% endif %}>Any status</option>
+      {% for value, label in statuses %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-secondary">Search</button></div>
+</form>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Employee</th>{% if multi_company %}<th>Company</th>{% endif %}<th>Asked by</th><th>Status</th><th>Asked</th><th></th></tr>
+      </thead>
+      <tbody>
+      {% for r in page %}
+        <tr>
+          <td><a class="fw-medium text-decoration-none" href="{% url 'web:employee_family_status_request' r.pk %}">{{ r.employee.full_name }}</a>
+              <span class="small text-body-secondary">{{ r.employee.employee_no }}</span></td>
+          {% if multi_company %}<td>{{ r.company.code }}</td>{% endif %}
+          <td>{% if r.from_employee %}The employee{% else %}{{ r.requested_by.get_full_name|default:r.requested_by.get_username }}{% endif %}</td>
+          <td>{% if r.status == 'approved' %}<span class="badge text-bg-success">{{ r.get_status_display }}</span>
+              {% elif r.status == 'waiting_hr' %}<span class="badge text-bg-warning">{{ r.get_status_display }}</span>
+              {% elif r.status == 'pending' %}<span class="badge text-bg-info">{{ r.get_status_display }}</span>
+              {% elif r.status == 'withdrawn' %}<span class="badge text-bg-secondary">{{ r.get_status_display }}</span>
+              {% else %}<span class="badge text-bg-danger">{{ r.get_status_display }}</span>{% endif %}</td>
+          <td class="text-nowrap">{{ r.created_at|date:"d M Y" }}</td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{% url 'web:employee_family_status_request' r.pk %}">Open</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="text-center text-body-secondary py-4">No family status requests.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% if page.paginator.num_pages > 1 %}
+  <div class="card-footer bg-white d-flex justify-content-between align-items-center small">
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    <span>
+      {% if page.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="?{{ extra }}&page={{ page.previous_page_number }}">Previous</a>{% endif %}
+      {% if page.has_next %}<a class="btn btn-sm btn-outline-secondary" href="?{{ extra }}&page={{ page.next_page_number }}">Next</a>{% endif %}
+    </span>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

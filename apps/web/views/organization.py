@@ -52,7 +52,7 @@ PROJECT_SECTIONS = [(7, "Project", ["company", "name", "location", "code"]),
 SITE_SECTIONS = [(6, "Site or office", [("name", "code"), "is_site"])]
 GRADE_SECTIONS = [(6, "Grade", [("name", "code"), "rank"])]
 DEPARTMENT_SECTIONS = [(6, "Department", ["company", ("name", "code"), "parent"])]
-DESIGNATION_SECTIONS = [(6, "Designation", ["name"])]
+DESIGNATION_SECTIONS = [(6, "Designation", ["name", "family_visa_default"])]
 
 @login_required
 def organization_home(request):

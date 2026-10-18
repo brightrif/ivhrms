@@ -124,5 +124,7 @@ def settings_access(request):
                                   f"{revoked} taken away." if (granted or revoked) else "Nothing changed.")
         return redirect("web:settings_access")
     groups, rows = access.grid()
+    for g in groups:
+        g.member_count = g.user_set.count()
     return render(request, "web/settings/access.html", {
         "tabs": _visible(request.user), "groups": groups, "rows": rows, "tab": "access", "show_access": True})

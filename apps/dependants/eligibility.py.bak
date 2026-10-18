@@ -1,0 +1,73 @@
+"""Who may have a NEW family visa.
+
+The rule, in this order:
+  1. the exception on the person, if HR or Management set one (Allowed or Not allowed, with a reason);
+  2. otherwise the default of the person's designation (ticked under Organization > Designations);
+  3. otherwise not allowed.
+
+Nobody is allowed until someone decides, on purpose. A renewal or a cancellation never asks (see
+visa_services.blocked_reason), and family details can always be recorded."""
+from dataclasses import dataclass
+
+from django.db import transaction
+
+from .sponsor import FamilyVisaException
+
+Mode = FamilyVisaException.Mode
+
+
+class EligibilityError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class SponsorStatus:
+    allowed: bool
+    source: str            # "exception", "designation" or "default"
+    text: str              # short, for badges and the employee page
+    reason: str = ""       # the reason given with an exception
+
+
+def sponsor_status(employee):
+    row = FamilyVisaException.objects.filter(employee=employee).first()
+    if row is not None and row.mode == Mode.ALLOWED:
+        return SponsorStatus(True, "exception", "Allowed by exception", row.reason)
+    if row is not None and row.mode == Mode.NOT_ALLOWED:
+        return SponsorStatus(False, "exception", "Not allowed by exception", row.reason)
+    designation = employee.designation
+    if designation is not None and designation.family_visa_default:
+        return SponsorStatus(True, "designation", f"Allowed as {designation.name}")
+    return SponsorStatus(False, "default", "Not allowed (default)")
+
+
+def sponsor_problem(employee):
+    """Why this employee cannot have a new family visa, in plain words, or None when they can."""
+    status = sponsor_status(employee)
+    if status.allowed:
+        return None
+    if status.source == "exception":
+        return (f"{employee.full_name} is marked 'not allowed' for family visas ({status.reason}). "
+                "HR or Management can change this on the employee page.")
+    return (f"{employee.full_name} is not allowed a family visa yet. HR or Management can allow it on the "
+            "employee page, or the designation can be ticked under Organization.")
+
+
+@transaction.atomic
+def set_exception(employee, mode, reason=""):
+    """Allow or refuse the family visa option for one person, or put them back on the designation's default.
+    Requests already made are never touched. Returns the row, or None when there was nothing to change."""
+    if mode not in Mode.values:
+        raise EligibilityError("Choose Default, Allowed or Not allowed.")
+    reason = " ".join((reason or "").split())
+    if mode != Mode.DEFAULT and not reason:
+        raise EligibilityError("Give the reason.")
+    row = FamilyVisaException.objects.select_for_update().filter(employee=employee).first()
+    if row is None:
+        if mode == Mode.DEFAULT:
+            return None
+        row = FamilyVisaException(employee=employee)
+    elif (row.mode, row.reason) == (mode, reason):
+        return row
+    row.mode, row.reason = mode, reason
+    row.save()
+    return row

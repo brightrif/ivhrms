@@ -1,0 +1,73 @@
+{% extends "web/base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Settings</h1>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-primary" href="{% url 'web:settings_user_for_employee' %}"><i class="bi bi-person-plus me-1"></i>Login for an employee</a>
+    <a class="btn btn-outline-primary" href="{% url 'web:settings_user_add' %}"><i class="bi bi-plus-lg me-1"></i>Login without an employee</a>
+  </div>
+</div>
+{% include "web/settings/_tabs.html" %}
+<p class="text-body-secondary">Everyone who can sign in. Choose which groups each person is in (what they may do is set on the Access tab) and which companies they work in.</p>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col-md-4">
+    <div class="input-group">
+      <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+      <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Username, name or email">
+    </div>
+  </div>
+  <div class="col-6 col-md-2">
+    <select name="group" class="form-select" onchange="this.form.submit()">
+      <option value="">Any group</option>
+      {% for g in groups %}<option value="{{ g.pk }}"{% if g.pk|stringformat:"s" == group %} selected{% endif %}>{{ g.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3">
+    <select name="status" class="form-select" onchange="this.form.submit()">
+      <option value="">Everyone</option>
+      <option value="active"{% if status == 'active' %} selected{% endif %}>Login switched on</option>
+      <option value="off"{% if status == 'off' %} selected{% endif %}>Login switched off</option>
+      <option value="no_group"{% if status == 'no_group' %} selected{% endif %}>In no group</option>
+      <option value="no_company"{% if status == 'no_company' %} selected{% endif %}>With no company</option>
+    </select>
+  </div>
+  <div class="col-auto"><button class="btn btn-outline-secondary">Search</button></div>
+</form>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0"><div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr><th>Login</th><th>Employee</th><th>Groups</th><th>Companies</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for u in page %}
+        <tr{% if not u.is_active %} class="opacity-75"{% endif %}>
+          <td><a class="fw-medium text-decoration-none" href="{% url 'web:settings_user' u.pk %}">{{ u.username }}</a>
+              <div class="small text-body-secondary">{{ u.get_full_name }}</div></td>
+          <td>{% if u.emp %}<a class="text-decoration-none" href="{% url 'web:employee_detail' u.emp.pk %}">{{ u.emp.employee_no }}</a>{% else %}<span class="text-body-secondary">-</span>{% endif %}</td>
+          <td>{% if u.is_superuser %}<span class="badge text-bg-dark">Superuser</span>{% endif %}
+              {% for g in u.groups.all %}<span class="badge text-bg-primary">{{ g.name }}</span> {% empty %}{% if not u.is_superuser %}<span class="badge text-bg-warning">None</span>{% endif %}{% endfor %}</td>
+          <td>{% for a in u.company_access.all %}<span class="badge text-bg-secondary">{{ a.company.code }}</span> {% empty %}{% if not u.is_superuser %}<span class="badge text-bg-warning">None</span>{% endif %}{% endfor %}</td>
+          <td>{% if not u.is_active %}<span class="badge text-bg-secondary">Switched off</span>
+              {% elif u.must_change_password %}<span class="badge text-bg-info">Waiting for first sign-in</span>
+              {% else %}<span class="badge text-bg-success">Active</span>{% endif %}</td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'web:settings_user' u.pk %}">Set access</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="text-center text-body-secondary py-4">Nobody matches.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div></div>
+  {% if page.paginator.num_pages > 1 %}
+  <div class="card-footer bg-white d-flex justify-content-between align-items-center small">
+    <span>Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    <span>
+      {% if page.has_previous %}<a class="btn btn-sm btn-outline-secondary" href="?{{ extra }}&page={{ page.previous_page_number }}">Previous</a>{% endif %}
+      {% if page.has_next %}<a class="btn btn-sm btn-outline-secondary" href="?{{ extra }}&page={{ page.next_page_number }}">Next</a>{% endif %}
+    </span>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

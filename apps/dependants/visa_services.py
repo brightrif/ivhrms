@@ -13,6 +13,7 @@ from apps.core import approvals
 from apps.core.models import ApprovalRequest
 from apps.employees.models import Employee
 
+from . import eligibility
 from . import services as family
 from .defaults import FLOW_CODE
 from .models import Dependant, DependantAttachment
@@ -74,6 +75,9 @@ def blocked_reason(dependant):
         return f"{dependant.full_name} is no longer sponsored."
     if dependant.visa_requests.filter(status__in=FamilyVisaRequest.OPEN).exists():
         return f"{dependant.full_name} already has a visa request in progress."
+    if current_visa(dependant) is None:
+        # a NEW visa needs the sponsor to be allowed; a renewal or a cancellation (a visa exists) never asks
+        return eligibility.sponsor_problem(dependant.employee)
     return None
 
 

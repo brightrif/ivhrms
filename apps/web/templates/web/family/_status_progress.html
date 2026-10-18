@@ -1,0 +1,12 @@
+<ol class="list-unstyled d-flex flex-wrap align-items-center gap-2 mb-0 small">
+{% for step in progress %}
+  <li class="d-flex align-items-center gap-1">
+    {% if step.state == 'done' %}<i class="bi bi-check-circle-fill text-success"></i>
+    {% elif step.state == 'current' %}<i class="bi bi-hourglass-split text-warning"></i>
+    {% elif step.state == 'stopped' %}<i class="bi bi-x-circle-fill text-danger"></i>
+    {% else %}<i class="bi bi-circle text-body-secondary"></i>{% endif %}
+    <span class="{% if step.state == 'current' %}fw-medium{% elif step.state == 'later' %}text-body-secondary{% endif %}">{{ step.label }}</span>
+  </li>
+  {% if not forloop.last %}<li class="text-body-secondary" aria-hidden="true"><i class="bi bi-chevron-right"></i></li>{% endif %}
+{% endfor %}
+</ol>

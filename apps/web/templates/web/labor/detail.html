@@ -22,6 +22,7 @@
   </div>
 </div>
 
+{% load family_card %}{% employee_family_card emp %}
 <div class="row g-3">
       <div class="col-lg-4"><div class="card shadow-sm border-0 h-100"><div class="card-body">
     <div class="d-flex justify-content-between align-items-start"><h2>Worker</h2>{% if perms.employees.change_employee and emp.status != 'separated' %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:labor_worker_edit' profile.pk %}" title="Edit worker details" aria-label="Edit worker details"><i class="bi bi-pencil"></i></a>{% endif %}</div>

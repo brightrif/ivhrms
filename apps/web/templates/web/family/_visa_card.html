@@ -3,6 +3,7 @@
   <div class="card-header bg-white d-flex justify-content-between align-items-center">
     <h2 class="mb-0">Visa requests</h2>
     {% if can_request %}<a class="btn btn-sm btn-primary" href="{% url 'web:employee_family_request_add' dep.pk %}"><i class="bi bi-plus-lg me-1"></i>New request</a>{% endif %}
+    {% if not can_request %}{% load family_card %}{% visa_block_note dep as note %}{% if note %}<span class="small text-body-secondary">{{ note }}</span>{% endif %}{% endif %}
   </div>
   <div class="card-body p-0"><div class="table-responsive">
     <table class="table align-middle mb-0">

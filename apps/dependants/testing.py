@@ -12,6 +12,7 @@ from apps.core.models import ApprovalRequest
 from apps.employees.models import Employee
 from apps.organization.models import CompanyAccess
 
+from . import eligibility
 from . import services as family
 from . import visa_services as visa
 from .defaults import FLOW_CODE
@@ -30,6 +31,10 @@ class VisaCase(ComplianceCase):
         CompanyAccess.objects.create(user=self.hr_b, company=self.co)
         self.visa_type = DocumentType.objects.get(code="family-visa")
         self.dpassport = DocumentType.objects.get(code="dependant-passport")
+        # nobody has the family visa option until it is decided, so the older tests allow their sponsors
+        for sponsor in (self.emp, getattr(self, "emp2", None)):
+            if sponsor is not None:
+                eligibility.set_exception(sponsor, "allowed", "set-up for the tests")
         self.kid = self.person("Yusuf")
 
     def iso(self, days):

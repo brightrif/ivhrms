@@ -1,0 +1,31 @@
+"""The Family card on an employee's page, and the note on a family member's visa card when the sponsor is not allowed."""
+from django import template
+
+from apps.dependants import eligibility, visa_services
+from apps.dependants.models import Dependant
+
+register = template.Library()
+
+
+@register.inclusion_tag("web/family/_employee_card.html", takes_context=True)
+def employee_family_card(context, emp):
+    request = context.get("request")
+    user = context.get("user") or getattr(request, "user", None)
+    if user is None or not user.has_perm("dependants.view_dependant"):
+        return {"show": False}
+    members = list(Dependant.objects.for_user(user).filter(employee=emp, is_active=True)
+                   .order_by("relationship", "date_of_birth", "id"))
+    left = emp.status == "separated"
+    return {"show": True, "emp": emp, "members": members, "status": eligibility.sponsor_status(emp),
+            "can_add": user.has_perm("dependants.add_dependant") and not left,
+            "can_decide": user.has_perm("dependants.change_familyvisaexception") and not left,
+            "next_url": request.get_full_path() if request is not None else ""}
+
+
+@register.simple_tag
+def visa_block_note(dep):
+    """Why there is no 'New request' button, when the reason is the sponsor. Empty otherwise."""
+    if not dep.is_active or visa_services.current_visa(dep) is not None:
+        return ""
+    status = eligibility.sponsor_status(dep.employee)
+    return "" if status.allowed else f"Family visa: {status.text}. Allow it on the employee page."

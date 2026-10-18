@@ -50,6 +50,10 @@ class Department(BaseModel):
 class Designation(BaseModel):
     name = models.CharField(max_length=120, unique=True)
     is_active = models.BooleanField(default=True)
+    family_visa_default = models.BooleanField(
+        "Family visa allowed by default", default=False,
+        help_text="Everyone with this designation may have family visas, unless HR or Management say "
+                  "otherwise on their page. Tick the manager-level designations.")
 
     def __str__(self):
         return self.name

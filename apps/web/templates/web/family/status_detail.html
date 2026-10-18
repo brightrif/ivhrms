@@ -1,0 +1,47 @@
+{% extends "web/base.html" %}
+{% block title %}Family status request{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h1 class="mb-0">{{ r.employee.full_name }}</h1>
+    <div class="text-body-secondary">{{ r.employee.employee_no }} &middot; Family status request</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'web:employee_family_status' %}">All requests</a>
+    <a class="btn btn-outline-secondary" href="{% url 'web:employee_detail' r.employee.pk %}">Employee record</a>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-3"><div class="card-body">
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+    <h2 class="mb-0">{{ r.get_status_display }}</h2>
+  </div>
+  {% include "web/family/_status_progress.html" with progress=progress %}
+  <div class="d-flex flex-wrap gap-2 mt-3">
+    {% if can_forward %}
+      <form method="post" action="{% url 'web:employee_family_status_forward' r.pk %}">{% csrf_token %}<button class="btn btn-primary">Send to {{ manager.full_name|default:"the manager" }}</button></form>
+    {% endif %}
+    {% if can_decline %}<a class="btn btn-outline-danger" href="{% url 'web:employee_family_status_decline' r.pk %}">Decline</a>{% endif %}
+    {% if can_withdraw %}
+      <form method="post" action="{% url 'web:employee_family_status_withdraw' r.pk %}" onsubmit="return confirm('Withdraw this request?')">{% csrf_token %}<button class="btn btn-outline-secondary">Withdraw</button></form>
+    {% endif %}
+    {% if r.status == 'approved' %}
+      <a class="btn btn-primary" href="{% url 'web:employee_family_add' %}?employee={{ r.employee.pk }}"><i class="bi bi-plus-lg me-1"></i>Add family member</a>
+    {% endif %}
+  </div>
+</div>
+<div class="row g-3">
+  <div class="col-lg-6"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <h2>The request</h2>
+    <dl class="row mb-0 small">
+      <dt class="col-5">Employee</dt><dd class="col-7">{{ r.employee.full_name }} ({{ r.employee.employee_no }})</dd>
+      <dt class="col-5">Asked by</dt><dd class="col-7">{% if r.from_employee %}The employee{% else %}{{ r.requested_by.get_full_name|default:r.requested_by.get_username }}{% endif %}</dd>
+      <dt class="col-5">Asked on</dt><dd class="col-7">{{ r.created_at|date:"d M Y H:i" }}</dd>
+      <dt class="col-5">Reporting manager</dt><dd class="col-7">{{ manager.full_name|default:"None assigned" }}</dd>
+      <dt class="col-5">Why</dt><dd class="col-7">{{ r.reason|default:"-" }}</dd>
+      {% if r.hr_note %}<dt class="col-5">HR declined</dt><dd class="col-7">{{ r.hr_note }}</dd>{% endif %}
+      {% if r.decided_note %}<dt class="col-5">Manager's comment</dt><dd class="col-7">{{ r.decided_note }}</dd>{% endif %}
+    </dl>
+  </div></div></div>
+</div>
+{% endblock %}
