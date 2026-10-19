@@ -1,0 +1,50 @@
+{% extends "web/base.html" %}
+{% block title %}Who approves family status{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Settings</h1>
+  <a class="btn btn-outline-secondary" href="{% url 'web:settings_module' 'dependants' %}">Back to Family Visas</a>
+</div>
+{% include "web/settings/_tabs.html" %}
+<p class="text-body-secondary">Who decides a family status request after HR has sent it on. By default it is the employee's reporting manager. A company with one manager, or an owner who decides everything, can name that one person instead; every request of the company then goes to him or her, for staff and for labor.</p>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    {% for r in rows %}
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h2 class="mb-0">{{ r.company.name }}</h2>
+        {% if r.approver %}<span class="badge text-bg-primary">{{ r.approver.get_full_name|default:r.approver.get_username }}</span>
+        {% else %}<span class="badge text-bg-secondary">Reporting manager</span>{% endif %}
+      </div>
+      <div class="small text-body-secondary mt-2">
+        {% if r.approver %}Every family status request of this company is decided by {{ r.approver.get_full_name|default:r.approver.get_username }}. It appears in their Approvals.
+        {% else %}Each request is decided by the employee's reporting manager. Someone with no reporting manager cannot ask until one is assigned.{% endif %}
+      </div>
+    </div></div>
+    {% empty %}<div class="text-body-secondary">You have no companies to show.</div>{% endfor %}
+  </div>
+
+  {% if can_edit %}
+  <div class="col-lg-5">
+    <form method="post" class="card shadow-sm border-0"><div class="card-body">
+      {% csrf_token %}
+      <h2>Change it</h2>
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+      {% if form.company.is_hidden %}{{ form.company }}{% else %}
+      <div class="mb-3"><label class="form-label" for="{{ form.company.id_for_label }}">Company</label>{{ form.company }}
+        {% for e in form.company.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+      {% endif %}
+      <div class="mb-3">
+        <label class="form-label" for="{{ form.approver.id_for_label }}">{{ form.approver.label }}</label>
+        {{ form.approver }}
+        <div class="form-text">{{ form.approver.help_text }}</div>
+        {% for e in form.approver.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+      <div class="small text-body-secondary mb-3">Requests already waiting stay with the approver they were sent to. If you replace the named person, the requests waiting for them go to the new person. The person who approves cannot approve their own request, so give them family status through their designation instead.</div>
+      <button class="btn btn-primary">Save</button>
+    </div></form>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -101,7 +101,8 @@ def settings_module(request, module):
             rows.append({"setting": setting, "value": value, "source": source, "editable": editable(setting),
                          "error": errors.get(setting.key), "name": _field(setting.key), "revert": f"r__{setting.key}"})
         extra = sec.context(request.user) if sec.context else {}
-        sections.append({"title": sec.title, "intro": sec.intro, "rows": rows, "template": sec.template, "extra": extra})
+        sections.append({"title": sec.title, "intro": sec.intro, "rows": rows, "template": sec.template, "extra": extra,
+                         "width": sec.width})
     return render(request, "web/settings/module.html", {
         "tabs": _visible(request.user), "module": mod, "sections": sections, "can_edit": can_edit,
         "companies": companies, "per_company": per_company, "scope": scope,

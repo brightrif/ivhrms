@@ -6,6 +6,11 @@ from decimal import Decimal
 
 from apps.configuration.registry import Capability, Module, Section, Setting, register
 
+def _approver_context(user):
+    from .status_approver import approver_context
+    return approver_context(user)
+
+
 register(Module(
     key="dependants", label="Family Visas", order=45, icon="bi-people-fill",
     sections=[
@@ -29,6 +34,11 @@ register(Module(
                         help="When on, an approved request cannot be marked as submitted (or completed) until the "
                              "proof of relationship, passport and CPR are on file. Cancellations are never held up."),
             ]),
+        Section(
+            title="Who approves family status",
+            intro="After HR sends a family status request on, the reporting manager decides it. A company with one "
+                  "manager, or an owner who decides everything, can name that one person instead.",
+            template="web/settings/_family_status_approver.html", context=_approver_context),
     ],
     capabilities=[
         Capability("See family members and their visa requests", "dependants.view_dependant"),

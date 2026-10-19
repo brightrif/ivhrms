@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from apps.core.models import BaseModel
 from apps.audit.registry import audited
+from .company_lists import CompanyListManager, check_unique, claim_current_company
 
 @audited(module="organization", company="id")
 class Company(BaseModel):
@@ -16,6 +17,10 @@ class Company(BaseModel):
     runs_projects = models.BooleanField(default=False, help_text="Offered when adding a project.")
     is_default = models.BooleanField(default=False, help_text="Chosen first on pages that ask for a company.")
     is_default_labor = models.BooleanField(default=False, help_text="Chosen first when adding labor workers.")
+    theme_color = models.CharField("Theme colour", max_length=7, blank=True,
+                                   help_text="Buttons and links in the Separate view, e.g. #1a5fa8. Empty = standard.")
+    sidebar_color = models.CharField("Sidebar colour", max_length=7, blank=True,
+                                     help_text="Sidebar in the Separate view. Empty = standard.")
 
     class Meta:
         verbose_name_plural = "companies"
@@ -46,23 +51,58 @@ class Department(BaseModel):
         return self.name
 
 
-@audited(module="organization")
+@audited(module="organization", company="company_id")
 class Designation(BaseModel):
-    name = models.CharField(max_length=120, unique=True)
+    """A job title. With no company it is shared by every company; with a company it belongs to that company only."""
+    company = models.ForeignKey(Company, null=True, blank=True, on_delete=models.CASCADE, related_name="+",
+                                help_text="Empty = shared by every company")
+    name = models.CharField(max_length=120)
     is_active = models.BooleanField(default=True)
     family_visa_default = models.BooleanField(
         "Family visa allowed by default", default=False,
         help_text="Everyone with this designation may have family visas, unless HR or Management say "
                   "otherwise on their page. Tick the manager-level designations.")
 
+    objects = CompanyListManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["company", "name"], name="uniq_designation_name_per_company"),
+            models.UniqueConstraint(fields=["name"], condition=models.Q(company__isnull=True),
+                                    name="uniq_designation_shared_name"),
+        ]
+
+    def save(self, *args, **kwargs):
+        claim_current_company(self)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.name
 
 
 class Grade(BaseModel):
-    code = models.CharField(max_length=20, unique=True)
+    """A pay or seniority grade. With no company it is shared by every company; with a company it is that company's."""
+    company = models.ForeignKey(Company, null=True, blank=True, on_delete=models.CASCADE, related_name="+",
+                                help_text="Empty = shared by every company")
+    code = models.CharField(max_length=20)
     name = models.CharField(max_length=80)
     rank = models.PositiveSmallIntegerField(default=0, help_text="Higher = more senior")
+
+    objects = CompanyListManager()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["company", "code"], name="uniq_grade_code_per_company"),
+            models.UniqueConstraint(fields=["code"], condition=models.Q(company__isnull=True),
+                                    name="uniq_grade_shared_code"),
+        ]
+
+    def clean(self):
+        check_unique(self, "code", "grade code")
+
+    def save(self, *args, **kwargs):
+        claim_current_company(self)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name

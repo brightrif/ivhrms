@@ -37,12 +37,31 @@ class PolicyForm(forms.ModelForm):
         extra = set(self.instance.nationalities or [])
         names = sorted(set(known_names()) | extra)
         self.fields["nationalities"].choices = [(n, n) for n in names]
-        self.fields["min_grade"].queryset = Grade.objects.order_by("-rank", "name")
+        grades = Grade.objects.order_by("-rank", "name")
+        company = self.instance.company if self.instance.pk else None
+        if company is None and self.is_bound and str(self.data.get("company", "")).isdigit():
+            company = companies_for(user).filter(pk=int(self.data["company"])).first()
+        if company is None:
+            only = list(companies_for(user)[:2])
+            company = only[0] if len(only) == 1 else None
+        if company is not None:
+            self.fields["min_grade"].queryset = grades.for_company(company)
+        else:                                          # company not chosen yet: show every company's, labelled
+            self.fields["min_grade"].queryset = grades.select_related("company")
+            self.fields["min_grade"].label_from_instance = (
+                lambda g: f"{g.name} ({g.company.code})" if g.company_id else g.name)
         self.fields["min_grade"].empty_label = "Any grade"
         if self.instance.pk:
             del self.fields["company"]                      # a policy stays with its company
         else:
             self.fields["company"].queryset = companies_for(user)
+
+    def clean_min_grade(self):
+        grade = self.cleaned_data.get("min_grade")
+        company = self.cleaned_data.get("company") or (self.instance.company if self.instance.pk else None)
+        if grade and company and grade.company_id not in (None, company.pk):
+            raise forms.ValidationError("That grade belongs to another company.")
+        return grade
 
     def clean(self):
         cd = super().clean()

@@ -1,0 +1,52 @@
+<div class="mb-4">
+  <label class="form-label fw-semibold" for="company-view-select">View</label>
+  {% if section.extra.can_change %}
+  <div class="d-flex gap-2">
+    <select id="company-view-select" name="company_view" class="form-select">
+      <option value="combined"{% if section.extra.company_view == "combined" %} selected{% endif %}>Combined: all companies together</option>
+      <option value="separate"{% if section.extra.company_view == "separate" %} selected{% endif %}>Separate: one company at a time</option>
+    </select>
+    <button type="button" class="btn btn-primary text-nowrap"
+            hx-post="{% url 'web:company_view_set' %}" hx-include="#company-view-select"
+            hx-confirm="Change the company view for everyone?">Apply</button>
+  </div>
+  <div class="form-text mt-2">
+    <strong>Combined</strong>: every screen shows all the companies a person has access to.<br>
+    <strong>Separate</strong>: a person works in one company at a time. Someone with one company sees only that
+    company. Someone with two gets a switch in the top bar and starts on the company that was set up first.
+  </div>
+  {% else %}
+  <div class="fw-semibold">{% if section.extra.company_view == "separate" %}Separate: one company at a time{% else %}Combined: all companies together{% endif %}</div>
+  <div class="small text-body-secondary mt-2">You can see this but not change it.</div>
+  {% endif %}
+</div>
+
+<div>
+  <div class="fw-semibold mb-1">Colours in the Separate view</div>
+  <div class="form-text mb-2">Tick a colour to use it for that company; leave it unticked to keep the standard one. Press Save for the row.</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Company</th><th>Theme</th><th>Sidebar</th><th></th></tr></thead>
+      <tbody>
+      {% for c in section.extra.colour_rows %}
+      <tr id="colours-{{ c.pk }}">
+        <td class="text-nowrap fw-medium">{{ c.name }}<input type="hidden" name="by_tick" value="1"></td>
+        <td>
+          <div class="d-flex align-items-center gap-2">
+            <input type="checkbox" name="theme_on" value="1" class="form-check-input mt-0"{% if c.theme_color %} checked{% endif %}{% if not section.extra.can_change %} disabled{% endif %} aria-label="Use a theme colour for {{ c.name }}">
+            <input type="color" name="theme_color" class="form-control form-control-color" value="{{ c.theme_color|default:'#31629c' }}"{% if not section.extra.can_change %} disabled{% endif %} aria-label="Theme colour for {{ c.name }}">
+          </div>
+        </td>
+        <td>
+          <div class="d-flex align-items-center gap-2">
+            <input type="checkbox" name="sidebar_on" value="1" class="form-check-input mt-0"{% if c.sidebar_color %} checked{% endif %}{% if not section.extra.can_change %} disabled{% endif %} aria-label="Use a sidebar colour for {{ c.name }}">
+            <input type="color" name="sidebar_color" class="form-control form-control-color" value="{{ c.sidebar_color|default:'#233460' }}"{% if not section.extra.can_change %} disabled{% endif %} aria-label="Sidebar colour for {{ c.name }}">
+          </div>
+        </td>
+        <td class="text-end">{% if section.extra.can_change %}<button type="button" class="btn btn-sm btn-primary" hx-post="{% url 'web:company_colours_set' c.pk %}" hx-include="#colours-{{ c.pk }}">Save</button>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -37,11 +37,21 @@ def _lock(req):
 
 
 def _send(req, user):
-    """Hand the request to the reporting manager. Raises StatusError (and so rolls back) if there is no one to ask."""
+    """Hand the request to whoever approves family status for this company: the reporting manager, or the one person
+    the company named (Settings, Family Visas). Raises StatusError (and so rolls back) if no one else could decide it."""
     try:
-        approvals.submit(FLOW_CODE, req, employee=req.employee, requested_by=user)
+        approval = approvals.submit(FLOW_CODE, req, employee=req.employee, requested_by=user)
     except approvals.ApprovalError as exc:
         raise StatusError(str(exc)) from exc
+    step = approval.flow.steps.filter(order=approval.current_step).first()
+    approvers = approvals.approver_ids(step, approval)
+    if not approvers - {user.pk, req.employee.user_id}:                # nobody approves their own request
+        if req.employee.user_id in approvers:
+            raise StatusError(f"{req.employee.full_name} is the person who approves family status, so nobody else can "
+                              "decide their own request. Give them family status through their designation instead "
+                              "(Organization, Designations: tick 'Family visa allowed by default').")
+        raise StatusError("You are the person who approves family status, and nobody can approve a request they "
+                          "raised. Ask the employee to request it, or ask someone else in HR to send it.")
     req.status = Status.PENDING
     req.save(update_fields=["status", "updated_at"])
 

@@ -151,11 +151,11 @@ def department_delete(request, pk):
 
 @hr_perm("organization.view_designation")
 def designation_list(request):
-    designations = list(Designation.objects.order_by("name"))
+    designations = list(Designation.objects.select_related("company").order_by("name"))
     counts = _staff_counts(request.user, "designation", designations)
     for d in designations:
         d.staff = counts.get(d.pk, 0)
-    grades = (Grade.objects.order_by("-rank", "name")
+    grades = (Grade.objects.select_related("company").order_by("-rank", "name")
               if request.user.has_perm("organization.view_grade") else [])
     return render(request, "web/organization/designations.html",
                   {"designations": designations, "grades": grades})

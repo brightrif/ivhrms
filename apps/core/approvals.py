@@ -90,6 +90,10 @@ def decide(request_id, user, decision, *, comment="", channel="web"):
         return _decide(request_id, user, decision, comment=comment, channel=channel)
     except ApprovalDenied:
         req = ApprovalRequest.objects.get(pk=request_id)
+        from apps.organization.scope import active_scope_for      # Separate company view: this company only
+        scope = active_scope_for(user)
+        if scope is not None and req.company_id != scope:
+            raise ApprovalError("This request belongs to the other company. Switch to that company to act on it.")
         audit.log("permission_denied", req, module="approvals", actor=user, channel=channel,
                   subject_employee_id=req.employee_id, company_id=req.company_id)
         raise
@@ -136,4 +140,8 @@ def pending_for(user):
     """Requests waiting on this user. Fine for now; optimise when volumes grow."""
     qs = (ApprovalRequest.objects.filter(status=Status.PENDING)
           .select_related("flow", "employee__reporting_manager"))
+    from apps.organization.scope import active_scope_for      # Separate company view: this company only
+    scope = active_scope_for(user)
+    if scope is not None:
+        qs = qs.filter(company_id=scope)
     return [r for r in qs if can_act(r, user)]

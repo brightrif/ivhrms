@@ -41,6 +41,7 @@ class Section:
     intro: str = ""
     template: Optional[str] = None
     context: Optional[Callable] = None     # (user) -> dict, only for custom sections
+    width: str = "col-lg-6"                # the Bootstrap column class of its card on the tab
 
 
 @dataclass(frozen=True)

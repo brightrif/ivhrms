@@ -32,11 +32,6 @@ register(Module(
             intro="Whether each company pays overtime, and at what rates. These are dated and affect pay, so a change "
                   "starts on a date you choose and earlier months stay as they were.",
             template="web/settings/_labor_overtime.html", context=overtime_context),
-        Section(
-            title="Default company",
-            intro="The company Add labor worker starts on. Leave it on \"Same as Add staff member\" to follow the "
-                  "Default company in the Organization settings. You can still pick another company on the page.",
-            template="web/settings/_labor_default_company.html", context=default_company_choices),
         Section(title="Workers", settings=[
             Setting("labor.default_standard_hours", "Standard hours per day for new workers", "decimal", Decimal("8"),
                     help="What the form starts with when you add a worker. Hours beyond this count as overtime.",

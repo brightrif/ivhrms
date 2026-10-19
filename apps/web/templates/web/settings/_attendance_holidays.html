@@ -1,0 +1,19 @@
+{% if section.extra.holiday_rows %}
+<div class="small text-body-secondary mb-1">The next {{ section.extra.holiday_rows|length }}:</div>
+<div class="table-responsive">
+  <table class="table table-sm align-middle mb-2">
+    <tbody>
+    {% for h in section.extra.holiday_rows %}
+      <tr><td class="text-nowrap">{{ h.date|date:"D j M Y" }}</td><td class="fw-medium">{{ h.name }}</td>
+          <td class="text-body-secondary">{% if h.company %}{{ h.company.name }}{% else %}every company{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="small text-body-secondary mb-2">No upcoming holidays are set.</p>
+{% endif %}
+<div class="d-flex flex-wrap gap-2">
+  {% if perms.scheduling.view_holiday %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:holiday_list' %}">See and manage the holidays</a>{% endif %}
+  {% if perms.scheduling.add_holiday %}<a class="btn btn-sm btn-outline-secondary" href="{% url 'web:holiday_add' %}"><i class="bi bi-plus-lg me-1"></i>Add a holiday</a>{% endif %}
+</div>

@@ -18,7 +18,7 @@
       </div>
       {% if r.has_rule %}
         <ul class="small mb-0 mt-2 list-unstyled">
-          {% for rule in r.rules %}<li><strong>{{ rule.text }}</strong> from {{ rule.from|date:"d M Y" }}{% if rule.to %} to {{ rule.to|date:"d M Y" }}{% else %} <span class="text-body-secondary">(now)</span>{% endif %}</li>{% endfor %}
+          {% for rule in r.rules %}<li><strong>{{ rule.text }}</strong> from {{ rule.from|date:"d M Y" }}{% if rule.to %} to {{ rule.to|date:"d M Y" }}{% elif rule.later %} <span class="text-body-secondary">(starts later)</span>{% else %} <span class="text-body-secondary">(now)</span>{% endif %}</li>{% endfor %}
         </ul>
       {% else %}
         <div class="small text-body-secondary mt-2">No rule has been set, so the built-in weekly off applies ({{ r.now }}).</div>

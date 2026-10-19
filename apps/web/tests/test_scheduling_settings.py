@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.accounts.models import User
+from apps.configuration import registry
 from apps.organization.models import Company, CompanyAccess
 from apps.scheduling import calendar_rules as rules
 from apps.scheduling.models import Holiday
@@ -142,8 +143,64 @@ class WeeklyOffPageTests(CalendarPagesCase):
         self.assertContains(self.post(company=self.other.pk), "Select a valid choice")
         self.assertFalse(WeeklyOffRule.objects.exists())
 
-    def test_the_settings_tab_for_holidays_and_weekly_off_describes_itself(self):
+
+    def test_a_rule_that_starts_later_is_marked_as_such(self):
+        self.post(effective_from="2099-01-01")
+        self.assertContains(self.client.get(reverse("web:weekly_off")), "(starts later)")
+
+    def test_the_pages_keep_the_attendance_tab_highlighted(self):
+        for name in ("holiday_list", "weekly_off", "holiday_add"):
+            self.assertEqual(self.client.get(reverse(f"web:{name}")).context["tab"], "attendance", name)
+
+
+class AttendanceTabTests(CalendarPagesCase):
+    """One Settings tab, Attendance, for the staff sheet, the weekly off and the public holidays."""
+
+    def tab(self):
         self.client.force_login(self.root)
-        resp = self.client.get(reverse("web:settings_module", args=["scheduling"]))
-        self.assertContains(resp, "Weekly off")
-        self.assertContains(resp, "Public holidays")
+        return self.client.get(reverse("web:settings_module", args=["attendance"]))
+
+    def test_the_tab_holds_all_three_sections(self):
+        resp = self.tab()
+        for text in ("Staff attendance sheet", "Weekly off", "Public holidays", "Period it opens on"):
+            self.assertContains(resp, text)
+
+    def test_the_old_holidays_and_weekly_off_tab_is_gone(self):
+        self.assertIsNone(registry.get_module("scheduling"))
+        self.assertEqual(self.client.get(reverse("web:settings_module", args=["scheduling"])).status_code, 404)
+        self.assertEqual([m.key for m in registry.modules()].count("attendance"), 1)
+
+    def test_the_sheet_and_the_weekly_off_share_a_row_and_the_holidays_take_the_whole_width(self):
+        self.assertEqual([s.width for s in registry.get_module("attendance").sections],
+                         ["col-lg-4", "col-lg-8", "col-12"])
+        resp = self.tab()
+        self.assertContains(resp, 'class="col-lg-4"')
+        self.assertContains(resp, 'class="col-lg-8"')
+        self.assertContains(resp, 'class="col-12"')
+
+    def test_other_tabs_keep_their_half_width_cards(self):
+        self.assertEqual(registry.Section("x").width, "col-lg-6")
+        self.assertTrue(all(s.width == "col-lg-6" for s in registry.get_module("labor").sections))
+        self.client.force_login(self.root)
+        self.assertContains(self.client.get(reverse("web:settings_module", args=["labor"])), 'class="col-lg-6"')
+
+    def test_the_weekly_off_section_shows_what_is_in_force_and_the_next_change(self):
+        rules.set_weekly_off(self.co, [4, 5], date(2099, 1, 1))
+        resp = self.tab()
+        self.assertContains(resp, "Company One")
+        self.assertContains(resp, "Friday")
+        self.assertContains(resp, "Friday, Saturday from 1 Jan 2099")
+
+    def test_the_holiday_section_lists_the_next_holidays_with_links(self):
+        rules.add_holidays(None, date(2099, 12, 16), None, "National Day 2099")
+        resp = self.tab()
+        self.assertContains(resp, "National Day 2099")
+        self.assertContains(resp, reverse("web:holiday_list"))
+        self.assertContains(resp, reverse("web:holiday_add"))
+
+    def test_all_the_attendance_rights_are_in_one_group_on_the_access_page(self):
+        perms = [c.perm for c in registry.get_module("attendance").capabilities]
+        self.assertEqual(perms, ["attendance.add_attendance", "scheduling.view_holiday", "scheduling.add_holiday",
+                                 "scheduling.change_holiday", "scheduling.add_weeklyoffrule"])
+        self.client.force_login(self.root)
+        self.assertContains(self.client.get(reverse("web:settings_access")), "Change the weekly off")

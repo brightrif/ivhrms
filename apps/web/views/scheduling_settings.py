@@ -21,7 +21,7 @@ from apps.web.views.settings_hub import _visible
 
 
 def _page(request, template, context):
-    context.update(tabs=_visible(request.user), tab="scheduling", show_access=request.user.is_superuser)
+    context.update(tabs=_visible(request.user), tab="attendance", show_access=request.user.is_superuser)
     return render(request, template, context)
 
 
@@ -95,7 +95,7 @@ def holiday_toggle(request, pk):
     return redirect(f"{reverse('web:holiday_list')}?year={holiday.date.year}")
 
 
-@hr_perm("scheduling.view_weeklyoffrule")
+@hr_perm("scheduling.view_holiday")
 def weekly_off(request):
     today = timezone.localdate()
     form = WeeklyOffForm(request.POST or None, user=request.user)
@@ -117,7 +117,7 @@ def weekly_off(request):
         days = calendar_rules.weekly_off_on(company.pk, today)
         rows.append({"company": company, "now": calendar_rules.weekday_names(days),
                      "rules": [{"text": calendar_rules.weekday_names(r.days), "from": r.effective_from,
-                                "to": r.effective_to}
+                                "to": r.effective_to, "later": r.effective_from > today}
                                for r in WeeklyOffRule.objects.filter(company=company).order_by("-effective_from")],
                      "has_rule": WeeklyOffRule.objects.filter(company=company).exists()})
     return _page(request, "web/settings/weekly_off.html", {"form": form, "rows": rows, "today": today})

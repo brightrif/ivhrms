@@ -20,7 +20,7 @@
   {% if scope %}<input type="hidden" name="company" value="{{ scope.pk }}">{% endif %}
   <div class="row g-3">
   {% for section in sections %}
-    <div class="col-lg-6"><div class="card shadow-sm border-0 h-100"><div class="card-body">
+    <div class="{{ section.width|default:'col-lg-6' }}"><div class="card shadow-sm border-0 h-100"><div class="card-body">
       <h2>{{ section.title }}</h2>
       {% if section.intro %}<p class="small text-body-secondary">{{ section.intro }}</p>{% endif %}
       {% if section.template %}{% include section.template %}{% endif %}

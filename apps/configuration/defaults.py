@@ -21,3 +21,8 @@ def ensure_system_defaults(sender=None, using=DEFAULT_DB_ALIAS, **kwargs):
             Permission.objects.using(using).get_or_create(
                 content_type=content_type, codename=f"{verb}_settings_{module.key}",
                 defaults={"name": f"{text} {module.label} settings"})
+
+    # One extra right, outside the per-module pair: who may change the Company view (see organization/scope.py).
+    Permission.objects.using(using).get_or_create(
+        content_type=content_type, codename="edit_company_view",
+        defaults={"name": "Change the company view and company colours"})

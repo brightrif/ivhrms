@@ -14,11 +14,12 @@
       <div class="card-body p-0">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>Designation</th><th class="text-end">Active staff</th><th>Status</th><th>Family visa</th><th></th></tr></thead>
+            <thead class="table-light"><tr><th>Designation</th><th>Company</th><th class="text-end">Active staff</th><th>Status</th><th>Family visa</th><th></th></tr></thead>
             <tbody>
             {% for d in designations %}
               <tr{% if not d.is_active %} class="opacity-75"{% endif %}>
                 <td class="fw-medium">{{ d.name }}</td>
+                <td>{% if d.company_id %}{{ d.company.code }}{% else %}<span class="text-body-secondary">Both</span>{% endif %}</td>
                 <td class="text-end">{{ d.staff }}</td>
                 <td>{% if d.is_active %}<span class="badge text-bg-success">Active</span>{% else %}<span class="badge text-bg-secondary">Inactive</span>{% endif %}</td>
                 <td>{% if d.family_visa_default %}<span class="badge text-bg-info">Allowed</span>{% else %}<span class="text-body-secondary">-</span>{% endif %}</td>
@@ -37,14 +38,14 @@
                 </td>
               </tr>
             {% empty %}
-              <tr><td colspan="5" class="text-center text-body-secondary py-4">No designations yet.</td></tr>
+              <tr><td colspan="6" class="text-center text-body-secondary py-4">No designations yet.</td></tr>
             {% endfor %}
             </tbody>
           </table>
         </div>
       </div>
     </div>
-    <p class="small text-body-secondary mt-2">Designations are shared by every company.</p>
+    <p class="small text-body-secondary mt-2">A designation marked Both is shared by every company. One added while working in a company in the Separate view belongs to that company only.</p>
   </div>
   {% if perms.organization.view_grade %}
   <div class="col-lg-5">{% include "web/organization/_grades_card.html" %}</div>

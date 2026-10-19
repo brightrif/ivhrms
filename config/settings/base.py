@@ -82,6 +82,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     # Add any custom middleware here
     "apps.audit.middleware.AuditContextMiddleware",
+    "apps.organization.middleware.CompanyScopeMiddleware",
     "apps.accounts.middleware.ForcePasswordChangeMiddleware",
     "apps.web.middleware.HtmxSessionExpiredMiddleware",
 ]
@@ -98,6 +99,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.web.company_context.company_scope',
             ],
         },
     },

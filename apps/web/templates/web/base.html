@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="{% static 'web/vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
     <link rel="stylesheet" href="{% static 'web/vendor/flag-icons/css/flag-icons.min.css' %}">
   <link rel="stylesheet" href="{% static 'web/app.css' %}">
+  {% include "web/_company_theme.html" %}
   <link rel="stylesheet" href="{% static 'web/vendor/air-datepicker/air-datepicker.css' %}">
   <link rel="stylesheet" href="{% static 'web/datepicker-theme.css' %}">
   <script src="{% static 'web/vendor/bootstrap/bootstrap.bundle.min.js' %}" defer></script>
@@ -101,6 +102,7 @@
               data-bs-target="#sidebar" aria-controls="sidebar" aria-label="Open menu">
         <i class="bi bi-list"></i>
       </button>
+      {% include "web/_company_switcher.html" %}
       <div class="ms-auto dropdown">
         <button class="btn btn-link text-decoration-none text-body d-flex align-items-center gap-2 p-0"
                 type="button" data-bs-toggle="dropdown" aria-expanded="false">

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.web.views import settings_hub, settings_users, scheduling_settings
+from apps.web.views import settings_hub, settings_users, scheduling_settings, family_status_approver,company_view
 
 urlpatterns = [
     path("settings/", settings_hub.settings_home, name="settings_home"),
@@ -17,6 +17,10 @@ urlpatterns = [
     path("settings/holidays/<int:pk>/", scheduling_settings.holiday_edit, name="holiday_edit"),
     path("settings/holidays/<int:pk>/toggle/", scheduling_settings.holiday_toggle, name="holiday_toggle"),
     path("settings/weekly-off/", scheduling_settings.weekly_off, name="weekly_off"),
-    path("settings/<slug:module>/", settings_hub.settings_module, name="settings_module"),
+    path("settings/family-status-approver/", family_status_approver.status_approver, name="family_status_approver"),
+    path("settings/company-view/", company_view.company_view_set, name="company_view_set"),
     path("settings/users/check/", settings_users.username_check, name="username_check"),
+    path("settings/company-colours/<int:pk>/", company_view.company_colours_set, name="company_colours_set"),
+    path("company/switch/", company_view.company_switch, name="company_switch"),
+    path("settings/<slug:module>/", settings_hub.settings_module, name="settings_module"),
 ]

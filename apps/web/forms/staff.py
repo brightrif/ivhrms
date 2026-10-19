@@ -77,9 +77,20 @@ class EmployeeForm(WhatsAppMixin, forms.ModelForm):
         dept.help_text = "Optional. You can assign or change it later." if company else "Choose a company first."
 
         desig = self.fields["designation"]
-        desig.queryset = Designation.objects.filter(is_active=True)
+        if company:
+            desig.queryset = Designation.objects.for_company(company).filter(is_active=True)
+        else:                                          # company not chosen yet: show every company's, labelled
+            desig.queryset = Designation.objects.select_related("company").filter(is_active=True)
+            desig.label_from_instance = lambda d: f"{d.name} ({d.company.code})" if d.company_id else d.name
         desig.required = True
         desig.empty_label = "Select a designation"
+
+    def clean_designation(self):
+        designation, company = self.cleaned_data.get("designation"), self.cleaned_data.get("company")
+        if designation and company and designation.company_id not in (None, company.pk):
+            raise ValidationError(f"{designation.name} belongs to another company. "
+                                  f"Choose one of {company.name}'s designations.")
+        return designation
 
     def clean(self):
         cd = super().clean()
@@ -140,6 +151,8 @@ class AssignmentForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.employee = employee
         self.fields["department"].queryset = Department.objects.filter(company=employee.company, is_active=True)
+        self.fields["designation"].queryset = Designation.objects.for_company(employee.company).filter(is_active=True)
+        self.fields["grade"].queryset = Grade.objects.for_company(employee.company)
         self.fields["reporting_manager"].queryset = (
             Employee.objects.filter(company=employee.company)
             .exclude(pk=employee.pk).exclude(status=Employee.Status.SEPARATED))
@@ -186,6 +199,7 @@ class ToStaffForm(forms.Form):
     def __init__(self, *args, employee, previous=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["department"].queryset = Department.objects.filter(company=employee.company, is_active=True)
+        self.fields["designation"].queryset = Designation.objects.for_company(employee.company).filter(is_active=True)
         self.fields["reporting_manager"].queryset = (Employee.objects.filter(company=employee.company)
                                                      .exclude(pk=employee.pk).exclude(status=Employee.Status.SEPARATED))
         choices = [("new", f"New staff number ({numbering.peek(employee.company, Employee.WorkerType.STAFF)})"),

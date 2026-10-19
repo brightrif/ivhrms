@@ -32,18 +32,36 @@ class CompanyError(Exception):
     pass
 
 
-def companies_for(user):
-    """Active companies the user may work in. Scopes every working screen."""
+def all_companies_for(user):
+    """Every active company the user has access to, whichever company they are working in right now."""
     if user.is_superuser:
         return Company.objects.filter(is_active=True)
     return Company.objects.filter(access__user=user, is_active=True)
 
 
-def manageable_companies(user):
-    """Every company the user may manage, inactive ones included."""
+def companies_for(user):
+    """Active companies the user may work in. Scopes every working screen. In the Separate company view this is only
+    the company the login is working in (see scope.py); otherwise everything the user has access to."""
+    from .scope import active_scope_for      # lazy: scope.py imports from this module too
+    companies = all_companies_for(user)
+    scope = active_scope_for(user)
+    return companies.filter(pk=scope) if scope is not None else companies
+
+
+def all_manageable_companies(user):
+    """Every company the user may manage, inactive ones included, whichever company they are working in right now."""
     if user.is_superuser:
         return Company.objects.all()
     return Company.objects.filter(access__user=user)
+
+
+def manageable_companies(user):
+    """Every company the user may manage, inactive ones included. In the Separate company view: only the one they
+    are working in (see scope.py). The Organization pages (Companies, Departments, Projects) use this."""
+    from .scope import active_scope_for      # lazy: scope.py imports from this module too
+    companies = all_manageable_companies(user)
+    scope = active_scope_for(user)
+    return companies.filter(pk=scope) if scope is not None else companies
 
 
 def active_employee_count(company):

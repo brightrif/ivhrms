@@ -1,0 +1,15 @@
+{% if company_separate and work_company %}
+<div class="company-switch d-flex align-items-center gap-2">
+  <i class="bi bi-building text-body-secondary"></i>
+  {% if work_companies|length > 1 %}
+  <form method="post" action="{% url 'web:company_switch' %}" class="m-0">
+    {% csrf_token %}
+    <select name="company" class="form-select form-select-sm fw-semibold" aria-label="Company" onchange="this.form.submit()">
+      {% for c in work_companies %}<option value="{{ c.pk }}"{% if c.pk == work_company.pk %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
+    </select>
+  </form>
+  {% else %}
+  <span class="fw-semibold">{{ work_company.name }}</span>
+  {% endif %}
+</div>
+{% endif %}
