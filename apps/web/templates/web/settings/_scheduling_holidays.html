@@ -1,0 +1,6 @@
+{% if holiday_rows %}
+<ul class="list-unstyled small mb-2">
+  {% for h in holiday_rows %}<li>{{ h.date|date:"D d M Y" }} &middot; <strong>{{ h.name }}</strong>{% if not h.company %} <span class="text-body-secondary">(every company)</span>{% endif %}</li>{% endfor %}
+</ul>
+{% else %}<p class="small text-body-secondary mb-2">No upcoming holidays are set.</p>{% endif %}
+{% if perms.scheduling.view_holiday %}<a class="btn btn-sm btn-outline-primary" href="{% url 'web:holiday_list' %}">See and manage the holidays</a>{% endif %}

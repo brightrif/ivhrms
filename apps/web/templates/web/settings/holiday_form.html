@@ -1,0 +1,30 @@
+{% extends "web/base.html" %}
+{% block title %}{% if editing %}Rename holiday{% else %}Add a holiday{% endif %}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Settings</h1>
+</div>
+{% include "web/settings/_tabs.html" %}
+<form method="post" class="row">
+  {% csrf_token %}
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>{% if editing %}Rename the holiday on {{ editing.date|date:"d M Y" }}{% else %}Add a holiday{% endif %}</h2>
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+      {% for f in form %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ f.id_for_label }}">{{ f.label }}</label>
+          {{ f }}
+          {% if f.help_text %}<div class="form-text">{{ f.help_text }}</div>{% endif %}
+          {% for e in f.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+        </div>
+      {% endfor %}
+      {% if not editing %}<div class="form-text">One row is made for each day. Days already recorded for attendance are not changed.</div>{% endif %}
+    </div></div>
+    <div class="form-actions">
+      <button class="btn btn-primary">{% if editing %}Save{% else %}Add the holiday{% endif %}</button>
+      <a class="btn btn-outline-secondary" href="{% url 'web:holiday_list' %}">Cancel</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

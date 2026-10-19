@@ -4,6 +4,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from .models import Holiday, ShiftAssignment, default_weekly_off
+from .calendar_rules import company_weekly_off, weekly_off_on  # noqa: F401  (weekly_off_on is used elsewhere)
 
 HOLIDAY, WEEKLY_OFF, WORKING = "holiday", "weekly_off", "working"
 
@@ -30,13 +31,13 @@ def day_types(employee, start, end):
         ShiftAssignment.objects.filter(employee=employee, effective_from__lte=end)
         .filter(Q(effective_to__isnull=True) | Q(effective_to__gte=start))
         .select_related("shift"))
-    default_off = default_weekly_off()
+    company_off = company_weekly_off(employee.company_id, start, end)         # {date: weekday numbers}
     result, d = {}, start
     while d <= end:
         if d in holidays:
             result[d] = HOLIDAY
         else:
-            off = default_off
+            off = company_off[d]
             for a in assignments:
                 if a.effective_from <= d and (a.effective_to is None or d <= a.effective_to):
                     off = a.shift.weekly_off_days

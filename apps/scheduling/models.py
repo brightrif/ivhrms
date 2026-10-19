@@ -96,3 +96,5 @@ class ShiftAssignment(BaseModel):
     def save(self, *args, **kwargs):
         self.company_id = self.employee.company_id
         super().save(*args, **kwargs)
+
+from .weekly_off import WeeklyOffRule  # noqa: E402,F401  (the company's weekly off)

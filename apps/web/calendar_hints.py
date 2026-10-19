@@ -14,7 +14,7 @@ def leave_calendar_hints(employee, *, days_back=60, days_ahead=420):
 
     today = timezone.localdate()
     shift = scheduling.shift_on(employee, today)
-    python_days = shift.weekly_off_days if shift else scheduling.default_weekly_off()
+    python_days = shift.weekly_off_days if shift else scheduling.weekly_off_on(employee.company_id, today)
     js_days = sorted({(day + 1) % 7 for day in python_days})        # Python: Mon=0..Sun=6; JavaScript: Sun=0..Sat=6
     holidays = scheduling.holidays_between(
         employee.company_id, today - timedelta(days=days_back), today + timedelta(days=days_ahead))
