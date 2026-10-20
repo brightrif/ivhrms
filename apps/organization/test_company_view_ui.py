@@ -52,6 +52,31 @@ class CompanyViewScreenTests(TestCase):
         self.first.refresh_from_db()
         self.assertEqual((self.first.theme_color, self.first.sidebar_color), ("", ""))
 
+    def test_saving_one_row_ignores_the_other_rows_the_page_also_sends(self):
+        """The Settings table is inside one form and HTMX posts all of it, so both companies' fields arrive together."""
+        self.client.force_login(self.root)
+        a, b = self.first.pk, self.second.pk
+        everything = {"by_tick": "1",
+                      f"theme_on_{a}": "1", f"theme_color_{a}": "#2f7d6b", f"sidebar_on_{a}": "1", f"sidebar_color_{a}": "#1f3a3a",
+                      f"theme_color_{b}": "#31629c", f"sidebar_color_{b}": "#233460"}
+        self.client.post(reverse("web:company_colours_set", args=[a]), everything)
+        self.first.refresh_from_db()
+        self.second.refresh_from_db()
+        self.assertEqual((self.first.theme_color, self.first.sidebar_color), ("#2f7d6b", "#1f3a3a"))
+        self.assertEqual((self.second.theme_color, self.second.sidebar_color), ("", ""))
+        self.client.post(reverse("web:company_colours_set", args=[b]), everything)       # b's own ticks are off
+        self.first.refresh_from_db()
+        self.second.refresh_from_db()
+        self.assertEqual((self.first.theme_color, self.first.sidebar_color), ("#2f7d6b", "#1f3a3a"))
+        self.assertEqual((self.second.theme_color, self.second.sidebar_color), ("", ""))
+
+    def test_the_settings_page_names_each_rows_fields_after_its_company(self):
+        self.client.force_login(self.root)
+        page = self.client.get(reverse("web:settings_module", args=["organization"]))
+        for company in (self.first, self.second):
+            for name in ("theme_on", "theme_color", "sidebar_on", "sidebar_color"):
+                self.assertContains(page, f'name="{name}_{company.pk}"')
+
     def test_the_colours_replace_the_variables_the_stylesheet_uses(self):
         self.first.theme_color, self.first.sidebar_color = "#1a5fa8", "#102030"
         html = self.theme_html(self.first)

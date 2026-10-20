@@ -1,0 +1,27 @@
+{% extends "web/base.html" %}
+{% block title %}Statement {{ loan.number }}{% endblock %}
+{% block content %}
+<div class="d-print-none d-flex gap-2 mb-3"><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Print</button>
+  <a class="btn btn-outline-secondary" href="{% url 'web:payroll_loan' loan.pk %}">Back to the loan</a></div>
+<div class="card shadow-sm border-0"><div class="card-body">
+  <h1 class="h4 mb-1">Loan statement {{ loan.number }}</h1>
+  <div class="text-body-secondary mb-3">{{ loan.company.name }} &middot; printed {{ today|date:"d M Y" }}</div>
+  <dl class="row mb-3">
+    <dt class="col-sm-3">Employee</dt><dd class="col-sm-9">{{ loan.employee.full_name }} ({{ loan.employee.employee_no }})</dd>
+    <dt class="col-sm-3">Kind</dt><dd class="col-sm-9">{{ loan.get_kind_display }}{% if loan.reason %}: {{ loan.reason }}{% endif %}</dd>
+    <dt class="col-sm-3">Amount</dt><dd class="col-sm-9">{{ loan.amount|floatformat:3 }} BHD{% if loan.interest_total %} + interest {{ loan.interest_total|floatformat:3 }} = {{ loan.total|floatformat:3 }}{% endif %}</dd>
+    <dt class="col-sm-3">Agreed</dt><dd class="col-sm-9">{% if loan.verbal %}Verbally by {{ loan.agreed_by }} on {{ loan.agreed_on|date:"d M Y" }}{% elif loan.approved_at %}Approved on {{ loan.approved_at|date:"d M Y" }}{% else %}Not yet approved{% endif %}</dd>
+    <dt class="col-sm-3">Paid out</dt><dd class="col-sm-9">{% if loan.paid_out_on %}{{ loan.paid_out_on|date:"d M Y" }}, bank transfer ref {{ loan.payout_reference }}{% else %}Not yet{% endif %}</dd>
+    <dt class="col-sm-3">Status</dt><dd class="col-sm-9">{{ loan.get_status_display }}</dd>
+  </dl>
+  <h2 class="h6">Repayments</h2>
+  <table class="table table-sm"><thead><tr><th>Date</th><th>How</th><th class="text-end">Amount (BHD)</th></tr></thead><tbody>
+  {% for p in payments %}<tr><td>{{ p.paid_on|date:"d M Y" }}</td><td>{{ p.get_method_display }}{% if p.reference %}, {{ p.reference }}{% endif %}</td><td class="text-end">{{ p.amount|floatformat:3 }}</td></tr>
+  {% empty %}<tr><td colspan="3" class="text-body-secondary">Nothing repaid yet.</td></tr>{% endfor %}
+  </tbody><tfoot><tr><th colspan="2">Repaid</th><th class="text-end">{{ repaid|floatformat:3 }}</th></tr><tr><th colspan="2">Balance</th><th class="text-end">{{ balance|floatformat:3 }}</th></tr></tfoot></table>
+  <h2 class="h6">Schedule</h2>
+  <table class="table table-sm mb-0"><thead><tr><th>Month</th><th class="text-end">Amount (BHD)</th><th>Status</th></tr></thead><tbody>
+  {% for r in rows %}<tr><td>{{ r.due_month|date:"M Y" }}</td><td class="text-end">{{ r.amount|floatformat:3 }}</td><td>{{ r.get_status_display }}</td></tr>{% empty %}<tr><td colspan="3" class="text-body-secondary">No schedule yet.</td></tr>{% endfor %}
+  </tbody></table>
+</div></div>
+{% endblock %}

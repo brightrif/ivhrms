@@ -1,0 +1,11 @@
+{% extends "web/base.html" %}
+{% block title %}Cancel the loan{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h1 class="mb-0">Payroll</h1></div>
+{% include "web/payroll/_tabs.html" with tab="loans" %}
+<div class="card shadow-sm border-0" style="max-width:34rem"><div class="card-body">
+  <h2>Cancel {{ loan.number }}?</h2>
+  <p>This draft for {{ loan.employee.full_name }} ({{ loan.amount|floatformat:3 }} BHD) will be cancelled. Nothing has been paid out.</p>
+  <form method="post" class="d-flex gap-2">{% csrf_token %}<button class="btn btn-danger">Cancel the loan</button><a class="btn btn-outline-secondary" href="{{ back_url }}">Keep it</a></form>
+</div></div>
+{% endblock %}

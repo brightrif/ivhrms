@@ -1,0 +1,90 @@
+{% extends "web/base.html" %}
+{% block title %}{% if loan %}Change {{ loan.number }}{% else %}New loan{% endif %}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h1 class="mb-0">Payroll</h1></div>
+{% include "web/payroll/_tabs.html" with tab="loans" %}
+<form method="post" class="row g-3">
+  {% csrf_token %}
+  <input type="hidden" name="employee" value="{{ employee.pk }}">
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0 h-100"><div class="card-body">
+      <h2>{% if loan %}{{ loan.number }}{% else %}New loan{% endif %}: {{ employee.full_name }}</h2>
+      <div class="small text-body-secondary mb-3">{{ employee.employee_no }} &middot; {{ employee.company.name }}</div>
+      {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+      {% if warnings %}
+      <div class="alert alert-warning">
+        <div class="fw-medium mb-1"><i class="bi bi-exclamation-triangle me-1"></i>This is over a limit set in Settings</div>
+        <ul class="mb-0 small">{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="{{ form.override_reason.id_for_label }}">{{ form.override_reason.label }}</label>
+        {{ form.override_reason }}
+        {% for e in form.override_reason.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+      </div>
+      {% elif loan.override_reason %}
+      <div class="small text-body-secondary mb-3">Over a limit, because: {{ loan.override_reason }}</div>
+      {% endif %}
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label" for="id_kind">{{ form.kind.label }}</label>{{ form.kind }}{% for e in form.kind.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+        <div class="col-md-6"><label class="form-label" for="id_first_month">{{ form.first_month.label }}</label>{{ form.first_month }}{% for e in form.first_month.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+        <div class="col-md-6"><label class="form-label" for="id_amount">{{ form.amount.label }}</label>{{ form.amount }}{% for e in form.amount.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+        <div class="col-md-6"><label class="form-label" for="id_months">{{ form.months.label }}</label>{{ form.months }}<div class="form-text">{{ form.months.help_text }}</div>{% for e in form.months.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+        <div class="col-md-6"><label class="form-label" for="id_interest_rate">{{ form.interest_rate.label }}</label>{{ form.interest_rate }}<div class="form-text">{{ form.interest_rate.help_text }}</div>{% for e in form.interest_rate.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+        <div class="col-md-6"><label class="form-label" for="id_reason">{{ form.reason.label }}</label>{{ form.reason }}{% for e in form.reason.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+      </div>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    {% if form.how %}
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>How was it agreed?</h2>
+      <div class="form-check mb-1"><input class="form-check-input" type="radio" name="how" id="how_approval" value="approval"{% if form.how.value != 'verbal' %} checked{% endif %}><label class="form-check-label" for="how_approval">Send for approval <span class="text-body-secondary">(Management decides, as for a final settlement)</span></label></div>
+      <div class="form-check mb-2"><input class="form-check-input" type="radio" name="how" id="how_verbal" value="verbal"{% if form.how.value == 'verbal' %} checked{% endif %}><label class="form-check-label" for="how_verbal">Already agreed verbally</label></div>
+      <div id="verbal" class="row g-2"{% if form.how.value != 'verbal' %} hidden{% endif %}>
+        <div class="col-md-7"><label class="form-label" for="id_agreed_by">{{ form.agreed_by.label }}</label>{{ form.agreed_by }}{% for e in form.agreed_by.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+        <div class="col-md-5"><label class="form-label" for="id_agreed_on">{{ form.agreed_on.label }}</label>{{ form.agreed_on }}{% for e in form.agreed_on.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}</div>
+      </div>
+      <div class="small text-body-secondary" id="how-note"></div>
+    </div></div>
+    {% endif %}
+    <div class="card shadow-sm border-0"><div class="card-body">
+      <h2>The schedule</h2>
+      <div id="preview" class="fw-medium"></div>
+      <div id="preview-note" class="small text-body-secondary"></div>
+    </div></div>
+  </div>
+  <div class="col-12 form-actions">
+    <button class="btn btn-primary">{% if loan %}Save{% else %}Create the loan{% endif %}</button>
+    <a class="btn btn-outline-secondary" href="{{ back_url }}">Cancel</a>
+  </div>
+</form>
+<script>
+  (function () {
+    var el = function (id) { return document.getElementById(id); };
+    function fmt(n) { return n.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 }); }
+    function preview() {
+      var a = parseFloat(el("id_amount").value) || 0, m = parseInt(el("id_months").value, 10) || 1,
+          r = parseFloat(el("id_interest_rate").value) || 0, advance = el("id_kind").value === "advance";
+      if (advance) { m = 1; el("id_months").value = 1; }
+      el("id_months").readOnly = advance;
+      var interest = Math.round(a * r / 100 * m / 12 * 1000) / 1000, total = a + interest,
+          per = Math.floor(total / m * 1000) / 1000, last = Math.round((total - per * (m - 1)) * 1000) / 1000;
+      el("preview").textContent = m + " instalment" + (m > 1 ? "s" : "") + " of " + fmt(per) + (m > 1 && last !== per ? ", the last one " + fmt(last) : "");
+      el("preview-note").textContent = interest > 0 ? "Total " + fmt(total) + ", of which interest " + fmt(interest) + "." : "No interest. Total " + fmt(total) + ".";
+    }
+    ["id_amount", "id_months", "id_interest_rate", "id_kind"].forEach(function (id) {
+      var node = el(id); if (node) { node.addEventListener("input", preview); node.addEventListener("change", preview); }
+    });
+    var verbal = el("how_verbal"), approval = el("how_approval");
+    function how() {
+      if (!verbal) return;
+      el("verbal").hidden = !verbal.checked;
+      el("how-note").textContent = verbal.checked
+        ? "The loan starts as approved. Who agreed and when are kept on the loan and in the audit log."
+        : "It waits for the approval before the bank transfer is recorded.";
+    }
+    if (verbal) { verbal.addEventListener("change", how); approval.addEventListener("change", how); how(); }
+    preview();
+  })();
+</script>
+{% endblock %}

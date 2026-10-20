@@ -1,0 +1,22 @@
+{% extends "web/base.html" %}
+{% block title %}New loan{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0">Payroll</h1>
+  <a class="btn btn-outline-secondary" href="{% url 'web:payroll_loans' %}">Back to loans</a>
+</div>
+{% include "web/payroll/_tabs.html" with tab="loans" %}
+<div class="card shadow-sm border-0 mb-3"><div class="card-body">
+  <h2>Who is the loan for?</h2>
+  <p class="small text-body-secondary mb-2">Staff or labor. Only the best matches are listed.</p>
+  <form method="get" hx-get="{% url 'web:payroll_loan_pick' %}" hx-trigger="input delay:300ms" hx-target="#results" hx-push-url="false">
+    <div class="row"><div class="col-md-6 col-lg-5">
+      <div class="input-group">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input type="search" name="q" value="{{ q }}" class="form-control" placeholder="Name or employee number" autofocus autocomplete="off">
+      </div>
+    </div></div>
+  </form>
+</div></div>
+<div id="results">{% include "web/payroll/_loan_pick_results.html" %}</div>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% if work_company and company_emblem %}
+<style>
+  .company-emblem { display: flex; align-items: center; gap: .75rem; margin: 0 1.25rem .5rem; padding: .55rem .75rem;
+                    border-radius: .6rem; background: rgba(255, 255, 255, .06); color: #cbd5e1; }
+  .company-emblem svg { width: 64px; height: 40px; flex: 0 0 64px; overflow: visible; }
+  .company-emblem .ce-name { font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 600; line-height: 1.25; }
+  .ce-spin { transform-box: fill-box; transform-origin: 50% 50%; }
+  .ce-gear-a { animation: ce-turn 18s linear infinite; }
+  .ce-gear-b { animation: ce-turn 11.25s linear infinite reverse; }
+  .ce-trolley { animation: ce-trolley 14s ease-in-out infinite; }
+  .ce-cable { transform-box: fill-box; transform-origin: 50% 0; animation: ce-hoist 7s ease-in-out infinite; }
+  .ce-load { animation: ce-lift 7s ease-in-out infinite; }
+  @keyframes ce-turn { to { transform: rotate(360deg); } }
+  @keyframes ce-trolley { 0%, 12% { transform: translateX(0); } 45%, 60% { transform: translateX(-16px); } 92%, 100% { transform: translateX(0); } }
+  @keyframes ce-hoist { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.45); } }
+  @keyframes ce-lift { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7.7px); } }
+  @media (prefers-reduced-motion: reduce) { .company-emblem * { animation: none !important; } }
+</style>
+<div class="company-emblem" role="img" aria-label="{{ work_company.name }}">
+  {% if company_emblem == "gears" %}
+  <svg viewBox="0 0 64 40" aria-hidden="true">
+    <g class="ce-spin ce-gear-a">
+      <circle cx="24" cy="23" r="12" fill="none" stroke="var(--iv-sky)" stroke-width="5" stroke-dasharray="2.4 2.31"/>
+      <circle cx="24" cy="23" r="9.2" fill="none" stroke="var(--iv-sky)" stroke-width="2.6"/>
+      <path d="M24 23v-6M24 23l5.2 3M24 23l-5.2 3" stroke="var(--iv-sky)" stroke-width="1.4" stroke-linecap="round"/>
+      <circle cx="24" cy="23" r="3.2" fill="#fff" opacity=".9"/>
+    </g>
+    <g class="ce-spin ce-gear-b">
+      <circle cx="45" cy="14" r="7.5" fill="none" stroke="#e2e8f0" stroke-width="4" stroke-dasharray="2.4 2.31"/>
+      <circle cx="45" cy="14" r="5.6" fill="none" stroke="#e2e8f0" stroke-width="2.2"/>
+      <circle cx="45" cy="14" r="2.2" fill="#fff" opacity=".9"/>
+    </g>
+  </svg>
+  {% elif company_emblem == "crane" %}
+  <svg viewBox="0 0 64 40" aria-hidden="true">
+    <g fill="none" stroke="var(--iv-sky)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 38h22"/>
+      <path d="M20 38V11M28 38V11M20 38l8-6-8-6 8-6-8-6 8-3"/>
+      <path d="M6 9h54"/>
+      <path d="M24 9V3l-14 6M24 3l30 6"/>
+    </g>
+    <rect x="4" y="9.6" width="7" height="4" rx=".8" fill="#e2e8f0"/>
+    <rect x="22" y="10" width="6" height="4.5" rx=".8" fill="#e2e8f0"/>
+    <g class="ce-trolley">
+      <rect x="49" y="9.8" width="5" height="2" fill="#e2e8f0"/>
+      <rect class="ce-cable" x="51.2" y="11.8" width="0.7" height="14" fill="#e2e8f0"/>
+      <g class="ce-load"><rect x="48" y="25.8" width="7" height="4.4" rx=".6" fill="var(--iv-sky)"/></g>
+    </g>
+  </svg>
+  {% endif %}
+  <div class="ce-name">{{ work_company.name|cut:"IV " }}</div>
+</div>
+{% endif %}

@@ -1,0 +1,101 @@
+{% extends "web/base.html" %}
+{% load bs %}
+{% block title %}{{ loan.number }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><h1 class="mb-0">Payroll</h1>
+  <a class="btn btn-outline-secondary" href="{% url 'web:payroll_loans' %}">All loans</a></div>
+{% include "web/payroll/_tabs.html" with tab="loans" %}
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h2 class="mb-0">{{ loan.number }} &middot; {{ loan.employee.full_name }}
+      <span class="badge {% if loan.status == 'active' %}text-bg-success{% elif loan.status == 'approved' %}text-bg-primary{% elif loan.status == 'submitted' %}text-bg-warning{% elif loan.status == 'closed' or loan.status == 'cancelled' %}text-bg-secondary{% else %}text-bg-light border{% endif %}">{{ loan.get_status_display }}</span></h2>
+    <div class="text-body-secondary small">{{ loan.employee.employee_no }} &middot; {{ loan.company.name }} &middot; {{ loan.get_kind_display }}{% if loan.reason %} &middot; {{ loan.reason }}{% endif %}</div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <a class="btn btn-outline-secondary" target="_blank" href="{% url 'web:payroll_loan_statement' loan.pk %}"><i class="bi bi-printer me-1"></i>Statement</a>
+    {% if loan.status == 'draft' %}
+      {% if can_add %}<a class="btn btn-outline-primary" href="{% url 'web:payroll_loan_edit' loan.pk %}">Change</a>
+        <a class="btn btn-outline-danger" href="{% url 'web:payroll_loan_cancel' loan.pk %}">Cancel</a>{% endif %}
+      {% if can_submit %}<form method="post" action="{% url 'web:payroll_loan_submit' loan.pk %}" class="d-inline" onsubmit="return confirm('Send this loan to Management for approval?')">{% csrf_token %}<button class="btn btn-primary">Send for approval</button></form>{% endif %}
+    {% elif loan.status == 'submitted' %}
+      {% if can_submit %}<form method="post" action="{% url 'web:payroll_loan_withdraw' loan.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-secondary">Take back</button></form>{% endif %}
+    {% elif loan.status == 'approved' %}
+      {% if can_pay %}<a class="btn btn-primary" href="{% url 'web:payroll_loan_payout' loan.pk %}">Record the bank transfer</a>{% endif %}
+      {% if can_add %}<a class="btn btn-outline-danger" href="{% url 'web:payroll_loan_cancel' loan.pk %}">Cancel</a>{% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{% if loan.note %}<div class="alert alert-warning py-2">{{ loan.note }}</div>{% endif %}
+{% if left and balance > 0 %}<div class="alert alert-danger py-2"><i class="bi bi-exclamation-triangle me-1"></i>{{ loan.employee.full_name }} has left the company and {{ balance|floatformat:3 }} BHD is still owed.{% if can_pay %} You can waive it below if it will not be recovered.{% endif %}</div>{% endif %}
+
+<div class="row row-cols-2 row-cols-md-4 g-2 mb-3">
+  <div class="col"><div class="card shadow-sm border-0"><div class="card-body py-2"><div class="small text-body-secondary">Amount{% if loan.interest_total %} + interest{% endif %}</div><div class="fs-5 fw-semibold">{{ loan.total|floatformat:3 }}</div></div></div></div>
+  <div class="col"><div class="card shadow-sm border-0"><div class="card-body py-2"><div class="small text-body-secondary">Repaid</div><div class="fs-5 fw-semibold">{{ repaid|floatformat:3 }}</div></div></div></div>
+  <div class="col"><div class="card shadow-sm border-0"><div class="card-body py-2"><div class="small text-body-secondary">Balance</div><div class="fs-5 fw-semibold">{{ balance|floatformat:3 }}</div></div></div></div>
+  <div class="col"><div class="card shadow-sm border-0"><div class="card-body py-2"><div class="small text-body-secondary">Next deduction</div><div class="fs-5 fw-semibold">{% if next_row %}{{ next_row.due_month|date:"M Y" }}{% else %}-{% endif %}</div></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm border-0 mb-3"><div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light"><tr><th>#</th><th>Month</th><th class="text-end">Amount</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr{% if r.status == 'skipped' %} class="text-body-secondary"{% endif %}>
+            <td>{{ r.n|default:"-" }}</td><td>{{ r.due_month|date:"M Y" }}</td><td class="text-end">{{ r.amount|floatformat:3 }}</td>
+            <td><span class="badge {% if r.status == 'deducted' %}text-bg-success{% elif r.status == 'scheduled' %}text-bg-info{% else %}text-bg-secondary{% endif %}">{{ r.get_status_display }}</span>
+                {% if r.deducted_on %}<span class="small text-body-secondary">{{ r.deducted_on|date:"d M Y" }}</span>{% endif %}</td>
+          </tr>
+        {% empty %}
+          {% for month, amount in preview %}
+          <tr class="text-body-secondary"><td>{{ forloop.counter }}</td><td>{{ month|date:"M Y" }}</td><td class="text-end">{{ amount|floatformat:3 }}</td><td>Planned, until it is approved</td></tr>
+          {% empty %}<tr><td colspan="4" class="text-center text-body-secondary py-3">No schedule yet.</td></tr>{% endfor %}
+        {% endfor %}
+        </tbody>
+      </table>
+    </div></div>
+
+    <div class="card shadow-sm border-0"><div class="card-body">
+      <h2>Payments</h2>
+      {% if payments %}
+      <table class="table table-sm mb-0">
+        <tbody>{% for p in payments %}<tr><td class="text-nowrap">{{ p.paid_on|date:"d M Y" }}</td><td>{{ p.get_method_display }}{% if p.reference %}, {{ p.reference }}{% endif %}{% if p.note %} <span class="text-body-secondary">({{ p.note }})</span>{% endif %}</td><td class="text-end">{{ p.amount|floatformat:3 }}</td></tr>{% endfor %}</tbody>
+      </table>
+      {% else %}<div class="small text-body-secondary">Nothing has been repaid yet.</div>{% endif %}
+    </div></div>
+  </div>
+
+  <div class="col-lg-5">
+    {% if loan.status == 'active' and can_pay %}
+    <div class="card shadow-sm border-0 mb-3"><div class="card-body">
+      <h2>Do something</h2>
+      <div class="d-grid gap-2">
+        <a class="btn btn-outline-primary" href="{% url 'web:payroll_loan_payment' loan.pk %}">Record an early payment</a>
+        <a class="btn btn-outline-primary" href="{% url 'web:payroll_loan_preclose' loan.pk %}">Pay off the loan</a>
+        {% if next_row %}<form method="post" action="{% url 'web:payroll_loan_skip' loan.pk %}" onsubmit="return confirm('Leave out the {{ next_row.due_month|date:"F Y" }} instalment? The same amount is added after the last one.')">{% csrf_token %}<button class="btn btn-outline-secondary w-100">Skip the next month</button></form>
+        <a class="btn btn-outline-secondary" href="{% url 'web:payroll_loan_reschedule' loan.pk %}">Reschedule the rest</a>{% endif %}
+        <a class="btn btn-outline-danger" href="{% url 'web:payroll_loan_waive' loan.pk %}">Waive the balance</a>
+      </div>
+    </div></div>
+    {% endif %}
+    <div class="card shadow-sm border-0"><div class="card-body">
+      <h2>About this loan</h2>
+      <dl class="row small mb-0">
+        <dt class="col-5 fw-normal text-body-secondary">Amount</dt><dd class="col-7">{{ loan.amount|floatformat:3 }} BHD</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Instalments</dt><dd class="col-7">{{ loan.months }}, from {{ loan.first_month|date:"M Y" }}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Interest</dt><dd class="col-7">{% if loan.interest_total %}{{ loan.interest_rate|floatformat:"-2" }}% a year, {{ loan.interest_total|floatformat:3 }} BHD{% else %}None{% endif %}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Agreed</dt>
+        <dd class="col-7">{% if loan.verbal %}Verbally by {{ loan.agreed_by }} on {{ loan.agreed_on|date:"d M Y" }}{% elif loan.approved_at %}Approved by Management on {{ loan.approved_at|date:"d M Y" }}{% else %}Not yet{% endif %}</dd>
+        <dt class="col-5 fw-normal text-body-secondary">Paid out</dt>
+        <dd class="col-7">{% if loan.paid_out_on %}Bank transfer on {{ loan.paid_out_on|date:"d M Y" }}, ref {{ loan.payout_reference }}{% else %}Not yet{% endif %}</dd>
+        {% if loan.override_reason %}<dt class="col-5 fw-normal text-body-secondary">Over a limit</dt><dd class="col-7">{{ loan.override_reason }}</dd>{% endif %}
+        {% if loan.closed_on %}<dt class="col-5 fw-normal text-body-secondary">Closed</dt><dd class="col-7">{{ loan.closed_on|date:"d M Y" }}. {{ loan.closed_note }}</dd>{% endif %}
+        <dt class="col-5 fw-normal text-body-secondary">Prepared by</dt><dd class="col-7">{{ loan.prepared_by.get_full_name|default:loan.prepared_by.get_username|default:"-" }}</dd>
+      </dl>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from apps.core.models import BaseModel
 from apps.audit.registry import audited
+from .scope import EMBLEMS
 from .company_lists import CompanyListManager, check_unique, claim_current_company
 
 @audited(module="organization", company="id")
@@ -21,6 +22,8 @@ class Company(BaseModel):
                                    help_text="Buttons and links in the Separate view, e.g. #1a5fa8. Empty = standard.")
     sidebar_color = models.CharField("Sidebar colour", max_length=7, blank=True,
                                      help_text="Sidebar in the Separate view. Empty = standard.")
+    emblem = models.CharField(max_length=10, blank=True, choices=EMBLEMS,
+                              help_text="Small animated picture under the IV logo in the Separate view.")
 
     class Meta:
         verbose_name_plural = "companies"

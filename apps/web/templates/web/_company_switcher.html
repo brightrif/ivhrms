@@ -1,7 +1,25 @@
 {% if company_separate and work_company %}
-<div class="company-switch d-flex align-items-center gap-2">
-  <i class="bi bi-building text-body-secondary"></i>
-  {% if work_companies|length > 1 %}
+<style>
+  .company-switch .cs-dot { width: .65rem; height: .65rem; border-radius: 50%; display: inline-block; margin-right: .45rem;
+                            border: 1px solid rgba(255, 255, 255, .8); vertical-align: -.05rem; }
+</style>
+<div class="company-switch d-flex align-items-center">
+  {% if work_companies|length == 2 %}
+  <form method="post" action="{% url 'web:company_switch' %}" class="m-0">
+    {% csrf_token %}
+    <div class="btn-group" role="group" aria-label="Company">
+      {% for c in work_companies %}{% if c.pk == work_company.pk %}
+      <button type="button" class="btn btn-sm btn-primary active fw-semibold" aria-current="true" title="{{ c.name }}">
+        <span class="cs-dot" style="background: {{ c.theme_color|default:'#31629c' }}"></span><span class="d-none d-md-inline">{{ c.name }}</span><span class="d-md-none">{{ c.code }}</span><i class="bi bi-check2 ms-1"></i>
+      </button>
+      {% else %}
+      <button type="submit" name="company" value="{{ c.pk }}" class="btn btn-sm btn-outline-secondary" title="Switch to {{ c.name }}">
+        <span class="cs-dot" style="background: {{ c.theme_color|default:'#31629c' }}"></span><span class="d-none d-md-inline">{{ c.name }}</span><span class="d-md-none">{{ c.code }}</span>
+      </button>
+      {% endif %}{% endfor %}
+    </div>
+  </form>
+  {% elif work_companies|length > 2 %}
   <form method="post" action="{% url 'web:company_switch' %}" class="m-0">
     {% csrf_token %}
     <select name="company" class="form-select form-select-sm fw-semibold" aria-label="Company" onchange="this.form.submit()">
@@ -9,7 +27,7 @@
     </select>
   </form>
   {% else %}
-  <span class="fw-semibold">{{ work_company.name }}</span>
+  <span class="fw-semibold"><span class="cs-dot" style="background: {{ work_company.theme_color|default:'#31629c' }}"></span>{{ work_company.name }}</span>
   {% endif %}
 </div>
 {% endif %}

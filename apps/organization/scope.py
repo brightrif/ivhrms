@@ -20,6 +20,7 @@ VIEWS = ((COMBINED, "Combined"), (SEPARATE, "Separate"))
 
 SETTING_KEY = "company_view"
 SESSION_KEY = "work_company_id"
+EMBLEMS = (("", "Automatic (from the company name)"), ("gears", "Gears (spare parts)"), ("crane", "Crane (construction)"), ("none", "None"))
 EDIT_PERM = "configuration.edit_company_view"
 
 _COLOUR = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -173,3 +174,19 @@ def current_scope():
 
     request = get_request()
     return getattr(request, "company_scope", None) if request is not None else None
+
+
+def emblem_for(company):
+    """The emblem to draw for a company: the one chosen in Settings, or, left on Automatic, gears for a spare parts
+    company and a crane for a construction one (by its name). "none" switches it off."""
+    chosen = getattr(company, "emblem", "")
+    if chosen == "none":
+        return ""
+    if chosen in ("gears", "crane"):
+        return chosen
+    name = company.name.lower()
+    if "construct" in name:
+        return "crane"
+    if "spare" in name or "parts" in name:
+        return "gears"
+    return ""

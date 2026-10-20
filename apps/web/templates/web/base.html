@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Home{% endblock %} · Ivhrms</title>
+  <title>{% block title %}Home{% endblock %}{% if work_company %} · {{ work_company.name }}{% endif %} · Ivhrms</title>
     <link rel="icon" type="image/png" href="{% static 'web/img/favicon.png' %}">
   <link rel="stylesheet" href="{% static 'web/vendor/bootstrap/bootstrap.min.css' %}">
   <link rel="stylesheet" href="{% static 'web/vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
@@ -34,6 +34,7 @@
         <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas"
                 data-bs-target="#sidebar" aria-label="Close"></button>
       </div>
+      {% include "web/_company_emblem.html" %}
       <div class="offcanvas-body">
         {% with u=request.resolver_match.url_name|default:"" %}
         <nav class="nav flex-column p-3 w-100">

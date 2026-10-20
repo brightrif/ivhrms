@@ -21,7 +21,7 @@ def company_view_context(user):
     from .services import all_manageable_companies
 
     return {"company_view": scope.current_view(), "can_change": user.has_perm(scope.EDIT_PERM),
-            "colour_rows": list(all_manageable_companies(user).order_by("name"))}
+            "emblems": scope.EMBLEMS, "colour_rows": list(all_manageable_companies(user).order_by("name"))}
 
 
 register(Module(

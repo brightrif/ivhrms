@@ -22,26 +22,31 @@
 </div>
 
 <div>
-  <div class="fw-semibold mb-1">Colours in the Separate view</div>
-  <div class="form-text mb-2">Tick a colour to use it for that company; leave it unticked to keep the standard one. Press Save for the row.</div>
+  <div class="fw-semibold mb-1">Look of each company in the Separate view</div>
+  <div class="form-text mb-2">Tick a colour to use it for that company; leave it unticked to keep the standard one. The emblem is the small animated picture under the IV logo. Press Save on that company's row.</div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
-      <thead><tr><th>Company</th><th>Theme</th><th>Sidebar</th><th></th></tr></thead>
+      <thead><tr><th>Company</th><th>Theme</th><th>Sidebar</th><th>Emblem</th><th></th></tr></thead>
       <tbody>
       {% for c in section.extra.colour_rows %}
       <tr id="colours-{{ c.pk }}">
         <td class="text-nowrap fw-medium">{{ c.name }}<input type="hidden" name="by_tick" value="1"></td>
         <td>
           <div class="d-flex align-items-center gap-2">
-            <input type="checkbox" name="theme_on" value="1" class="form-check-input mt-0"{% if c.theme_color %} checked{% endif %}{% if not section.extra.can_change %} disabled{% endif %} aria-label="Use a theme colour for {{ c.name }}">
-            <input type="color" name="theme_color" class="form-control form-control-color" value="{{ c.theme_color|default:'#31629c' }}"{% if not section.extra.can_change %} disabled{% endif %} aria-label="Theme colour for {{ c.name }}">
+            <input type="checkbox" name="theme_on_{{ c.pk }}" value="1" class="form-check-input mt-0"{% if c.theme_color %} checked{% endif %}{% if not section.extra.can_change %} disabled{% endif %} aria-label="Use a theme colour for {{ c.name }}">
+            <input type="color" name="theme_color_{{ c.pk }}" class="form-control form-control-color" value="{{ c.theme_color|default:'#31629c' }}"{% if not section.extra.can_change %} disabled{% endif %} aria-label="Theme colour for {{ c.name }}">
           </div>
         </td>
         <td>
           <div class="d-flex align-items-center gap-2">
-            <input type="checkbox" name="sidebar_on" value="1" class="form-check-input mt-0"{% if c.sidebar_color %} checked{% endif %}{% if not section.extra.can_change %} disabled{% endif %} aria-label="Use a sidebar colour for {{ c.name }}">
-            <input type="color" name="sidebar_color" class="form-control form-control-color" value="{{ c.sidebar_color|default:'#233460' }}"{% if not section.extra.can_change %} disabled{% endif %} aria-label="Sidebar colour for {{ c.name }}">
+            <input type="checkbox" name="sidebar_on_{{ c.pk }}" value="1" class="form-check-input mt-0"{% if c.sidebar_color %} checked{% endif %}{% if not section.extra.can_change %} disabled{% endif %} aria-label="Use a sidebar colour for {{ c.name }}">
+            <input type="color" name="sidebar_color_{{ c.pk }}" class="form-control form-control-color" value="{{ c.sidebar_color|default:'#233460' }}"{% if not section.extra.can_change %} disabled{% endif %} aria-label="Sidebar colour for {{ c.name }}">
           </div>
+        </td>
+        <td>
+          <select name="emblem_{{ c.pk }}" class="form-select form-select-sm"{% if not section.extra.can_change %} disabled{% endif %} aria-label="Emblem for {{ c.name }}">
+            {% for value, label in section.extra.emblems %}<option value="{{ value }}"{% if c.emblem == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
         </td>
         <td class="text-end">{% if section.extra.can_change %}<button type="button" class="btn btn-sm btn-primary" hx-post="{% url 'web:company_colours_set' c.pk %}" hx-include="#colours-{{ c.pk }}">Save</button>{% endif %}</td>
       </tr>
