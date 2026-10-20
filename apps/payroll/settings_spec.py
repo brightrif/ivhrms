@@ -26,6 +26,11 @@ def allowance_context(user):
     return {"allowance_rows": rows}
 
 
+def _loan_settings():
+    from .loan_settings import loan_settings
+    return loan_settings()
+
+
 register(Module(
     key="payroll", label="Payroll", order=55, icon="bi-cash-coin",
     sections=[
@@ -40,6 +45,11 @@ register(Module(
             intro="The allowances each company pays on top of basic salary, such as housing or transport. "
                   "They are offered on every staff salary.",
             template="web/settings/_payroll_allowances.html", context=allowance_context),
+        Section(
+            title="Loans",
+            intro="Loans and salary advances. The default interest is 0, and every limit is 0, which means no limit. "
+                  "When a loan goes over a limit, HR gets a warning and must give a reason to go ahead.",
+            settings=_loan_settings()),
     ],
     capabilities=[
         Capability("See staff salaries and payment details", "payroll.view_salaryrecord",
@@ -67,5 +77,13 @@ register(Module(
         Capability("See allowance types", "payroll.view_allowancetype"),
         Capability("Add and change allowance types", "payroll.add_allowancetype",
                    "Also switches an allowance on or off."),
+        Capability("See loans and salary advances", "payroll.view_loan",
+                   "Shows the Loans tab with every balance and schedule."),
+        Capability("Prepare loans", "payroll.add_loan", "Create a loan, change a draft, cancel one before it is paid out."),
+        Capability("Send a loan for approval", "payroll.submit_loan", "Management then decides it in the Approvals inbox."),
+        Capability("Record loan payouts and repayments", "payroll.pay_loan",
+                   "The bank transfer, early payments, pre-closure, skipping a month, rescheduling, waiving a balance."),
+        Capability("Add a loan that was agreed verbally", "payroll.agree_loan",
+                   "Skips the approval: HR records who agreed it and when."),
     ],
 ))

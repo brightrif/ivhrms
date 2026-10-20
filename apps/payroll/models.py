@@ -164,3 +164,5 @@ class PaymentDetail(BaseModel):
 
 from . import payrun  # noqa: E402,F401  (registers the payroll run models)
 from . import finalsettlement  # noqa: E402,F401  (registers the final settlement models)
+
+from . import loans  # noqa: E402,F401  (loans and salary advances)

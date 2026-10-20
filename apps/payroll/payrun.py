@@ -206,6 +206,7 @@ class PayrollAdjustment(BaseModel):
         PENALTY = "penalty", "Penalty"
         RENEWAL = "renewal", "Renewal fee charged to the employee"
         FINE = "fine", "Vehicle fine"
+        LOAN = "loan", "Loan instalment"
         OTHER = "other", "Other"
 
     run = models.ForeignKey(PayrollRun, on_delete=models.CASCADE, related_name="adjustments")

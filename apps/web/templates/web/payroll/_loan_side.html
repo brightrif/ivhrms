@@ -1,0 +1,41 @@
+{# The schedule a new loan would get, and the boxes that only matter when it was agreed verbally. Used beside the form by form_layout.html. #}
+<div class="card shadow-sm border-0 mb-3"><div class="card-body">
+  <h2>The schedule</h2>
+  <div id="loan-preview" class="fw-medium"></div>
+  <div id="loan-preview-note" class="small text-body-secondary"></div>
+  <div id="loan-how-note" class="small text-body-secondary mt-2"></div>
+</div></div>
+<script>
+  (function () {
+    var el = function (id) { return document.getElementById(id); };
+    function fmt(n) { return n.toLocaleString("en-US", { minimumFractionDigits: 3, maximumFractionDigits: 3 }); }
+    function preview() {
+      var a = parseFloat(el("id_amount").value) || 0, m = parseInt(el("id_months").value, 10) || 1,
+          r = parseFloat(el("id_interest_rate").value) || 0, advance = el("id_kind").value === "advance";
+      if (advance) { m = 1; el("id_months").value = 1; }
+      el("id_months").readOnly = advance;
+      var interest = Math.round(a * r / 100 * m / 12 * 1000) / 1000, total = a + interest,
+          per = Math.floor(total / m * 1000) / 1000, last = Math.round((total - per * (m - 1)) * 1000) / 1000;
+      el("loan-preview").textContent = m + " instalment" + (m > 1 ? "s" : "") + " of " + fmt(per) + (m > 1 && last !== per ? ", the last one " + fmt(last) : "");
+      el("loan-preview-note").textContent = interest > 0 ? "Total " + fmt(total) + ", of which interest " + fmt(interest) + "." : "No interest. Total " + fmt(total) + ".";
+    }
+    ["id_amount", "id_months", "id_interest_rate", "id_kind"].forEach(function (id) {
+      var node = el(id);
+      if (node) { node.addEventListener("input", preview); node.addEventListener("change", preview); }
+    });
+    var how = el("id_how");
+    function verbal() {
+      if (!how) return;
+      var on = how.value === "verbal";
+      ["id_agreed_by", "id_agreed_on"].forEach(function (id) {
+        var box = el(id) && el(id).closest(".col-md");
+        if (box) box.hidden = !on;
+      });
+      el("loan-how-note").textContent = on
+        ? "The loan starts as approved. Who agreed and when are kept on the loan and in the audit log."
+        : "It waits for the approval before the bank transfer is recorded.";
+    }
+    if (how) { how.addEventListener("change", verbal); verbal(); }
+    preview();
+  })();
+</script>

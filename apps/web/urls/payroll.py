@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.web.views import payroll, payroll_runs, payroll_settlements
+from apps.web.views import payroll, payroll_loans, payroll_runs, payroll_settlements
 
 urlpatterns = [
     path("payroll/", payroll.payroll_home, name="payroll_home"),
@@ -43,5 +43,20 @@ urlpatterns = [
     path("payroll/settlements/<int:pk>/pay/", payroll_settlements.settlement_pay, name="payroll_settlement_pay"),
     path("payroll/settlements/<int:pk>/statement/", payroll_settlements.settlement_statement, name="payroll_settlement_statement"),
     path("payroll/settlements/<int:pk>/certificate/", payroll_settlements.settlement_certificate, name="payroll_settlement_certificate"),
+    path("payroll/loans/", payroll_loans.loan_list, name="payroll_loans"),
+    path("payroll/loans/new/", payroll_loans.loan_new, name="payroll_loan_new"),
+    path("payroll/loans/employees/", payroll_loans.loan_employee_search, name="payroll_loan_employee_search"),
+    path("payroll/loans/<int:pk>/", payroll_loans.loan_detail, name="payroll_loan"),
+    path("payroll/loans/<int:pk>/edit/", payroll_loans.loan_edit, name="payroll_loan_edit"),
+    path("payroll/loans/<int:pk>/statement/", payroll_loans.loan_statement, name="payroll_loan_statement"),
+    path("payroll/loans/<int:pk>/submit/", payroll_loans.loan_submit, name="payroll_loan_submit"),
+    path("payroll/loans/<int:pk>/withdraw/", payroll_loans.loan_withdraw, name="payroll_loan_withdraw"),
+    path("payroll/loans/<int:pk>/cancel/", payroll_loans.loan_cancel, name="payroll_loan_cancel"),
+    path("payroll/loans/<int:pk>/payout/", payroll_loans.loan_payout, name="payroll_loan_payout"),
+    path("payroll/loans/<int:pk>/payment/", payroll_loans.loan_payment, name="payroll_loan_payment"),
+    path("payroll/loans/<int:pk>/preclose/", payroll_loans.loan_preclose, name="payroll_loan_preclose"),
+    path("payroll/loans/<int:pk>/skip/", payroll_loans.loan_skip, name="payroll_loan_skip"),
+    path("payroll/loans/<int:pk>/reschedule/", payroll_loans.loan_reschedule, name="payroll_loan_reschedule"),
+    path("payroll/loans/<int:pk>/waive/", payroll_loans.loan_waive, name="payroll_loan_waive"),
     path("payroll/runs/<int:pk>/lines/<int:line_pk>/payslip/", payroll_runs.payslip, name="payroll_payslip"),
 ]

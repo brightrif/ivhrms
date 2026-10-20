@@ -12,7 +12,8 @@ from .common import date_input
 
 MONTHS = [(i, calendar.month_name[i]) for i in range(1, 13)]
 MANUAL_CATEGORIES = [(c, label) for c, label in PayrollAdjustment.Category.choices
-                     if c not in (PayrollAdjustment.Category.RENEWAL, PayrollAdjustment.Category.FINE)]
+                     if c not in (PayrollAdjustment.Category.RENEWAL, PayrollAdjustment.Category.FINE,
+                                  PayrollAdjustment.Category.LOAN)]
 
 
 def _company_field(form, user):

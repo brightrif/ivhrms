@@ -10,3 +10,9 @@ def payroll_decided(sender, approval, **kwargs):
         runs.finalize(approval)
     elif approval.flow.code == settlements.FLOW_CODE:
         settlements.finalize(approval)
+
+@receiver(approval_completed)
+def loan_decided(sender, approval, **kwargs):
+    from . import loan_services
+    if approval.flow.code == loan_services.FLOW_CODE:
+        loan_services.finalize(approval)

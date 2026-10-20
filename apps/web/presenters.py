@@ -4,6 +4,7 @@ from apps.vehicles.custody import CustodyRequest
 from apps.dependants.status import FamilyStatusRequest
 from apps.dependants.visa import FamilyVisaRequest
 from apps.airtickets.ticketrequests import TicketRequest
+from apps.payroll.loans import Loan
 
 def describe(approval):
     """Turn whatever an approval points at into something an approver can read."""
@@ -20,6 +21,8 @@ def describe(approval):
         return {"kind": "Family visa", "title": t.title, "detail": t.detail, "reason": t.reason}
     if isinstance(t, FamilyStatusRequest):
         return {"kind": "Family status", "title": t.title, "detail": t.detail, "reason": t.reason}
+    if isinstance(t, Loan):
+        return {"kind": "Loan", "title": t.title, "detail": t.detail, "reason": t.reason}
     if isinstance(t, TicketRequest):
         return {"kind": "Air ticket", "title": t.title, "detail": t.detail, "reason": t.notes}
     return {"kind": approval.flow.name, "title": str(t), "detail": "", "reason": ""}

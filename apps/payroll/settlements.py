@@ -254,6 +254,9 @@ def calculate_settlement(case):
     case.items.filter(is_system=True).delete()
     for n, (kind, label, amount) in enumerate(items):
         SettlementItem.objects.create(settlement=case, kind=kind, label=label, amount=money(amount), is_system=True, position=n)
+    from .loan_services import settlement_loan_lines
+
+    issues.extend(settlement_loan_lines(case))
     total = sum((i.amount for i in case.items.all()), ZERO)
     if total < 0:
         issues.append(issue("negative_total", "block", "The person owes more than they are owed. Reduce a deduction, or "
@@ -411,6 +414,9 @@ def _recover_fines(case):
             recoveries.mark_recovered(fine, on, "Deducted in the final settlement")
         except VehicleError as exc:
             problems.append(f"Fine {fine.reference or fine.pk}: {exc}")
+    from .loan_services import recover_settlement_loans
+
+    problems += recover_settlement_loans(case)
     return ("Approved, but check: " + "; ".join(problems))[:500] if problems else ""
 
 

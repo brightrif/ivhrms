@@ -220,6 +220,9 @@ def charge_candidates(run, user):
         if ("fine", f.pk) not in taken and f.display_amount > 0:
             found.append(("fine", f.pk, f.driver_id, Category.FINE,
                           f"Fine {f.reference or f.pk}, {f.offence} ({f.vehicle.plate_number})", f.display_amount))
+    from .loan_services import loan_candidates
+
+    found += loan_candidates(run, taken, ids)
     return found
 
 
@@ -327,6 +330,9 @@ def _mark_charges_recovered(run):
             recoveries.mark_recovered(fine, on, f"Deducted in {run.label} payroll")
         except VehicleError as exc:
             problems.append(f"Fine {fine.reference or fine.pk}: {exc}")
+    from .loan_services import mark_instalments_deducted
+
+    problems += mark_instalments_deducted(run)
     return ("Approved, but check: " + "; ".join(problems))[:500] if problems else ""
 
 

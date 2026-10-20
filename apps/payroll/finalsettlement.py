@@ -110,6 +110,7 @@ class SettlementItem(BaseModel):
         LEAVE = "leave", "Annual leave"
         NOTICE = "notice", "Notice"
         GRATUITY = "gratuity", "Gratuity"
+        LOAN = "loan", "Loan balance"
         ADDITION = "addition", "Addition"
         DEDUCTION = "deduction", "Deduction"
 
